@@ -1,8 +1,18 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/setup.sh\""
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
-        "_id": "llm-transpile",
         "matcher": "Read",
         "hooks": [
           {
