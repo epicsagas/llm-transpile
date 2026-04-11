@@ -256,6 +256,22 @@ match transpile(input, format, fidelity, budget) {
 
 ---
 
+## Claude Code Skills
+
+If you use [Claude Code](https://claude.ai/code), copy the skills in `.claude/commands/` to your own `~/.claude/commands/` directory to get project-aware slash commands:
+
+```bash
+cp .claude/commands/*.md ~/.claude/commands/
+```
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| `/transpile` | Transpile any document to bridge format via CLI |
+| `/transpile-integrate` | Add `llm-transpiler` to your Rust project and generate integration code |
+| `/transpile-batch` | Generate a batch script to process an entire directory |
+
+---
+
 ## Contributing
 
 Contributions are welcome — bug reports, feature requests, and pull requests.
