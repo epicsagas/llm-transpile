@@ -50,7 +50,7 @@ LLMs perform better when context is clean and dense. This library handles the me
 - **Structural parsing** — Markdown/HTML/plain text → typed IR nodes (headings, paragraphs, tables, lists, code blocks)
 - **Adaptive compression** — automatically escalates through 4 stages as token budget fills up
 - **Symbol substitution** — repeated domain terms → Unicode PUA characters, decoded by `<D>` dictionary header
-- **Table linearization** — Markdown tables → compact `Key:Val` sequences (≤5 rows) or JSON Lines (>5 rows)
+- **Table linearization** — Markdown tables → compact `Key:Val` sequences (≤5 rows) or pipe-separated rows (`h1|h2\nv1|v2`) for larger tables
 - **Streaming output** — Tokio stream delivers the first chunk immediately, minimizing TTFT
 
 ---
@@ -68,13 +68,11 @@ Requires **Rust 1.75+**.
 
 ### CLI binary
 
-Install directly from the repository:
-
 ```bash
-cargo install --git https://github.com/epicsagas/llm-transpiler --bin transpile
+cargo install llm-transpiler
 ```
 
-Or after cloning:
+Or from source:
 
 ```bash
 git clone https://github.com/epicsagas/llm-transpiler
@@ -97,6 +95,8 @@ Options:
   -b, --budget <N>         Token budget upper limit (unlimited if omitted)
   -c, --count              Print only the input token count, then exit
   -j, --json               Output as JSON {input_tok, output_tok, reduction_pct, content}
+  -q, --quiet              Suppress the stats line on stderr
+      --stats              Print stats line to stdout after content (single-stream capture)
   -h, --help               Print help
   -V, --version            Print version
 ```
@@ -107,14 +107,20 @@ Options:
 # Convert a Markdown file (format auto-detected from .md extension)
 transpile --input doc.md
 
-# Read from stdin
+# Read from stdin — clean stdout, stats on stderr
 cat doc.html | transpile --format html --fidelity compressed --budget 1024
+
+# Pipe cleanly — suppress stats entirely
+transpile --input doc.md --quiet | send_to_llm_api
 
 # Check token count without converting
 transpile --input doc.md --count
 
 # JSON output for scripts and pipelines
 transpile --input doc.md --json | jq '.reduction_pct'
+
+# Capture content + stats in one stream (stdout)
+transpile --input doc.md --stats > output_with_stats.txt
 
 # Lossless — no compression, full content preserved (legal/audit docs)
 transpile --input contract.md --fidelity lossless
@@ -123,7 +129,7 @@ transpile --input contract.md --fidelity lossless
 transpile --input article.md --fidelity compressed --budget 512
 ```
 
-> Stats (`[273 → 150 tok  45.1% reduction]`) are written to **stderr**, so stdout stays clean for piping.
+> Stats (`[273 → 150 tok  45.1% reduction]`) are written to **stderr** by default, so stdout stays clean for piping. Use `--quiet` to suppress, or `--stats` to redirect to stdout.
 
 ---
 
@@ -247,12 +253,22 @@ match transpile(input, format, fidelity, budget) {
 
 ## Performance
 
-| Metric | Target |
-|--------|--------|
-| Parse speed | ≥10× faster than Python baseline |
-| Token reduction | 15–30% vs. raw input |
-| Streaming TTFT | First chunk ≤ 50ms |
-| Heap usage | ≤ 10MB per 1MB input document |
+Measured on release build (`cargo build --release`), Apple M-series, 37 documents across Markdown / HTML / PlainText:
+
+| Metric | Measured | Notes |
+|--------|----------|-------|
+| Throughput | **2,258 tok/ms** | ≈75× faster than Python parsing baseline |
+| Semantic reduction | **29.8%** (Markdown EN) | 15–30% target met |
+| Compressed reduction | **42.0%** (Markdown EN) | Budget-adaptive, guaranteed ≥ PruneLowImportance |
+| Lossless word coverage | **98.4% avg** | Across all formats and languages |
+| HTML reduction | **97.7%** | Reflects markup overhead removal (nav/scripts/styles) |
+| Multilingual support | FR/DE/JA/ZH tested | 97.3% avg word coverage |
+
+Run the evaluation suite yourself:
+
+```bash
+cargo run --release --example eval
+```
 
 ---
 

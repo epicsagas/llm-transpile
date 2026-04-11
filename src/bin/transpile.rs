@@ -43,6 +43,15 @@ struct Cli {
     /// Output result as JSON {input_tok, output_tok, reduction_pct, content}
     #[arg(short, long)]
     json: bool,
+
+    /// Suppress the stats line written to stderr ([N → M tok  X% reduction])
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Print stats line to stdout after content (instead of stderr)
+    /// Useful when you want content + stats in a single captured stream
+    #[arg(long)]
+    stats: bool,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -135,8 +144,9 @@ fn main() {
     };
 
     // ── Output ───────────────────────────────────────────────────────────────
+    let stats_line = format!("[{input_tok} → {output_tok} tok  {reduction:.1}% reduction]");
+
     if cli.json {
-        // serde_json is already a dependency
         let obj = serde_json::json!({
             "input_tok": input_tok,
             "output_tok": output_tok,
@@ -146,7 +156,12 @@ fn main() {
         println!("{}", obj);
     } else {
         print!("{output}");
-        // Print stats to stderr so they don't pollute piped output
-        eprintln!("\n[{input_tok} → {output_tok} tok  {reduction:.1}% reduction]");
+        if cli.stats {
+            // Stats on stdout after content — useful when capturing a single stream
+            println!("\n\n{stats_line}");
+        } else if !cli.quiet {
+            // Default: stats on stderr so stdout stays clean for piping
+            eprintln!("\n{stats_line}");
+        }
     }
 }
