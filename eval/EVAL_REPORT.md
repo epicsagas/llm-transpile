@@ -1,52 +1,52 @@
-# llm-transpiler 정량 평가 보고서
+# llm-transpiler Quantitative Evaluation Report
 
-평가일: 2026-04-11  
-버전: v0.1.0  
-데이터셋: `eval/` (11개 문서)
+Evaluation date: 2026-04-11  
+Version: v0.1.0  
+Dataset: `eval/` (11 documents)
 
-## 평가 방법
+## Evaluation Methodology
 
-### 실행 방법
+### How to Run
 
 ```bash
 cargo run --example eval
 ```
 
-소스: `eval/eval.rs`
+Source: `eval/eval.rs`
 
-### 데이터셋
+### Dataset
 
-| 경로 | 설명 | 문서 수 |
+| Path | Description | Doc count |
 |------|------|---------|
-| `eval/dataset/policy/` | 직접 제작한 정책 문서 (인증, API, 데이터 보존) | 3 |
-| `eval/dataset/hf/` | HuggingFace 공개 기술 문서 | 8 |
+| `eval/dataset/policy/` | Hand-crafted policy documents (authentication, API, data retention) | 3 |
+| `eval/dataset/hf/` | HuggingFace public technical documentation | 8 |
 
-### 측정 지표
+### Metrics
 
-| 지표 | 정의 |
+| Metric | Definition |
 |------|------|
-| **입력tok** | `token_count(원문)` — 문자 수 기반 휴리스틱 (CJK=2, 기타=4자당 1토큰) |
-| **Sem절감%** | `(1 - Semantic출력tok / 입력tok) × 100` — 예산 4096tok |
-| **Cmp절감%** | `(1 - Compressed출력tok / 입력tok) × 100` — 예산 2048tok |
-| **Sem_ms** | Semantic 변환 소요 시간 (ms) |
-| **Cmp_ms** | Compressed 변환 소요 시간 (ms) |
-| **tok/ms** | `입력tok / Sem_ms` — 처리 속도 |
-| **Loss절감%** | Lossless 모드 출력 절감률 (예산 없음) |
-| **Loss무결** | 원문 앞부분 단어 3개가 Lossless 출력에 모두 포함되는지 여부 |
+| **InputTok** | `token_count(raw_text)` — character-based heuristic (CJK=2, others=1 token per 4 chars) |
+| **Sem%** | `(1 - Semantic_output_tok / input_tok) × 100` — budget 4096 tok |
+| **Cmp%** | `(1 - Compressed_output_tok / input_tok) × 100` — budget 2048 tok |
+| **Sem_ms** | Semantic conversion time (ms) |
+| **Cmp_ms** | Compressed conversion time (ms) |
+| **tok/ms** | `input_tok / Sem_ms` — throughput |
+| **Loss%** | Lossless mode output reduction rate (no budget) |
+| **LossInteg** | Whether the first 3 words of the raw text are all present in the Lossless output |
 
-### FidelityLevel별 설정
+### FidelityLevel Settings
 
-| 레벨 | 토큰 예산 | 압축 동작 |
+| Level | Token budget | Compression behavior |
 |------|---------|---------|
-| `Semantic` | 4096 | 불용어 제거 → 저중요도 단락 제거 → 중복 제거 → 첫 문장만 유지 |
-| `Compressed` | 2048 | Semantic과 동일하나 더 공격적인 예산 |
-| `Lossless` | 없음 | 압축 완전 금지, 원문 구조만 정규화 |
+| `Semantic` | 4096 | Stopword removal → low-importance paragraph pruning → deduplication → first sentence only |
+| `Compressed` | 2048 | Same as Semantic but with more aggressive budget |
+| `Lossless` | None | Compression strictly forbidden, only structural normalization of original |
 
 ---
 
-## 결과 테이블
+## Results Table
 
-| 파일 | 입력tok | Sem절감% | Cmp절감% | Sem_ms | Cmp_ms | tok/ms | Loss절감% | Loss무결 | 입력KB |
+| File | InputTok | Sem% | Cmp% | Sem_ms | Cmp_ms | tok/ms | Loss% | LossInteg | InputKB |
 |------|---------|---------|---------|--------|--------|--------|---------|---------|--------|
 | 01_auth_policy.md | 273 | 0.4 | 0.4 | 1 | 0 | 273 | 0.4 | ✓ | 1.1 |
 | 02_api_access.md | 284 | 0.4 | 0.4 | 0 | 0 | 284 | 0.4 | ✓ | 1.1 |
@@ -59,31 +59,31 @@ cargo run --example eval
 | model-cards.md | 4404 | 51.0 | 51.0 | 2 | 2 | 2202 | 25.9 | ✓ | 17.2 |
 | safetensors_README.md | 2697 | 14.7 | 16.4 | 1 | 1 | 2697 | 14.7 | ✓ | 10.6 |
 | transformers_CONTRIBUTING.md | 7841 | 31.6 | 31.6 | 3 | 3 | 2614 | 13.2 | ✗ | 30.7 |
-| **합계/평균** | **25428** | **29.7** | **35.7** | 1 | 1 | — | — | **10/11** | — |
+| **Total/Average** | **25428** | **29.7** | **35.7** | 1 | 1 | — | — | **10/11** | — |
 
 ---
 
-## 요약
+## Summary
 
-| 지표 | 값 | 목표 |
+| Metric | Value | Target |
 |------|-----|------|
-| Semantic 평균 절감 | **29.7%** | 15–30% ✓ |
-| Compressed 평균 절감 | **35.7%** | ≥ Semantic ✓ |
-| Lossless 무결성 | **10/11 (90.9%)** | 100% △ |
-| 처리 속도 (Semantic) | **≥ 2,000 tok/ms** | Python 대비 ≥10× ✓ |
-| 단위 테스트 통과 | **52/52** | 100% ✓ |
+| Semantic avg. reduction | **29.7%** | 15–30% ✓ |
+| Compressed avg. reduction | **35.7%** | ≥ Semantic ✓ |
+| Lossless integrity | **10/11 (90.9%)** | 100% △ |
+| Throughput (Semantic) | **≥ 2,000 tok/ms** | ≥10× vs. Python ✓ |
+| Unit tests passing | **52/52** | 100% ✓ |
 
 ---
 
-## 이상치 분석
+## Outlier Analysis
 
-### transformers_CONTRIBUTING.md — Lossless 무결성 ✗
+### transformers_CONTRIBUTING.md — Lossless Integrity ✗
 
-**원인**: 무결성 검사가 파일 앞부분 단어 3개를 샘플링하는데, 이 파일은 Apache 라이선스 헤더로 시작하며 파서가 해당 블록을 메타데이터로 분류해 Lossless 출력에서 제외될 수 있음.  
-**판정**: eval 샘플링 로직의 한계. Lossless 모드 자체의 결함이 아님.  
-**개선 방향**: 무결성 검사 시 파일 본문(첫 헤더 이후)에서 샘플링하도록 개선.
+**Cause**: The integrity check samples the first 3 words from the file. This file begins with an Apache license header, and the parser classifies that block as metadata, which may cause it to be excluded from the Lossless output.  
+**Verdict**: A limitation of the eval sampling logic, not a defect in Lossless mode itself.  
+**Improvement**: Update the integrity check to sample from the document body (after the first heading).
 
-### 소형 문서(1–3KB) — Sem절감% 0.3–0.4%
+### Small documents (1–3KB) — Sem% 0.3–0.4%
 
-**원인**: 입력 토큰(273–337)이 예산(4096) 대비 매우 작아 압축이 거의 발동하지 않음. 구조 정규화 오버헤드만 적용됨.  
-**판정**: 정상 동작. 소형 문서는 압축 필요성 자체가 낮음.
+**Cause**: Input tokens (273–337) are very small relative to the budget (4096), so compression is rarely triggered. Only structural normalization overhead is applied.  
+**Verdict**: Expected behavior. Small documents have little need for compression in the first place.

@@ -29,12 +29,64 @@ LLMs perform better when context is clean and dense. This library handles the me
 
 ## Installation
 
+### Library (Rust crate)
+
 ```toml
 [dependencies]
 llm-transpiler = "0.1"
 ```
 
 Requires Rust 1.75+.
+
+### CLI binary
+
+```bash
+cargo install --git https://github.com/epicsagas/llm-transpiler --bin transpile
+```
+
+Or after cloning:
+
+```bash
+cargo install --path .
+```
+
+## CLI Usage
+
+```
+transpile [OPTIONS]
+
+Options:
+  -i, --input <FILE>       Input file (reads from stdin if omitted)
+  -f, --format <FORMAT>    markdown | html | plaintext  [default: markdown]
+                           (auto-detected from file extension when --input is given)
+  -l, --fidelity <LEVEL>   lossless | semantic | compressed  [default: semantic]
+  -b, --budget <N>         Token budget upper limit (unlimited if omitted)
+  -c, --count              Print only the input token count, then exit
+  -j, --json               Output JSON: {input_tok, output_tok, reduction_pct, content}
+  -h, --help               Print help
+  -V, --version            Print version
+```
+
+**Examples**
+
+```bash
+# Convert a Markdown file (format auto-detected from .md extension)
+transpile --input doc.md
+
+# Read from stdin
+cat doc.html | transpile --format html --fidelity compressed --budget 1024
+
+# Check token count before committing to a budget
+transpile --input doc.md --count
+
+# Machine-readable JSON output (for scripts / pipelines)
+transpile --input doc.md --json | jq '.reduction_pct'
+
+# Lossless — no compression, full content preserved
+transpile --input contract.md --fidelity lossless
+```
+
+Stats (`[273 → 150 tok  45.1% reduction]`) are printed to **stderr**, so stdout stays clean for piping.
 
 ## Usage
 

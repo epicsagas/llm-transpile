@@ -1,0 +1,128 @@
+{"lang": "en", "text": "The system must encrypt all data at rest.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "en", "text": "All API calls shall use TLS 1.3 or higher.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "en", "text": "Authentication is required before accessing protected resources.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "en", "text": "The service must not store plaintext passwords.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "en", "text": "Clients shall not cache tokens beyond the expiry time.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "en", "text": "Developers should use parameterized queries to prevent injection.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "en", "text": "It is recommended to rotate secrets every 90 days.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "en", "text": "Users may configure optional two-factor authentication.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "en", "text": "The timeout is optional and defaults to 30 seconds.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "ko", "text": "모든 데이터는 반드시 암호화해야 한다.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ko", "text": "API 호출 시 인증 토큰을 포함해야 합니다.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ko", "text": "비밀번호는 필수로 8자 이상이어야 한다.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ko", "text": "평문 비밀번호를 저장하면 안 된다.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ko", "text": "만료된 토큰을 재사용해서는 안 됩니다.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ko", "text": "가능하면 파라미터화된 쿼리를 사용하는 것이 좋다.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ko", "text": "시크릿은 90일마다 교체하는 것을 권장한다.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ko", "text": "사용자는 2단계 인증을 선택적으로 활성화할 수 있다.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "ja", "text": "すべてのデータは暗号化しなければならない。", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ja", "text": "APIコールにはTLS 1.3以上を使用すること。", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ja", "text": "平文のパスワードを保存してはならない。", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ja", "text": "パラメータ化クエリを使用すべきである。", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ja", "text": "タイムアウトはオプションで設定できる。", "gold": "May", "source": "synthetic_legal"}
+{"lang": "zh", "text": "所有数据必须进行加密存储。", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "zh", "text": "API调用必须使用TLS 1.3或更高版本。", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "zh", "text": "系统不得以明文存储密码。", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "zh", "text": "建议使用参数化查询防止注入攻击。", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "zh", "text": "用户可以选择启用双因素认证。", "gold": "May", "source": "synthetic_legal"}
+{"lang": "de", "text": "Alle Daten müssen verschlüsselt gespeichert werden.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "de", "text": "API-Aufrufe müssen TLS 1.3 oder höher verwenden.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "de", "text": "Passwörter dürfen nicht im Klartext gespeichert werden.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "de", "text": "Entwickler sollten parametrisierte Abfragen verwenden.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "de", "text": "Der Timeout kann optional konfiguriert werden.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "fr", "text": "Toutes les données doivent être chiffrées au repos.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "fr", "text": "Les appels API doivent utiliser TLS 1.3 ou supérieur.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "fr", "text": "Il est interdit de stocker les mots de passe en clair.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "fr", "text": "Il est recommandé d'utiliser des requêtes paramétrées.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "fr", "text": "Les utilisateurs peuvent activer l'authentification à deux facteurs.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "es", "text": "Todos los datos deben cifrarse en reposo.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "es", "text": "Está prohibido almacenar contraseñas en texto plano.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "es", "text": "Se recomienda usar consultas parametrizadas.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "es", "text": "Los usuarios pueden activar la autenticación de dos factores.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "pt", "text": "Todos os dados devem ser criptografados em repouso.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "pt", "text": "É proibido armazenar senhas em texto simples.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "pt", "text": "Recomenda-se o uso de consultas parametrizadas.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "pt", "text": "Os usuários podem ativar a autenticação de dois fatores.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "ru", "text": "Все данные должны быть зашифрованы при хранении.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ru", "text": "Запрещено хранить пароли в открытом виде.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ru", "text": "Следует использовать параметризованные запросы.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ru", "text": "Пользователи могут включить двухфакторную аутентификацию.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "ar", "text": "يجب تشفير جميع البيانات أثناء التخزين.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ar", "text": "يحظر تخزين كلمات المرور بنص واضح.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ar", "text": "ينبغي استخدام الاستعلامات المعلمية لمنع الحقن.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ar", "text": "يمكن للمستخدمين تفعيل المصادقة الثنائية.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "it", "text": "Tutti i dati devono essere crittografati a riposo.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "it", "text": "È vietato memorizzare le password in chiaro.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "it", "text": "Si raccomanda di utilizzare query parametrizzate.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "it", "text": "Gli utenti possono abilitare l'autenticazione a due fattori.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "nl", "text": "Alle gegevens dienen versleuteld te worden opgeslagen.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "nl", "text": "Wachtwoorden mogen niet in leesbare tekst worden opgeslagen.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "nl", "text": "Het wordt aanbevolen om geparametriseerde queries te gebruiken.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "nl", "text": "Gebruikers kunnen optioneel tweefactorauthenticatie inschakelen.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "pl", "text": "Wszystkie dane muszą być przechowywane w postaci zaszyfrowanej.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "pl", "text": "Zabrania się przechowywania haseł w postaci jawnej.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "pl", "text": "Zaleca się stosowanie zapytań parametryzowanych.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "pl", "text": "Użytkownicy mogą włączyć uwierzytelnianie dwuskładnikowe.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "tr", "text": "Tüm veriler depolamada şifrelenmelidir.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "tr", "text": "Parolaların düz metin olarak saklanması yasaktır.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "tr", "text": "Enjeksiyonu önlemek için parametreli sorgular kullanılmalıdır.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "tr", "text": "Kullanıcılar isteğe bağlı olarak iki faktörlü kimlik doğrulamayı etkinleştirebilir.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "sv", "text": "Alla data måste krypteras vid lagring.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "sv", "text": "Lösenord får inte lagras i klartext.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "sv", "text": "Parametriserade frågor bör användas för att förhindra injektion.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "sv", "text": "Användare kan aktivera tvåfaktorsautentisering.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "da", "text": "Alle data skal krypteres ved lagring.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "da", "text": "Adgangskoder må ikke gemmes i klar tekst.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "da", "text": "Det anbefales at bruge parametriserede forespørgsler.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "da", "text": "Brugere kan aktivere tofaktorgodkendelse.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "fi", "text": "Kaikki tiedot täytyy salata tallennettaessa.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "fi", "text": "Salasanoja ei saa tallentaa selkokielisenä.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "fi", "text": "Parametrisoituja kyselyitä pitää käyttää injektion estämiseksi.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "fi", "text": "Käyttäjät voivat ottaa käyttöön kaksivaiheisen todennuksen.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "el", "text": "Όλα τα δεδομένα πρέπει να κρυπτογραφηθούν κατά την αποθήκευση.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "el", "text": "Απαγορεύεται η αποθήκευση κωδικών σε απλό κείμενο.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "el", "text": "Συνιστάται η χρήση παραμετροποιημένων ερωτημάτων.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "el", "text": "Οι χρήστες μπορούν να ενεργοποιήσουν τον έλεγχο ταυτότητας δύο παραγόντων.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "hi", "text": "सभी डेटा को संग्रहीत करते समय एन्क्रिप्ट किया जाना चाहिए।", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "hi", "text": "पासवर्ड को सादे पाठ में संग्रहीत करना मना है।", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "hi", "text": "इंजेक्शन रोकने के लिए पैरामीटरयुक्त क्वेरी का उपयोग होना चाहिए।", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "hi", "text": "उपयोगकर्ता वैकल्पिक रूप से दो-कारक प्रमाणीकरण सक्षम कर सकते हैं।", "gold": "May", "source": "synthetic_legal"}
+{"lang": "uk", "text": "Усі дані повинні бути зашифровані при зберіганні.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "uk", "text": "Заборонено зберігати паролі у відкритому вигляді.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "uk", "text": "Слід використовувати параметризовані запити.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "uk", "text": "Користувачі можуть увімкнути двофакторну автентифікацію.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "vi", "text": "Tất cả dữ liệu phải được mã hóa khi lưu trữ.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "vi", "text": "Nghiêm cấm lưu trữ mật khẩu dưới dạng văn bản rõ.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "vi", "text": "Nên sử dụng truy vấn có tham số để ngăn chặn injection.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "vi", "text": "Người dùng có thể bật xác thực hai yếu tố tùy chọn.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "id", "text": "Semua data wajib dienkripsi saat disimpan.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "id", "text": "Dilarang menyimpan kata sandi dalam teks biasa.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "id", "text": "Disarankan menggunakan kueri berparameter untuk mencegah injeksi.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "id", "text": "Pengguna dapat mengaktifkan autentikasi dua faktor secara opsional.", "gold": "May", "source": "synthetic_legal"}
+{"lang": "fa", "text": "تمام داده‌ها باید در هنگام ذخیره‌سازی رمزگذاری شوند.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "fa", "text": "نباید رمز عبور به صورت متن ساده ذخیره شود.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "fa", "text": "بهتر است از کوئری‌های پارامتری برای جلوگیری از تزریق استفاده شود.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "he", "text": "כל הנתונים חייבים להיות מוצפנים בעת אחסון.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "he", "text": "אסור לאחסן סיסמאות בטקסט גלוי.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "he", "text": "צריך להשתמש בשאילתות מפוקדות למניעת הזרקה.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "sw", "text": "Data zote zinahitajika kusimbwa wakati wa kuhifadhi.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "sw", "text": "Hairuhusiwi kuhifadhi nywila kwa maandishi wazi.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "sw", "text": "Inashauriwa kutumia maswali yenye vigezo kuzuia uingizaji.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "bg", "text": "Всички данни трябва да бъдат криптирани при съхранение.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "bg", "text": "Забранено е съхраняването на пароли в открит текст.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "bg", "text": "Препоръчва се използването на параметризирани заявки.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "cs", "text": "Všechna data musí být šifrována při ukládání.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "cs", "text": "Je zakázáno ukládat hesla v prostém textu.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "cs", "text": "Doporučuje se používat parametrizované dotazy.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "sk", "text": "Všetky dáta musia byť šifrované pri ukladaní.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "sk", "text": "Je zakázané ukladať heslá v čistom texte.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "sk", "text": "Odporúča sa používať parametrizované dotazy.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "hu", "text": "Minden adatot titkosítani kell tároláskor.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "hu", "text": "Tilos a jelszavakat egyszerű szövegként tárolni.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "hu", "text": "Ajánlott paraméteres lekérdezéseket használni.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "ro", "text": "Toate datele trebuie criptate la stocare.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "ro", "text": "Este interzisă stocarea parolelor în text simplu.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "ro", "text": "Se recomandă utilizarea interogărilor parametrizate.", "gold": "Should", "source": "synthetic_legal"}
+{"lang": "hr", "text": "Svi podaci moraju biti šifrirani pri pohrani.", "gold": "Must", "source": "synthetic_legal"}
+{"lang": "hr", "text": "Zabranjeno je pohranjivati lozinke u čistom tekstu.", "gold": "MustNot", "source": "synthetic_legal"}
+{"lang": "hr", "text": "Preporuča se koristiti parametrizirane upite.", "gold": "Should", "source": "synthetic_legal"}

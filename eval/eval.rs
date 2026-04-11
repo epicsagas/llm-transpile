@@ -75,19 +75,24 @@ fn pct(a: usize, b: usize) -> f64 {
 
 fn main() {
     let base = concat!(env!("CARGO_MANIFEST_DIR"), "/eval");
-    let files = [
-        format!("{base}/dataset/policy/01_auth_policy.md"),
-        format!("{base}/dataset/policy/02_api_access.md"),
-        format!("{base}/dataset/policy/03_data_retention.md"),
-        format!("{base}/dataset/hf/hub-docs_security.md"),
-        format!("{base}/dataset/hf/security-tokens.md"),
-        format!("{base}/dataset/hf/datasets-cards.md"),
-        format!("{base}/dataset/hf/repositories-getting-started.md"),
-        format!("{base}/dataset/hf/spaces-overview.md"),
-        format!("{base}/dataset/hf/model-cards.md"),
-        format!("{base}/dataset/hf/safetensors_README.md"),
-        format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"),
-    ];
+
+    let mut files: Vec<String> = Vec::new();
+    for dir in &[
+        format!("{base}/dataset/policy"),
+        format!("{base}/dataset/hf"),
+    ] {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                    if let Some(s) = path.to_str() {
+                        files.push(s.to_string());
+                    }
+                }
+            }
+        }
+    }
+    files.sort();
 
     println!("{:<36} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>7} {:>7} {:>8}",
         "file", "in_tok", "Sem%red", "Cmp%red", "Sem_ms", "Cmp_ms", "tok/ms", "Loss%red", "Loss_ok", "in_KB");

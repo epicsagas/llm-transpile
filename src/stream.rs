@@ -179,7 +179,7 @@ impl StreamingTranspiler {
             let usage = if budget > 0 {
                 accumulated_tokens as f64 / budget as f64
             } else {
-                1.0 // budget=0: 즉시 Compressed 전환
+                1.0 // budget=0: immediately switch to Compressed
             };
             let effective_fidelity = if fidelity != FidelityLevel::Lossless
                 && usage >= 0.80
@@ -331,7 +331,7 @@ mod tests {
     async fn budget_triggers_force_final() {
         // Extremely low budget → force-final on the first body chunk
         let doc = make_doc(FidelityLevel::Semantic, &["긴 내용 단락1", "긴 내용 단락2", "긴 내용 단락3"]);
-        let transpiler = StreamingTranspiler::new(5, FidelityLevel::Semantic); // 5토큰 예산
+        let transpiler = StreamingTranspiler::new(5, FidelityLevel::Semantic); // 5-token budget
         let chunks: Vec<_> = transpiler
             .transpile(doc)
             .collect::<Vec<_>>()

@@ -9,7 +9,7 @@
 //! ```rust
 //! use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 //!
-//! let md = "# 계약서\n\n본 계약은 2024년에 체결되었습니다.";
+//! let md = "# Contract\n\nThis agreement was concluded in 2024.";
 //! let result = transpile(md, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))
 //!     .expect("transpile failed");
 //! println!("{}", result);
@@ -22,7 +22,7 @@
 //! use futures::StreamExt;
 //!
 //! async fn example() {
-//!     let md = "# 문서\n\n단락 내용입니다.";
+//!     let md = "# Document\n\nThis is a paragraph.";
 //!     let mut stream = transpile_stream(md, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
 //!     while let Some(chunk) = stream.next().await {
 //!         let chunk = chunk.expect("stream error");

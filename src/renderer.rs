@@ -270,7 +270,7 @@ mod tests {
             .map(|i| vec![i.to_string(), format!("v{}", i)])
             .collect();
         let out = linearize_table(&headers, &rows);
-        // JSON Lines: 각 줄이 JSON 객체
+        // JSON Lines: each line is a JSON object
         for line in out.lines() {
             let parsed: serde_json::Value = serde_json::from_str(line).expect("valid JSON");
             assert!(parsed.get("id").is_some());

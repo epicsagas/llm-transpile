@@ -197,7 +197,7 @@ mod tests {
             headers: vec!["이름".into(), "나이".into()],
             rows: vec![vec!["홍길동".into(), "30".into()]],
         };
-        // "이름"(6) + "나이"(6) + "홍길동"(9) + "30"(2) = 23 bytes
+        // "이름"(6 bytes) + "나이"(6 bytes) + "홍길동"(9 bytes) + "30"(2 bytes) = 23 bytes
         assert_eq!(node.char_len(), 23);
     }
 }
