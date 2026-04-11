@@ -66,7 +66,7 @@ llm-transpile = "0.1"
 
 Requires **Rust 1.75+**.
 
-### CLI binary + tool integration (one command)
+### CLI binary + tool integration
 
 ```bash
 cargo install llm-transpile
@@ -75,14 +75,35 @@ transpile install
 
 `transpile install` launches an interactive wizard that detects and configures whichever tools are installed:
 
-| Tool | What gets configured |
-|------|---------------------|
-| **Claude Code** | PostToolUse hook (large-file hint) + `/tctx` slash command |
-| **Gemini CLI** | `tgemini <file> "<prompt>"` shell wrapper |
-| **Codex CLI** | `tcodex <file> "<prompt>"` shell wrapper |
-| **Cursor** | `.cursor/transpile-ctx.sh` context regeneration script |
-| **OpenCode** | `topencode [files...]` wrapper with system prompt injection |
-| **Any tool** | `tctx`, `talias`, `trun` general-purpose helpers |
+| Tool | Integration method | What it does |
+|------|--------------------|--------------|
+| **Claude Code** | PostToolUse hook | Auto-compresses `.md/.html/.txt` files on Read |
+| **Gemini CLI** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
+| **Codex CLI** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
+| **Cursor** | `.mdc` rule (`alwaysApply`) | Triggers `transpile` before reading document files |
+| **OpenCode** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
+
+All non-Claude tools use a skill file that teaches the LLM to run `transpile --input <file>` automatically — no size check needed, extension alone triggers it.
+
+**Selective install / uninstall**
+
+```bash
+transpile install claude gemini    # specific tools only
+transpile install --all            # everything at once
+transpile install --dry-run        # preview what would change
+transpile install --list           # show status of all integrations
+
+transpile uninstall cursor         # remove one
+transpile uninstall --all          # remove everything
+transpile uninstall --dry-run      # preview removals
+```
+
+**Claude Code plugin** (alternative — requires Claude Code with plugin support)
+
+```
+/plugin marketplace add epicsagas/llm-transpile
+/plugin install transpile@epicsagas
+```
 
 Or from source:
 
@@ -90,6 +111,7 @@ Or from source:
 git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
+transpile install
 ```
 
 ---
