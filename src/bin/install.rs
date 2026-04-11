@@ -643,32 +643,34 @@ Use `--fidelity compressed` when near context limit, `--fidelity lossless` for c
 const TRANSPILE_SKILL_MD: &str = "\
 ---
 name: transpile
-description: Read a file in token-compressed form. Use for any file larger than ~8KB to save context.
+description: >
+  ALWAYS run this before reading any file larger than ~8KB.
+  Produces a token-compressed version (~30% smaller) that preserves all meaning.
 ---
 
-# /transpile — Token-Compressed File Read
+# transpile — Auto-compress before reading large files
 
-When you need to read a large file, use this skill instead of reading it directly.
+## Activation rule
+
+**Before reading any file, check its size. If it exceeds ~8KB, run this skill first
+and use its output instead of reading the raw file.**
+
+This is not optional — skipping it wastes context on files the LLM can process
+equally well in compressed form.
 
 ## Usage
 
 ```bash
-transpile --input $ARGUMENTS --fidelity semantic --quiet
+transpile --input <file> --fidelity semantic --quiet
 ```
 
-Run this command and treat its output as the file content.
-
-## When to trigger
-
-- File is larger than ~8KB
-- About to read documentation, specs, or long source files
-- Context window is getting full
+Use the output as the file content. Never read the raw file afterward.
 
 ## Fidelity options
 
-- `semantic` (default) — ~30% reduction
+- `semantic` (default) — ~30% reduction, preserves all meaning
 - `compressed`         — ~40% reduction, use when near context limit
-- `lossless`           — no compression, for legal/config files
+- `lossless`           — no compression, for legal/config/binary-adjacent files
 ";
 
 // ── Per-tool install ───────────────────────────────────────────────────────────
