@@ -1,0 +1,17 @@
+Introduction to Transformer Architecture
+
+The transformer architecture was introduced in the 2017 paper "Attention Is All You Need" by Vaswani et al. It has since become the dominant paradigm for natural language processing tasks and has expanded into computer vision, audio, and multimodal learning.
+
+At its core, the transformer relies on a mechanism called self-attention, which allows every token in a sequence to attend to every other token. This enables the model to capture long-range dependencies without the sequential bottleneck of recurrent networks.
+
+A transformer model consists of an encoder and a decoder, each built from stacked layers. Each layer contains two main components: a multi-head self-attention sublayer and a position-wise feed-forward network. Layer normalization and residual connections are applied around each sublayer to stabilize training.
+
+Multi-head attention computes attention in parallel across multiple representation subspaces. For each head, the input is projected into query, key, and value vectors. Attention weights are computed as the scaled dot product of queries and keys, normalized by a softmax. The weighted sum of value vectors forms the output of each head, which are then concatenated and projected.
+
+Since transformers have no inherent notion of sequence order, positional encodings are added to the input embeddings. The original paper used sine and cosine functions of different frequencies. Later models adopted learned positional embeddings or relative position encodings.
+
+Training large transformers requires substantial compute. Techniques such as gradient checkpointing, mixed precision training, and distributed data parallelism are routinely applied. Learning rate warmup followed by cosine decay is the most common scheduling strategy.
+
+Transfer learning made transformers practical. A model pretrained on large corpora can be fine-tuned on downstream tasks with relatively few labeled examples. BERT popularized masked language modeling as a pretraining objective for encoders. GPT demonstrated that autoregressive language modeling scales remarkably well.
+
+Inference efficiency is an active research area. Quantization reduces weight precision to 8-bit or 4-bit integers with minimal accuracy loss. Knowledge distillation trains a smaller student model to mimic a larger teacher. Speculative decoding uses a draft model to propose tokens that are then verified by the full model in parallel.

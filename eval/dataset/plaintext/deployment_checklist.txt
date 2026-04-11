@@ -1,0 +1,21 @@
+Model Deployment Checklist
+
+Before deploying a machine learning model to production, verify that evaluation metrics have been computed on a held-out test set that was never used during training or hyperparameter selection. Document the baseline performance and acceptable thresholds for each metric relevant to the task.
+
+Confirm that the model artifact is versioned and stored in a reproducible location such as a model registry. Record the training configuration, dataset version, and environment specification alongside the artifact so that the exact run can be reproduced if necessary.
+
+Validate that the preprocessing pipeline used at inference is identical to the one used during training. Mismatches in tokenization, normalization, or feature encoding are a common source of training-serving skew and can silently degrade performance.
+
+Measure inference latency and memory footprint under realistic load conditions. If the model does not meet latency requirements, consider applying quantization, layer fusion, or batching optimizations before deployment. Profile both the model forward pass and the surrounding preprocessing and postprocessing steps.
+
+Implement input validation at the serving boundary. Reject or sanitize inputs that are malformed, unexpectedly long, or outside the distribution the model was trained on. Log rejected inputs for monitoring and retraining purposes.
+
+Set up monitoring for both system metrics and model performance metrics in production. Track request rate, error rate, and tail latency at the infrastructure level. Monitor prediction distributions and confidence scores at the model level to detect drift over time.
+
+Define a rollback plan before the deployment proceeds. Maintain the previous model version in a deployable state so that it can be restored quickly if the new model causes regressions or unexpected failures in production.
+
+Document data retention and privacy obligations that apply to inputs and outputs logged during inference. Ensure that personally identifiable information is handled according to applicable regulations and internal data governance policies.
+
+Conduct a load test at expected peak traffic before making the deployment generally available. Identify bottlenecks and set appropriate resource limits and autoscaling thresholds to maintain reliability under variable demand.
+
+Notify relevant stakeholders of the deployment timeline, expected changes in model behavior, and the criteria that would trigger a rollback. Establish a clear point of contact for issues raised during the initial rollout period.

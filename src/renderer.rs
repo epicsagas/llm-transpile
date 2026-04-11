@@ -97,22 +97,16 @@ pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
             .collect::<Vec<_>>()
             .join("\n")
     } else {
-        rows.iter()
-            .map(|row| {
-                let obj: serde_json::Map<String, serde_json::Value> = headers
-                    .iter()
-                    .zip(row.iter())
-                    .map(|(h, v)| {
-                        (
-                            h.trim().to_string(),
-                            serde_json::Value::String(v.trim().to_string()),
-                        )
-                    })
-                    .collect();
-                serde_json::to_string(&obj).unwrap_or_default()
-            })
+        // Compact pipe-separated format — significantly fewer tokens than JSON Lines.
+        // Format: header row first, then one data row per line.
+        // Example: `Name|Age\nAlice|30\nBob|25`
+        let header_row = headers.iter().map(|h| h.trim()).collect::<Vec<_>>().join("|");
+        let data_rows = rows
+            .iter()
+            .map(|row| row.iter().map(|v| v.trim()).collect::<Vec<_>>().join("|"))
             .collect::<Vec<_>>()
-            .join("\n")
+            .join("\n");
+        format!("{}\n{}", header_row, data_rows)
     }
 }
 
@@ -268,16 +262,18 @@ mod tests {
     }
 
     #[test]
-    fn table_large_jsonl_format() {
+    fn table_large_pipe_format() {
         let headers = vec!["id".into(), "val".into()];
         let rows: Vec<Vec<String>> = (0..6)
             .map(|i| vec![i.to_string(), format!("v{}", i)])
             .collect();
         let out = linearize_table(&headers, &rows);
-        // JSON Lines: each line is a JSON object
-        for line in out.lines() {
-            let parsed: serde_json::Value = serde_json::from_str(line).expect("valid JSON");
-            assert!(parsed.get("id").is_some());
+        // Compact pipe format: header row first, then one data row per line
+        let mut lines = out.lines();
+        let header_line = lines.next().expect("header row");
+        assert_eq!(header_line, "id|val");
+        for (i, line) in lines.enumerate() {
+            assert_eq!(line, format!("{}|v{}", i, i));
         }
     }
 

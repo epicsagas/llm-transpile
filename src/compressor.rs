@@ -8,6 +8,13 @@
 //! | 60–80%      | Stopwords + prune bottom-20% importance paragraphs        |
 //! | 80–95%      | Above + deduplicate sentences + linearize numeric data    |
 //! | 95%+        | Above + truncate all paragraphs to first sentence (Semantic+) |
+//!
+//! ## Stopword matching strategy
+//!
+//! - **ASCII stopwords**: compiled into `\b word \b` regex patterns (case-insensitive).
+//! - **Non-ASCII stopwords** (Korean, Japanese, CJK, Arabic, etc.): matched as exact
+//!   whitespace-delimited tokens. This is necessary because `\b` does not recognise
+//!   Unicode word boundaries for scripts without ASCII-style spacing.
 
 use crate::ir::{DocNode, FidelityLevel};
 use regex::Regex;
@@ -45,6 +52,18 @@ impl CompressionConfig {
             _ => CompressionStage::MaxCompression,
         }
     }
+
+    /// Returns the minimum compression stage enforced by the fidelity level,
+    /// regardless of budget usage ratio.
+    ///
+    /// - `Compressed`: always applies at least `PruneLowImportance`
+    /// - Others: no minimum (budget ratio decides)
+    pub fn min_stage(&self) -> CompressionStage {
+        match self.fidelity {
+            FidelityLevel::Compressed => CompressionStage::PruneLowImportance,
+            _ => CompressionStage::StopwordOnly,
+        }
+    }
 }
 
 /// Compression stage enumeration.
@@ -66,9 +85,12 @@ pub enum CompressionStage {
 
 /// Budget-based adaptive document compressor.
 pub struct AdaptiveCompressor {
-    /// Stopword regex list pre-compiled in the constructor.
-    /// Built once at construction time to avoid recompilation on every call.
-    stopword_regexes: Vec<Regex>,
+    /// Pre-compiled regex list for ASCII stopwords.
+    /// Uses `\b word \b` word-boundary matching (case-insensitive).
+    ascii_stopword_regexes: Vec<Regex>,
+    /// Non-ASCII stopword list for exact whitespace-token matching.
+    /// Applied with a whitespace-split-filter pass to handle CJK / Korean / Arabic etc.
+    nonascii_stopwords: Vec<String>,
 }
 
 impl Default for AdaptiveCompressor {
@@ -78,26 +100,47 @@ impl Default for AdaptiveCompressor {
 }
 
 impl AdaptiveCompressor {
-    /// Creates a compressor with the default stopword list (empty).
+    /// Creates a compressor with the default stopword list.
+    ///
+    /// The default list includes common English function words (ASCII) and
+    /// standalone Korean connective words (non-ASCII). For domain-specific
+    /// stopwords use [`Self::with_stopwords`].
     pub fn new() -> Self {
         Self::with_stopwords(default_stopwords())
     }
 
-    /// Creates a compressor with a custom stopword list.
-    /// Stopwords are compiled into regexes at construction time and cached.
+    /// Creates a compressor with a fully custom stopword list.
+    ///
+    /// Stopwords are partitioned at construction time:
+    /// - ASCII words → compiled into `\b…\b` regexes (cached).
+    /// - Non-ASCII words → stored as plain strings for token-level matching.
     pub fn with_stopwords(stopwords: Vec<String>) -> Self {
-        let stopword_regexes = stopwords
-            .iter()
-            .filter_map(|sw| {
-                // `\b` only recognizes ASCII word boundaries.
-                // Non-ASCII stopwords (Arabic, Hindi, etc.) may be silently ignored
-                // because boundary matching does not work for them.
-                // TODO: Non-ASCII stopwords need a separate whitespace-based split-replace strategy.
-                let pattern = format!(r"(?i)\b{}\b\s*", regex::escape(sw));
-                Regex::new(&pattern).ok()
-            })
-            .collect();
-        Self { stopword_regexes }
+        let mut ascii_stopword_regexes = Vec::new();
+        let mut nonascii_stopwords = Vec::new();
+
+        for sw in &stopwords {
+            if sw.is_ascii() {
+                // ASCII: `\b` word boundaries work correctly.
+                if let Ok(re) = Regex::new(&format!(r"(?i)\b{}\b\s*", regex::escape(sw))) {
+                    ascii_stopword_regexes.push(re);
+                }
+            } else {
+                // Non-ASCII (Korean, CJK, Arabic, Devanagari, …):
+                // `\b` does not recognise Unicode script-word boundaries reliably,
+                // so we store these as plain strings for whitespace-token matching.
+                nonascii_stopwords.push(sw.clone());
+            }
+        }
+
+        Self {
+            ascii_stopword_regexes,
+            nonascii_stopwords,
+        }
+    }
+
+    /// Returns true when no stopwords are configured (both lists empty).
+    pub fn has_stopwords(&self) -> bool {
+        !self.ascii_stopword_regexes.is_empty() || !self.nonascii_stopwords.is_empty()
     }
 
     /// Applies compression to the node list and returns the result.
@@ -108,7 +151,7 @@ impl AdaptiveCompressor {
             return nodes; // Lossless: compression entirely forbidden
         }
 
-        let stage = cfg.stage();
+        let stage = cfg.stage().max(cfg.min_stage());
 
         // ① Stopword removal (all stages)
         nodes = self.remove_stopwords(nodes);
@@ -124,7 +167,7 @@ impl AdaptiveCompressor {
         }
 
         // ④ Truncate paragraphs to their first sentence
-        // Lossless early-returns at the top of the function, so fidelity != Lossless is guaranteed here.
+        // Lossless early-returns at the top, so fidelity != Lossless is guaranteed here.
         if stage >= CompressionStage::MaxCompression {
             nodes = truncate_to_first_sentence(nodes);
         }
@@ -135,7 +178,7 @@ impl AdaptiveCompressor {
     // ── Internal helpers ─────────────────────────
 
     fn remove_stopwords(&self, nodes: Vec<DocNode>) -> Vec<DocNode> {
-        if self.stopword_regexes.is_empty() {
+        if !self.has_stopwords() {
             return nodes;
         }
         nodes
@@ -154,17 +197,41 @@ impl AdaptiveCompressor {
             .collect()
     }
 
+    /// Removes stopwords from a single text string.
+    ///
+    /// Two passes:
+    /// 1. ASCII regex pass (`\b word \b`) — O(N × |ascii_stopwords|).
+    /// 2. Non-ASCII whitespace-token pass — splits on whitespace, filters exact matches,
+    ///    then rejoins. O(N) per token.
+    ///
+    /// A final `split_whitespace().join(" ")` collapses any consecutive spaces
+    /// introduced by both passes.
     fn strip_stopwords(&self, text: &str) -> String {
-        // One pass per stopword (O(N × |text|)). Because stopwords use `\b` ASCII-boundary regexes,
-        // they cannot be replaced with a single aho-corasick pass.
-        // The default stopword list is empty, so `remove_stopwords` early-returns and this function
-        // is only called when the caller explicitly configures stopwords.
         let mut result = text.to_string();
-        for re in &self.stopword_regexes {
+
+        // Pass 1 — ASCII regex stopwords
+        for re in &self.ascii_stopword_regexes {
             result = re.replace_all(&result, "").into_owned();
         }
-        // Collapse consecutive whitespace (single pass)
-        result.split_whitespace().collect::<Vec<_>>().join(" ")
+
+        // Pass 2 — Non-ASCII token stopwords (whitespace-delimited exact match)
+        if !self.nonascii_stopwords.is_empty() {
+            result = result
+                .split_whitespace()
+                .filter(|token| {
+                    !self
+                        .nonascii_stopwords
+                        .iter()
+                        .any(|sw| sw.as_str() == *token)
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+        } else {
+            // Collapse consecutive whitespace even when no non-ASCII stopwords exist.
+            result = result.split_whitespace().collect::<Vec<_>>().join(" ");
+        }
+
+        result
     }
 }
 
@@ -276,15 +343,88 @@ fn first_sentence(text: &str) -> String {
     text.trim().to_string() // No sentence terminator found — return the full text
 }
 
-/// Default stopword list — returns an empty list for language neutrality.
+// ────────────────────────────────────────────────
+// 4. Default stopword list
+// ────────────────────────────────────────────────
+
+/// Default stopword list — English function words + Korean standalone connectives.
 ///
-/// For language-specific stopwords, use `AdaptiveCompressor::with_stopwords()`.
+/// **English (ASCII)**: common articles, prepositions, auxiliaries, and pronouns
+/// that carry little semantic weight in most technical / business documents.
+///
+/// **Korean (non-ASCII)**: standalone connective words that appear as discrete
+/// whitespace-delimited tokens (그리고, 하지만, …). Grammatical particles
+/// (은/는/이/가/을/를/…) are *not* included because they are fused to the preceding
+/// noun in Korean text and cannot be stripped by whitespace-token matching without
+/// morphological analysis.
+///
+/// For domain-specific stopwords use [`AdaptiveCompressor::with_stopwords`].
 fn default_stopwords() -> Vec<String> {
-    vec![]
+    // ── English function words ────────────────────────────────────────────
+    // Articles
+    let articles = ["a", "an", "the"];
+    // Coordinating conjunctions
+    let conjunctions = ["and", "or", "but", "nor", "yet", "so", "for"];
+    // Common prepositions
+    let prepositions = [
+        "in", "on", "at", "to", "of", "by", "as", "up", "via", "into", "from", "with", "than",
+        "about", "over", "after", "before", "between", "through", "during", "within", "without",
+    ];
+    // Auxiliary / modal verbs
+    let auxiliaries = [
+        "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+        "did", "will", "would", "shall", "should", "may", "might", "must", "can", "could",
+    ];
+    // Common pronouns / determiners
+    let pronouns = [
+        "it", "its", "this", "that", "these", "those", "not", "no", "also", "too", "very", "just",
+        "such",
+    ];
+
+    // ── Korean standalone connectives (non-ASCII) ─────────────────────────
+    // These are whole whitespace-delimited words in Korean prose.
+    // Particles (은/는/이/가/…) are excluded — they require morphological analysis.
+    let korean_connectives = [
+        "그리고",
+        "하지만",
+        "그러나",
+        "따라서",
+        "또한",
+        "즉",
+        "및",
+        "또는",
+        "그래서",
+        "그런데",
+        "게다가",
+        "다만",
+        "단지",
+        "특히",
+        "주로",
+        "왜냐하면",
+        "그러므로",
+        "한편",
+        "반면",
+        "다만",
+        "이처럼",
+        "이렇게",
+        "이에",
+        "이후",
+        "이전",
+    ];
+
+    articles
+        .iter()
+        .chain(conjunctions.iter())
+        .chain(prepositions.iter())
+        .chain(auxiliaries.iter())
+        .chain(pronouns.iter())
+        .map(|s| s.to_string())
+        .chain(korean_connectives.iter().map(|s| s.to_string()))
+        .collect()
 }
 
 // ────────────────────────────────────────────────
-// 4. Unit tests
+// 5. Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -317,19 +457,28 @@ mod tests {
     }
 
     #[test]
-    fn new_compressor_has_empty_stopwords() {
+    fn new_compressor_has_stopwords() {
         let compressor = AdaptiveCompressor::new();
-        // A compressor created with new() must have an empty stopword regex list.
+        // Default constructor must load the built-in stopword list.
         assert!(
-            compressor.stopword_regexes.is_empty(),
-            "stopword regex list from new() must be empty"
+            compressor.has_stopwords(),
+            "default compressor must have a non-empty stopword list"
         );
     }
 
     #[test]
-    fn stopword_removal_works() {
-        // Stopword removal only works when stopwords are explicitly specified via with_stopwords.
-        let compressor = AdaptiveCompressor::with_stopwords(vec!["the".into()]);
+    fn empty_compressor_has_no_stopwords() {
+        let compressor = AdaptiveCompressor::with_stopwords(vec![]);
+        assert!(
+            !compressor.has_stopwords(),
+            "compressor built with empty list must report no stopwords"
+        );
+    }
+
+    #[test]
+    fn stopword_removal_ascii_works() {
+        // "the" is in the default list → should be removed
+        let compressor = AdaptiveCompressor::new();
         let nodes = vec![make_para("the quick brown fox", 1.0)];
         let cfg = CompressionConfig {
             budget: 1000,
@@ -339,7 +488,7 @@ mod tests {
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
             assert!(
-                !text.to_lowercase().contains("the "),
+                !text.to_lowercase().starts_with("the "),
                 "stopword 'the' must be removed: got '{}'",
                 text
             );
@@ -347,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn with_stopwords_removes_specified_words() {
+    fn with_stopwords_removes_specified_ascii_words() {
         let compressor = AdaptiveCompressor::with_stopwords(vec!["hello".into(), "world".into()]);
         let nodes = vec![make_para("hello world foo", 1.0)];
         let cfg = CompressionConfig {
@@ -368,6 +517,54 @@ mod tests {
                 text
             );
             assert!(text.contains("foo"), "'foo' must remain: got '{}'", text);
+        }
+    }
+
+    #[test]
+    fn nonascii_stopword_removal_works() {
+        // Korean connective "그리고" is in the default list and should be removed
+        // when it appears as a standalone whitespace-delimited token.
+        let compressor = AdaptiveCompressor::new();
+        let nodes = vec![make_para("사과 그리고 바나나", 1.0)];
+        let cfg = CompressionConfig {
+            budget: 1000,
+            current_tokens: 100,
+            fidelity: FidelityLevel::Semantic,
+        };
+        let result = compressor.compress(nodes, &cfg);
+        if let DocNode::Para { text, .. } = &result[0] {
+            assert!(
+                !text.contains("그리고"),
+                "Korean connective '그리고' must be removed: got '{}'",
+                text
+            );
+            assert!(text.contains("사과"), "'사과' must remain: got '{}'", text);
+            assert!(
+                text.contains("바나나"),
+                "'바나나' must remain: got '{}'",
+                text
+            );
+        }
+    }
+
+    #[test]
+    fn nonascii_stopword_partial_match_not_removed() {
+        // "그리고" should NOT be removed when it is a substring of another word,
+        // e.g. "그리고나서" is a different word and must be preserved.
+        let compressor = AdaptiveCompressor::with_stopwords(vec!["그리고".into()]);
+        let nodes = vec![make_para("그리고나서 확인", 1.0)];
+        let cfg = CompressionConfig {
+            budget: 1000,
+            current_tokens: 100,
+            fidelity: FidelityLevel::Semantic,
+        };
+        let result = compressor.compress(nodes, &cfg);
+        if let DocNode::Para { text, .. } = &result[0] {
+            assert!(
+                text.contains("그리고나서"),
+                "'그리고나서' must NOT be removed (not an exact token): got '{}'",
+                text
+            );
         }
     }
 
@@ -432,7 +629,7 @@ mod tests {
 
     #[test]
     fn prune_keeps_single_paragraph() {
-        let compressor = AdaptiveCompressor::new();
+        let compressor = AdaptiveCompressor::with_stopwords(vec![]);
         let nodes = vec![make_para("only paragraph", 0.1)]; // low importance
         let cfg = CompressionConfig {
             budget: 100,
@@ -449,7 +646,7 @@ mod tests {
 
     #[test]
     fn prune_keeps_all_equal_importance_paragraphs() {
-        let compressor = AdaptiveCompressor::new();
+        let compressor = AdaptiveCompressor::with_stopwords(vec![]);
         // 3 paragraphs, all same importance — none should be removed
         let nodes = vec![
             make_para("first", 0.5),

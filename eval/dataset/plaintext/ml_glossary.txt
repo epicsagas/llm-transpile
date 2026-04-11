@@ -1,0 +1,29 @@
+Machine Learning Glossary
+
+Backpropagation is the algorithm used to compute gradients in neural networks. It applies the chain rule of calculus to propagate error signals from the output layer back through the network, allowing each parameter to be updated in the direction that reduces the loss.
+
+Batch normalization normalizes the activations of each layer across a mini-batch during training. It reduces internal covariate shift and allows the use of higher learning rates. At inference time, running statistics computed during training are used instead.
+
+Dropout is a regularization technique that randomly sets a fraction of neuron activations to zero during each forward pass. This prevents co-adaptation of neurons and reduces overfitting. At inference, all neurons are used but their outputs are scaled by the retention probability.
+
+Embedding refers to a dense vector representation of a discrete object such as a word, token, or entity. Embeddings are learned jointly with the rest of the model and capture semantic relationships in the geometry of the vector space.
+
+Fine-tuning is the process of continuing to train a pretrained model on a new dataset or task. Because the model already encodes general knowledge, fine-tuning typically requires far fewer examples and less compute than training from scratch.
+
+Gradient clipping limits the magnitude of the gradient vector before a parameter update. It prevents exploding gradients, which are particularly common in recurrent architectures and very deep networks.
+
+Hyperparameter is any configuration value that is set before training begins and is not updated by gradient descent. Common hyperparameters include learning rate, batch size, number of layers, and dropout rate.
+
+Inference is the process of running a trained model on new inputs to produce predictions. Unlike training, inference does not involve computing gradients or updating parameters.
+
+Knowledge distillation is a compression technique in which a smaller student model is trained to reproduce the output distributions of a larger teacher model. The soft probability outputs of the teacher carry more information than hard labels and guide the student more effectively.
+
+Overfitting occurs when a model learns to perform well on training data but generalizes poorly to unseen examples. It is typically caused by a model that is too expressive relative to the amount of available training data.
+
+Perplexity is a measure of how well a language model predicts a sample. It is the exponentiated average negative log-likelihood per token. Lower perplexity indicates a better fit to the data distribution.
+
+Regularization refers to any technique that discourages a model from overfitting by adding constraints or penalties. Common approaches include weight decay, dropout, and data augmentation.
+
+Softmax is a function that converts a vector of real numbers into a probability distribution. Each element of the output is the exponentiated input value divided by the sum of all exponentiated values.
+
+Tokenization is the process of converting raw text into a sequence of tokens that a model can process. Common strategies include word-level, character-level, and subword tokenization. Byte-pair encoding and WordPiece are widely used subword methods.
