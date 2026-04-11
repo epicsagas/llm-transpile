@@ -10,6 +10,7 @@ repository   = "https://github.com/epicsagas/llm-transpile"
 homepage     = "https://github.com/epicsagas/llm-transpile"
 keywords     = ["llm", "tokenizer", "markdown", "compression", "rag"]
 categories   = ["text-processing", "command-line-utilities", "encoding"]
+autobins     = false
 exclude      = [
     "eval/dataset/html/*",
     "eval/dataset/multilingual/*",
