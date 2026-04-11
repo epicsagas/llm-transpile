@@ -1,8 +1,14 @@
 # llm-transpiler
 
+[![Crates.io](https://img.shields.io/crates/v/llm-transpiler.svg)](https://crates.io/crates/llm-transpiler)
+[![docs.rs](https://docs.rs/llm-transpiler/badge.svg)](https://docs.rs/llm-transpiler)
+[![CI](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+
 **Token-optimized document transpiler for LLM pipelines**
 
-Raw documents (Markdown, HTML, plain text) → structured bridge format — with adaptive compression that keeps you under token budget.
+Raw documents (Markdown, HTML, plain text) → structured bridge format `<D>?<H><B>` — with adaptive compression that keeps you under token budget.
 
 ```
 <H>
@@ -11,21 +17,42 @@ s: Annual license terms between licensor and licensee
 k: [license, contract, software]
 </H>
 <B>
-# 계약 당사자
-본 계약은 갑(라이선서)과 을(라이선시) 사이에 체결됩니다.
+# Contracting Parties
+This agreement is made between Licensor and Licensee.
 ...
 </B>
 ```
+
+---
+
+## Table of Contents
+
+- [Why](#why)
+- [Installation](#installation)
+- [CLI Usage](#cli-usage)
+- [Library Usage](#library-usage)
+- [Output Format](#output-format)
+- [Fidelity Levels](#fidelity-levels)
+- [Adaptive Compression](#adaptive-compression)
+- [Input Formats](#input-formats)
+- [Error Handling](#error-handling)
+- [Performance](#performance)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
 
 ## Why
 
 LLMs perform better when context is clean and dense. This library handles the mechanical work:
 
 - **Structural parsing** — Markdown/HTML/plain text → typed IR nodes (headings, paragraphs, tables, lists, code blocks)
-- **Adaptive compression** — automatically escalates through 4 compression stages as token budget fills up
+- **Adaptive compression** — automatically escalates through 4 stages as token budget fills up
 - **Symbol substitution** — repeated domain terms → Unicode PUA characters, decoded by `<D>` dictionary header
 - **Table linearization** — Markdown tables → compact `Key:Val` sequences (≤5 rows) or JSON Lines (>5 rows)
-- **Streaming output** — Tokio stream delivers the first chunk (header) immediately, minimizing TTFT
+- **Streaming output** — Tokio stream delivers the first chunk immediately, minimizing TTFT
+
+---
 
 ## Installation
 
@@ -36,9 +63,11 @@ LLMs perform better when context is clean and dense. This library handles the me
 llm-transpiler = "0.1"
 ```
 
-Requires Rust 1.75+.
+Requires **Rust 1.75+**.
 
 ### CLI binary
+
+Install directly from the repository:
 
 ```bash
 cargo install --git https://github.com/epicsagas/llm-transpiler --bin transpile
@@ -47,8 +76,12 @@ cargo install --git https://github.com/epicsagas/llm-transpiler --bin transpile
 Or after cloning:
 
 ```bash
+git clone https://github.com/epicsagas/llm-transpiler
+cd llm-transpiler
 cargo install --path .
 ```
+
+---
 
 ## CLI Usage
 
@@ -56,13 +89,13 @@ cargo install --path .
 transpile [OPTIONS]
 
 Options:
-  -i, --input <FILE>       Input file (reads from stdin if omitted)
-  -f, --format <FORMAT>    markdown | html | plaintext  [default: markdown]
-                           (auto-detected from file extension when --input is given)
-  -l, --fidelity <LEVEL>   lossless | semantic | compressed  [default: semantic]
+  -i, --input <FILE>       Input file path (reads from stdin if omitted)
+  -f, --format <FORMAT>    Input format: markdown | html | plaintext  [default: markdown]
+                           Auto-detected from file extension when --input is used
+  -l, --fidelity <LEVEL>   Compression level: lossless | semantic | compressed  [default: semantic]
   -b, --budget <N>         Token budget upper limit (unlimited if omitted)
   -c, --count              Print only the input token count, then exit
-  -j, --json               Output JSON: {input_tok, output_tok, reduction_pct, content}
+  -j, --json               Output as JSON {input_tok, output_tok, reduction_pct, content}
   -h, --help               Print help
   -V, --version            Print version
 ```
@@ -76,19 +109,24 @@ transpile --input doc.md
 # Read from stdin
 cat doc.html | transpile --format html --fidelity compressed --budget 1024
 
-# Check token count before committing to a budget
+# Check token count without converting
 transpile --input doc.md --count
 
-# Machine-readable JSON output (for scripts / pipelines)
+# JSON output for scripts and pipelines
 transpile --input doc.md --json | jq '.reduction_pct'
 
-# Lossless — no compression, full content preserved
+# Lossless — no compression, full content preserved (legal/audit docs)
 transpile --input contract.md --fidelity lossless
+
+# Aggressive compression into a 512-token budget
+transpile --input article.md --fidelity compressed --budget 512
 ```
 
-Stats (`[273 → 150 tok  45.1% reduction]`) are printed to **stderr**, so stdout stays clean for piping.
+> Stats (`[273 → 150 tok  45.1% reduction]`) are written to **stderr**, so stdout stays clean for piping.
 
-## Usage
+---
+
+## Library Usage
 
 ### Synchronous
 
@@ -100,10 +138,10 @@ let md = r#"
 
 This agreement is made between Licensor and Licensee.
 
-| Item     | Cost       |
-|----------|------------|
-| Base fee | $800       |
-| Support  | $200       |
+| Item     | Cost  |
+|----------|-------|
+| Base fee | $800  |
+| Support  | $200  |
 "#;
 
 let output = transpile(md, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))?;
@@ -113,10 +151,10 @@ println!("{}", output);
 ### Streaming (Tokio)
 
 ```rust
-use llm_transpiler::{transpile_stream, FidelityLevel};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
-let mut stream = transpile_stream(input, FidelityLevel::Semantic, 4096).await;
+let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
 
 while let Some(chunk) = stream.next().await {
     let chunk = chunk?;
@@ -131,92 +169,122 @@ while let Some(chunk) = stream.next().await {
 let n = llm_transpiler::token_count("Hello, world!");
 ```
 
-## Fidelity levels
+---
 
-| Level | Use case | Compression |
-|-------|----------|-------------|
-| `Lossless` | Legal / audit documents | None — original content guaranteed |
-| `Semantic` | General RAG pipelines | Stopword removal, low-importance paragraph pruning |
-| `Compressed` | Summarization pipelines | Maximum compression, first-sentence extraction |
-
-## Adaptive compression stages
-
-The compressor monitors token budget usage in real time and escalates automatically:
-
-| Budget usage | Stage | What happens |
-|---|---|---|
-| 0–60% | Stopword removal | English/Korean stopwords stripped |
-| 60–80% | Prune low importance | Bottom 20% of paragraphs by importance score removed |
-| 80–95% | Deduplicate + linearize | Duplicate paragraphs removed; tables linearized |
-| 95%+ | Max compression | Each paragraph truncated to first sentence (`Semantic`/`Compressed` only) |
-
-During streaming, when budget reaches 80%, the compressor automatically switches to `Compressed` mode for remaining nodes.
-
-## Output format
+## Output Format
 
 ```
-<D>              ← symbol dictionary (omitted if no substitutions)
-{PUA_char}=term
+<D>                  ← Symbol dictionary (omitted when no substitutions occur)
+{sym}=repeated-term
 </D>
-<H>              ← YAML-like metadata header
+<H>                  ← YAML-like metadata header
 t: document title
 s: one-line summary
 k: [keyword1, keyword2]
 </H>
-<B>              ← document body
+<B>                  ← Document body (compressed + substituted)
 ...content...
 </B>
 ```
 
-The `<D>` block uses Unicode Private Use Area characters (`U+E000–U+F8FF`) as substitution symbols, avoiding collisions with visible patterns like `$1`, `$2`. The dictionary supports up to 6,400 unique terms per document.
+The `<D>` block uses Unicode Private Use Area characters (`U+E000–U+F8FF`) as compact symbol handles, avoiding collision with visible text patterns. The dictionary supports up to **6,400 unique terms** per document.
 
-## Input formats
+---
+
+## Fidelity Levels
+
+| Level | Typical use case | Compression applied |
+|-------|-----------------|---------------------|
+| `Lossless` | Legal / audit documents | None — original content guaranteed |
+| `Semantic` | General RAG pipelines | Stopword removal + low-importance pruning |
+| `Compressed` | Summarization, tight budgets | Maximum compression, first-sentence extraction |
+
+---
+
+## Adaptive Compression
+
+The compressor monitors budget usage in real time and escalates automatically:
+
+| Budget usage | Stage | What happens |
+|---|---|---|
+| 0–60% | `StopwordOnly` | English/Korean stopwords stripped |
+| 60–80% | `PruneLowImportance` | Bottom 20% of paragraphs by importance score removed |
+| 80–95% | `DeduplicateAndLinearize` | Duplicate sentences removed; tables linearized |
+| 95%+ | `MaxCompression` | Each paragraph truncated to first sentence |
+
+> `Lossless` mode bypasses all compression stages unconditionally.
+
+During streaming, when budget usage crosses 80%, remaining nodes are automatically switched to `Compressed` mode.
+
+---
+
+## Input Formats
 
 | `InputFormat` | Parser |
 |---|---|
-| `Markdown` | pulldown-cmark (CommonMark + tables) |
-| `Html` | Tag stripping + entity decoding → plain text pipeline |
+| `Markdown` | [pulldown-cmark](https://crates.io/crates/pulldown-cmark) — CommonMark + GFM tables |
+| `Html` | ammonia sanitization → tag stripping → plain text pipeline |
 | `PlainText` | Blank-line paragraph splitting |
 
-## Supported metadata keys
+---
 
-Add `Metadata` nodes to populate the `<H>` header:
-
-```rust
-doc.push(DocNode::Metadata { key: "title".into(),    value: "My Document".into() });
-doc.push(DocNode::Metadata { key: "summary".into(),  value: "One-line summary".into() });
-doc.push(DocNode::Metadata { key: "keywords".into(), value: "key1, key2".into() });
-```
-
-## Error types
+## Error Handling
 
 ```rust
-pub enum TranspileError {
-    Parse(String),                                // parser failure
-    SymbolOverflow(SymbolOverflowError),          // >6400 unique terms
-    Stream(StreamError),                          // channel closed
-    LosslessModeViolation,                        // compression attempted on Lossless doc
+use llm_transpiler::TranspileError;
+
+match transpile(input, format, fidelity, budget) {
+    Ok(output) => { /* use output */ }
+    Err(TranspileError::Parse(msg))          => eprintln!("parse failed: {msg}"),
+    Err(TranspileError::SymbolOverflow(e))   => eprintln!("too many unique terms: {e}"),
+    Err(TranspileError::LosslessModeViolation) => eprintln!("compression in lossless mode"),
+    Err(e)                                   => eprintln!("error: {e}"),
 }
 ```
 
-## Performance targets
+---
+
+## Performance
 
 | Metric | Target |
 |--------|--------|
 | Parse speed | ≥10× faster than Python baseline |
 | Token reduction | 15–30% vs. raw input |
 | Streaming TTFT | First chunk ≤ 50ms |
-| Heap usage | ≤ 10MB for 1MB input document |
+| Heap usage | ≤ 10MB per 1MB input document |
 
-## Development
+---
+
+## Contributing
+
+Contributions are welcome — bug reports, feature requests, and pull requests.
 
 ```bash
-cargo test          # run all tests
-cargo bench         # run benchmarks (HTML report → target/criterion/)
+# Clone and build
+git clone https://github.com/epicsagas/llm-transpiler
+cd llm-transpiler
+cargo build
+
+# Run tests
+cargo test
+
+# Run benchmarks (HTML report → target/criterion/)
+cargo bench
+
+# Lint and format
 cargo clippy -- -D warnings
 cargo fmt
 ```
 
+**Guidelines**
+
+- Keep MSRV at Rust 1.75 — avoid features introduced after that.
+- New compression behavior must not affect `Lossless` mode.
+- Each PR should include tests for any new logic in the relevant module (`ir`, `compressor`, `symbol`, `renderer`).
+- Run `cargo clippy -- -D warnings` and `cargo fmt` before submitting.
+
+---
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
