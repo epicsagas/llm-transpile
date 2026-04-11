@@ -5,6 +5,7 @@
 [![CI](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **Token-optimized document transpiler for LLM pipelines**
 
