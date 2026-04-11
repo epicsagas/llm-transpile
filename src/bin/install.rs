@@ -402,7 +402,7 @@ fn detect_profile() -> String {
 
 fn build_shell_block(_tools: &[&str]) -> String {
     // Single unified helper — all tools use `transpile` directly.
-    // Per-tool wrappers are replaced by /tctx skills installed in each tool.
+    // Per-tool wrappers are replaced by /transpile skills installed in each tool.
     vec![
         r#"tctx() { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }"#.to_string(),
     ].join("\n")
@@ -549,14 +549,14 @@ fn setup_claude() {
     std::fs::write(&settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
     eprintln!("  Claude Code: PostToolUse hook registered in {}", settings_path.display());
 
-    // /tctx slash command
+    // /transpile slash command
     let cmd_dir = claude_dir.join("commands");
     std::fs::create_dir_all(&cmd_dir).ok();
     std::fs::write(
-        cmd_dir.join("tctx.md"),
-        "---\nname: tctx\ndescription: Compress a file with llm-transpile and insert into context\n---\n\nRun and insert the token-compressed version:\n\n```bash\ntranspile --input $ARGUMENTS --fidelity semantic --quiet\n```\n",
+        cmd_dir.join("transpile.md"),
+        "---\nname: transpile\ndescription: Compress a file with llm-transpile and insert into context\n---\n\nRun and insert the token-compressed version:\n\n```bash\ntranspile --input $ARGUMENTS --fidelity semantic --quiet\n```\n",
     ).ok();
-    eprintln!("  Claude Code: /tctx command written");
+    eprintln!("  Claude Code: /transpile command written");
 }
 
 fn remove_claude() {
@@ -586,23 +586,23 @@ fn remove_claude() {
     if hook_script.exists() { std::fs::remove_file(&hook_script).ok(); }
     eprintln!("  Claude Code: hook script removed");
 
-    let cmd = claude_dir.join("commands").join("tctx.md");
+    let cmd = claude_dir.join("commands").join("transpile.md");
     if cmd.exists() { std::fs::remove_file(cmd).ok(); }
-    eprintln!("  Claude Code: /tctx command removed");
+    eprintln!("  Claude Code: /transpile command removed");
 }
 
 
-// ── /tctx skill content (shared across all tools) ────────────────────────────
+// ── /transpile skill content (shared across all tools) ────────────────────────────
 
-/// The /tctx skill instructs the LLM to run `transpile` when it wants to read
+/// The /transpile skill instructs the LLM to run `transpile` when it wants to read
 /// a large file, instead of reading the raw content directly.
-const TCTX_SKILL: &str = "\
+const TRANSPILE_SKILL: &str = "\
 ---
-name: tctx
+name: transpile
 description: Read a file in token-compressed form. Use for any file larger than ~8KB to save context.
 ---
 
-# /tctx — Token-Compressed File Read
+# /transpile — Token-Compressed File Read
 
 When you need to read a large file, use this skill instead of reading it directly.
 It produces a semantically equivalent but ~30% smaller version.
@@ -632,32 +632,32 @@ Run this command and treat its output as the file content.
 
 fn setup_gemini() {
     let gemini_dir = PathBuf::from(home()).join(".gemini");
-    let skill_dir = gemini_dir.join("skills").join("tctx");
+    let skill_dir = gemini_dir.join("skills").join("transpile");
     std::fs::create_dir_all(&skill_dir).ok();
-    std::fs::write(skill_dir.join("SKILL.md"), TCTX_SKILL).ok();
-    eprintln!("  Gemini CLI: /tctx skill installed in {}", skill_dir.display());
+    std::fs::write(skill_dir.join("SKILL.md"), TRANSPILE_SKILL).ok();
+    eprintln!("  Gemini CLI: /transpile skill installed in {}", skill_dir.display());
 }
 
 fn remove_gemini() {
-    let skill_dir = PathBuf::from(home()).join(".gemini").join("skills").join("tctx");
+    let skill_dir = PathBuf::from(home()).join(".gemini").join("skills").join("transpile");
     if skill_dir.exists() { std::fs::remove_dir_all(&skill_dir).ok(); }
-    eprintln!("  Gemini CLI: /tctx skill removed");
+    eprintln!("  Gemini CLI: /transpile skill removed");
 }
 
 // ── Codex CLI ──────────────────────────────────────────────────────────────────
 
 fn setup_codex() {
     // Codex discovers skills from ~/.agents/skills/
-    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("tctx");
+    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("transpile");
     std::fs::create_dir_all(&skill_dir).ok();
-    std::fs::write(skill_dir.join("SKILL.md"), TCTX_SKILL).ok();
-    eprintln!("  Codex CLI: /tctx skill installed in {}", skill_dir.display());
+    std::fs::write(skill_dir.join("SKILL.md"), TRANSPILE_SKILL).ok();
+    eprintln!("  Codex CLI: /transpile skill installed in {}", skill_dir.display());
 }
 
 fn remove_codex() {
-    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("tctx");
+    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("transpile");
     if skill_dir.exists() { std::fs::remove_dir_all(&skill_dir).ok(); }
-    eprintln!("  Codex CLI: /tctx skill removed");
+    eprintln!("  Codex CLI: /transpile skill removed");
 }
 
 // ── OpenCode ───────────────────────────────────────────────────────────────────
@@ -666,20 +666,20 @@ fn opencode_command_path() -> PathBuf {
     let cfg_dir = std::env::var("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from(home()).join(".config"));
-    cfg_dir.join("opencode").join("commands").join("tctx.md")
+    cfg_dir.join("opencode").join("commands").join("transpile.md")
 }
 
 fn setup_opencode() {
     let cmd_path = opencode_command_path();
     std::fs::create_dir_all(cmd_path.parent().unwrap()).ok();
-    std::fs::write(&cmd_path, TCTX_SKILL).ok();
-    eprintln!("  OpenCode: /tctx command installed in {}", cmd_path.display());
+    std::fs::write(&cmd_path, TRANSPILE_SKILL).ok();
+    eprintln!("  OpenCode: /transpile command installed in {}", cmd_path.display());
 }
 
 fn remove_opencode() {
     let p = opencode_command_path();
     if p.exists() { std::fs::remove_file(&p).ok(); }
-    eprintln!("  OpenCode: /tctx command removed");
+    eprintln!("  OpenCode: /transpile command removed");
 }
 
 // ── Cursor ─────────────────────────────────────────────────────────────────────
@@ -688,12 +688,12 @@ fn setup_cursor() {
     // Cursor commands live in .cursor/commands/ (project-local)
     let cmd_dir = std::path::Path::new(".cursor").join("commands");
     std::fs::create_dir_all(&cmd_dir).ok();
-    std::fs::write(cmd_dir.join("tctx.md"), TCTX_SKILL).ok();
-    eprintln!("  Cursor: /tctx command installed in .cursor/commands/tctx.md");
+    std::fs::write(cmd_dir.join("transpile.md"), TRANSPILE_SKILL).ok();
+    eprintln!("  Cursor: /transpile command installed in .cursor/commands/transpile.md");
 }
 
 fn remove_cursor() {
-    let p = std::path::Path::new(".cursor/commands/tctx.md");
+    let p = std::path::Path::new(".cursor/commands/transpile.md");
     if p.exists() { std::fs::remove_file(p).ok(); }
-    eprintln!("  Cursor: /tctx command removed");
+    eprintln!("  Cursor: /transpile command removed");
 }
