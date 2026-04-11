@@ -549,14 +549,6 @@ fn setup_claude() {
     std::fs::write(&settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
     eprintln!("  Claude Code: PostToolUse hook registered in {}", settings_path.display());
 
-    // /transpile slash command
-    let cmd_dir = claude_dir.join("commands");
-    std::fs::create_dir_all(&cmd_dir).ok();
-    std::fs::write(
-        cmd_dir.join("transpile.md"),
-        "---\nname: transpile\ndescription: Compress a file with llm-transpile and insert into context\n---\n\nRun and insert the token-compressed version:\n\n```bash\ntranspile --input $ARGUMENTS --fidelity semantic --quiet\n```\n",
-    ).ok();
-    eprintln!("  Claude Code: /transpile command written");
 }
 
 fn remove_claude() {
@@ -586,9 +578,10 @@ fn remove_claude() {
     if hook_script.exists() { std::fs::remove_file(&hook_script).ok(); }
     eprintln!("  Claude Code: hook script removed");
 
+    // Remove command file (legacy path)
     let cmd = claude_dir.join("commands").join("transpile.md");
     if cmd.exists() { std::fs::remove_file(cmd).ok(); }
-    eprintln!("  Claude Code: /transpile command removed");
+    eprintln!("  Claude Code: hook + command removed");
 }
 
 
