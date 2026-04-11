@@ -211,7 +211,6 @@ $RECYCLE.BIN/
 secrets.*
 *_secret.*
 credentials.*
-.agents/
-.claude
-.collet/
+*.local.json
 .harness/
+eval/.tmp/

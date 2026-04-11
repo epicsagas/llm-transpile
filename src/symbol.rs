@@ -8,9 +8,14 @@
 //!   → Zero reverse-substitution collisions compared to visible `$1`, `$2` patterns
 //! - `intern()` / `decode_str()` pair provides fully symmetric encode ↔ decode
 //! - The `<D>` global dictionary block is emitted only once at the top of the document
+//!
+//! # Thread safety
+//! `SymbolDict` uses `std::sync::RwLock` for the internal Aho-Corasick automaton cache,
+//! making the type `Send + Sync`. It can therefore be moved into `tokio::spawn` tasks or
+//! shared across threads via `Arc<SymbolDict>` (with `Arc<Mutex<SymbolDict>>` for mutation).
 
-use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 /// Unicode PUA start codepoint.
 const PUA_START: u32 = 0xE000;
@@ -28,8 +33,9 @@ type AcCache = (Vec<String>, Vec<String>, aho_corasick::AhoCorasick);
 /// Bidirectional mapping table between technical terms and PUA symbols.
 ///
 /// # Thread safety
-/// Uses `RefCell` interior mutability, so this type is `!Send`.
-/// It cannot be passed directly to `tokio::spawn`; wrap in `Arc<Mutex<SymbolDict>>` if needed.
+/// Uses `std::sync::RwLock` for the lazy Aho-Corasick automaton cache.
+/// The type is `Send + Sync` and can be safely moved into async tasks.
+/// For concurrent mutation, wrap in `Arc<Mutex<SymbolDict>>`.
 pub struct SymbolDict {
     /// term → PUA character
     encode: HashMap<String, char>,
@@ -37,9 +43,9 @@ pub struct SymbolDict {
     decode: HashMap<char, String>,
     /// Next PUA codepoint to assign
     next_code: u32,
-    /// Lazy-build cache for `encode_str` (interior mutability).
+    /// Lazy-build cache for `encode_str` (interior mutability via RwLock).
     /// Invalidated on `intern()` calls; lazily rebuilt on the first `encode_str()` call.
-    ac_cache: RefCell<Option<AcCache>>,
+    ac_cache: RwLock<Option<AcCache>>,
 }
 
 impl Default for SymbolDict {
@@ -55,7 +61,7 @@ impl SymbolDict {
             encode: HashMap::new(),
             decode: HashMap::new(),
             next_code: PUA_START,
-            ac_cache: RefCell::new(None),
+            ac_cache: RwLock::new(None),
         }
     }
 
@@ -87,7 +93,8 @@ impl SymbolDict {
         self.encode.insert(term.to_string(), sym);
         self.decode.insert(sym, term.to_string());
         self.next_code += 1;
-        *self.ac_cache.borrow_mut() = None; // Invalidate cache when the dictionary changes
+        // Invalidate the Aho-Corasick cache — it will be rebuilt on the next encode_str() call.
+        *self.ac_cache.write().unwrap() = None;
         Ok(sym)
     }
 
@@ -110,30 +117,30 @@ impl SymbolDict {
 
     /// Replaces dictionary-registered terms in the input string with PUA symbols.
     ///
-    /// Single aho-corasick LeftmostLongest pass, O(n+T) complexity.
+    /// Single Aho-Corasick `LeftmostLongest` pass, O(n+T) complexity.
     /// The automaton is lazily built on the first call and cached until the next `intern()` call.
     pub fn encode_str(&self, input: &str) -> String {
         if self.encode.is_empty() {
             return input.to_string();
         }
 
-        // Cache hit path: single borrow() (shared reference)
+        // ── Cache-hit path: shared read lock ─────────────────────────────
         {
-            let cache = self.ac_cache.borrow();
+            let cache = self.ac_cache.read().unwrap();
             if let Some((_, replacements, ac)) = cache.as_ref() {
                 return ac.replace_all(input, replacements);
             }
-        }
+        } // read lock released here
 
-        // Cache miss: build automaton then store with borrow_mut()
+        // ── Cache-miss path: build automaton, then store ──────────────────
         {
             let mut pairs: Vec<(String, String)> = self
                 .encode
                 .iter()
                 .map(|(k, v)| (k.clone(), v.to_string()))
                 .collect();
-            // LeftmostLongest selects by length, but on equal-length conflicts it picks
-            // the pattern with the lower registration ID, so sort longest-first to assign IDs.
+            // LeftmostLongest selects by length; sort longest-first to assign lower IDs
+            // to longer patterns so they are preferred on equal-length conflicts.
             pairs.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
 
             let patterns: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
@@ -145,10 +152,10 @@ impl SymbolDict {
                 .expect("AhoCorasick build cannot fail with valid patterns");
 
             let pattern_strs: Vec<String> = pairs.into_iter().map(|(k, _)| k).collect();
-            *self.ac_cache.borrow_mut() = Some((pattern_strs, replacements, ac));
+            *self.ac_cache.write().unwrap() = Some((pattern_strs, replacements, ac));
         }
 
-        let cache = self.ac_cache.borrow();
+        let cache = self.ac_cache.read().unwrap();
         let (_, replacements, ac) = cache.as_ref().unwrap();
         ac.replace_all(input, replacements)
     }
@@ -285,5 +292,12 @@ mod tests {
             "LeftmostLongest: full 'abc' must be substituted, sym_ab={:?}",
             sym_ab
         );
+    }
+
+    /// Compile-time check: SymbolDict must be Send + Sync after the RwLock migration.
+    #[test]
+    fn symbol_dict_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<SymbolDict>();
     }
 }

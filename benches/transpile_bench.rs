@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use llm_transpiler::{FidelityLevel, InputFormat, transpile};
+use llm_transpile::{FidelityLevel, InputFormat, transpile};
 
 const SAMPLE_MD: &str = r#"
 # 소프트웨어 라이선스 계약

@@ -1,8 +1,8 @@
-# LLM Transpiler Bridge — Technical Specification (SPEC)
+# LLM Transpiler — Technical Specification (SPEC)
 
-> **Version**: 0.1.0
+> **Version**: 0.2.0
 > **Date**: 2026-04-11
-> **Status**: Draft
+> **Status**: Current (reflects v0.1.x implementation)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1.1 Purpose
 
-A high-performance Rust library that converts raw documents (PDF, HTML, Markdown, Plain Text, Tables, etc.)
+A high-performance Rust library that converts raw documents (HTML, Markdown, Plain Text)
 into a **structured bridge format** that allows LLM agents to receive the maximum
 amount of information with the minimum number of tokens.
 
@@ -23,11 +23,11 @@ amount of information with the minimum number of tokens.
 | TTFT improvement | First chunk delivered in ≤ 50ms via streaming |
 | Safety | Zero back-substitution collisions, explicit control over semantic loss |
 
-### 1.3 Out of Scope
+### 1.3 Out of Scope (current version)
 
-- Direct LLM API calls (Anthropic / OpenAI SDK integration is the user's responsibility)
-- Embedding generation
-- Vector DB storage
+- PDF input — requires pre-conversion to Markdown or Plain Text
+- Direct LLM API calls — the caller integrates the output with any LLM SDK
+- Embedding generation or vector DB storage
 
 ---
 
@@ -36,13 +36,14 @@ amount of information with the minimum number of tokens.
 ```
 ┌───────────────────────────────────────────────────────┐
 │                   Public API (lib.rs)                 │
-│  transpile()  /  transpile_stream()  /  token_count() │ 
+│  transpile()  /  transpile_stream()  /  token_count() │
 └───────────────────────┬───────────────────────────────┘
                         │
           ┌─────────────▼──────────────┐
-          │   IncrementalParser        │  (parser.rs)
-          │   lopdf / html5ever /      │
-          │   pulldown-cmark           │
+          │   parser.rs                │
+          │   pulldown-cmark (MD)      │
+          │   ammonia (HTML strip)     │
+          │   PlainText splitter       │
           └─────────────┬──────────────┘
                         │  Vec<DocNode>
           ┌─────────────▼──────────────┐
@@ -56,7 +57,7 @@ amount of information with the minimum number of tokens.
     └────────────┬──┘  └────┬───────────────┘
                  └────┬─────┘
           ┌───────────▼──────────────┐
-          │   StreamingRenderer      │  (renderer.rs)
+          │   renderer.rs            │
           │   YAML header + XML body │
           └───────────┬──────────────┘
                       │  TranspileChunk (Tokio stream)
@@ -81,7 +82,7 @@ pub enum FidelityLevel {
 
 pub enum DocNode {
     Header   { level: u8, text: String },
-    Para     { text: String, importance: f32 },
+    Para     { text: String, importance: f32 },  // importance ∈ [0.1, 1.0]
     Table    { headers: Vec<String>, rows: Vec<Vec<String>> },
     Code     { lang: Option<String>, body: String },
     List     { ordered: bool, items: Vec<String> },
@@ -97,55 +98,84 @@ pub struct IRDocument {
 
 #### Invariants
 
-- `importance` value range: `0.0..=1.0`
-- If `token_budget` is `Some(n)`, the rendered output token count is guaranteed to be ≤ `n`
-- `Compressed`-stage compression is forbidden at `FidelityLevel::Lossless`
+- `importance` value range: `0.1..=1.0`
+- `FidelityLevel::Lossless` forbids all compression stages
 
 ---
 
-### 3.2 `symbol.rs` — SymbolDict
+### 3.2 `parser.rs` — Input Parsers
+
+#### Supported formats
+
+| Format | Parser | Notes |
+|--------|--------|-------|
+| `Markdown` | `pulldown-cmark` (CommonMark + GFM tables) | Primary format |
+| `Html` | `ammonia` tag-stripping → PlainText delegate | Tag-safe HTML sanitisation |
+| `PlainText` | Blank-line paragraph splitter | `# ` / `## ` prefix → headings |
+
+> **PDF**: Not supported. Pre-convert to Markdown or Plain Text before calling the API.
+
+#### Paragraph importance scoring
+
+Each `DocNode::Para` receives an importance score computed from three signals:
+
+| Signal | Weight | Rationale |
+|--------|--------|-----------|
+| Position index | 50 % | Inverted-pyramid — earlier paragraphs introduce the topic |
+| Character length | 40 % | Short paragraphs (< 40 chars) are likely captions or footnotes |
+| Heading proximity | 10 % | Paragraph immediately after a heading is a section intro |
+
+Score formula: `clamp(position × 0.5 + length × 0.4 + heading_bonus × 0.1, 0.1, 1.0)`
+
+---
+
+### 3.3 `symbol.rs` — SymbolDict
 
 #### Design Principles
 
-- Substitution symbols use Unicode **Private Use Area** (`U+E000–U+F8FF`)
-  → Prevents back-substitution collisions with visible patterns like `$1`, `$2`
-- The global dictionary is output only once at the top of the document in the `<D>` tag
+- Substitution symbols use Unicode **Private Use Area** (`U+E000–U+F8FF`) — 6 144 slots
+- Zero reverse-substitution collisions vs. visible patterns like `$1`, `$2`
+- The global dictionary is output only once in the `<D>` tag
 - `intern()` / `decode_str()` pair provides fully symmetric encode ↔ decode
+- Internal Aho-Corasick automaton cache uses `std::sync::RwLock` → type is `Send + Sync`
 
 #### Interface
 
 ```rust
 impl SymbolDict {
     pub fn new() -> Self;
-    pub fn intern(&mut self, term: &str) -> char;
-    pub fn decode_str(&self, input: &str) -> String;
-    pub fn render_dict_header(&self) -> String;  // generates <D> block
+    pub fn intern(&mut self, term: &str) -> Result<char, SymbolOverflowError>;
+    pub fn encode_str(&self, input: &str) -> String;
+    pub fn decode_str(&self, input: &str) -> String;  // test-only
+    pub fn render_dict_header(&self) -> String;        // generates <D> block
 }
 ```
 
-#### Constraints
+#### Thread safety
 
-- Returns `SymbolTableOverflow` error when exceeding the PUA upper limit `U+F8FF`
-- Re-interning the same term returns the same symbol (idempotency guaranteed)
+`SymbolDict` is `Send + Sync`. For concurrent mutation use `Arc<Mutex<SymbolDict>>`.
 
 ---
 
-### 3.3 `compressor.rs` — AdaptiveCompressor
+### 3.4 `compressor.rs` — AdaptiveCompressor
 
 #### Compression Strategy (by stage)
 
 | Budget usage rate | Strategy applied |
 |------------|-----------|
-| 0–60%      | Stopword removal only |
-| 60–80%     | Stopwords + remove bottom 20% paragraphs by importance |
-| 80–95%     | Above + duplicate sentence removal + numeric data linearization |
-| 95%+       | Above + all paragraphs → 1-sentence summary (Semantic only) |
+| 0–60% | Stopword removal only |
+| 60–80% | Stopwords + prune bottom-20% paragraphs by importance |
+| 80–95% | Above + duplicate sentence removal + numeric data linearisation |
+| 95%+ | Above + all paragraphs → first sentence only (Semantic+) |
 
-#### Numeric Data Linearization
+#### Stopword matching
 
-- Row count ≤ 5: `Key:Val, Key:Val` sequence
-- Row count > 5: JSON Lines (`{"k":"v",...}` 1 line/row)
-- Markdown table symbols (`|`, `-`) fully removed
+- **ASCII stopwords**: `\b word \b` regex (case-insensitive) — correct word-boundary semantics.
+- **Non-ASCII stopwords** (Korean connectives, CJK, Arabic, …): exact whitespace-token
+  matching — avoids `\b` Unicode-boundary issues.
+- **Default list**: common English function words + Korean standalone connectives.
+  No Korean grammatical particles (은/는/이/가/…) — morphological analysis would
+  be required and is out of scope.
 
 #### Interface
 
@@ -157,14 +187,15 @@ pub struct CompressionConfig {
 }
 
 impl AdaptiveCompressor {
-    pub fn compress(&self, nodes: Vec<DocNode>, cfg: &CompressionConfig)
-        -> Vec<DocNode>;
+    pub fn new() -> Self;                                         // default stopwords
+    pub fn with_stopwords(stopwords: Vec<String>) -> Self;        // custom stopwords
+    pub fn compress(&self, nodes: Vec<DocNode>, cfg: &CompressionConfig) -> Vec<DocNode>;
 }
 ```
 
 ---
 
-### 3.4 `renderer.rs` — StreamingRenderer
+### 3.5 `renderer.rs` — Renderer
 
 #### Output Format
 
@@ -183,53 +214,61 @@ k: [keyword1, keyword2]
 </B>
 ```
 
-- `<D>`: SymbolDict global dictionary (omitted if no substitutions)
-- `<H>`: YAML serialized header (serde-norway, YAML 1.2 compliant)
-- `<B>`: Body (line breaks and whitespace minimized)
+- `<D>`: SymbolDict global dictionary (omitted when empty)
+- `<H>`: YAML-like header block
+- `<B>`: Body content
 
 #### Interface
 
 ```rust
 pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String;
 pub fn render_full(doc: &IRDocument, dict: &mut SymbolDict) -> String;
+pub fn build_yaml_header(doc: &IRDocument) -> String;
+pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String;
 ```
 
 ---
 
-### 3.5 `stream.rs` — Streaming Transpiler
+### 3.6 `stream.rs` — Streaming Transpiler
 
-#### Chunk Definition
+#### Chunk definition
 
 ```rust
 pub struct TranspileChunk {
     pub sequence:    usize,
     pub content:     String,
-    pub token_count: usize,   // pre-calculated by tiktoken-rs
+    pub token_count: usize,   // heuristic (default) or tiktoken cl100k_base (feature flag)
     pub is_final:    bool,
 }
 ```
 
-#### Streaming Pipeline
+#### StreamingTranspiler
 
 ```rust
-pub async fn transpile_stream(
-    source:  impl AsyncRead + Unpin + Send + 'static,
-    budget:  usize,
-    fidelity: FidelityLevel,
-) -> impl Stream<Item = Result<TranspileChunk>>;
+impl StreamingTranspiler {
+    /// Default — empty symbol dictionary.
+    pub fn new(budget: usize, fidelity: FidelityLevel) -> Self;
+
+    /// Pre-populated symbol dictionary for domain-specific streaming compression.
+    pub fn with_dict(budget: usize, fidelity: FidelityLevel, dict: SymbolDict) -> Self;
+
+    pub fn transpile(self, doc: IRDocument)
+        -> Pin<Box<dyn Stream<Item = Result<TranspileChunk, StreamError>> + Send>>;
+}
 ```
 
-- Tokio-based async stream
-- Chunks split at semantic unit (paragraph/section) boundaries
-- Automatically switches to `Compressed` mode when budget reaches 80%
-- First chunk always includes `<D>` + `<H>`
+#### Streaming behaviour
+
+- First chunk always contains `<D>` (if non-empty) + `<H><B>` — minimises TTFT.
+- Automatically switches to `Compressed` fidelity at 80% budget usage.
+- Symbol substitution is **available** when a pre-populated dict is supplied via `with_dict`.
 
 ---
 
 ## 4. Public API (`lib.rs`)
 
 ```rust
-/// Synchronous conversion — processes the entire document at once
+/// Synchronous conversion.
 pub fn transpile(
     input:    &str,
     format:   InputFormat,
@@ -237,18 +276,18 @@ pub fn transpile(
     budget:   Option<usize>,
 ) -> Result<String, TranspileError>;
 
-/// Asynchronous streaming conversion
+/// Asynchronous streaming conversion.
 pub async fn transpile_stream(
-    source:   impl AsyncRead + Unpin + Send + 'static,
+    input:    &str,
+    format:   InputFormat,
     fidelity: FidelityLevel,
     budget:   usize,
-) -> impl Stream<Item = Result<TranspileChunk>>;
+) -> Pin<Box<dyn Stream<Item = Result<TranspileChunk, StreamError>> + Send>>;
 
-/// Token count pre-calculation utility
-pub fn token_count(text: &str, model: TokenModel) -> usize;
+/// Token count utility (heuristic by default; accurate with `tiktoken` feature).
+pub fn token_count(text: &str) -> usize;
 
-pub enum InputFormat { PlainText, Markdown, Html, Pdf }
-pub enum TokenModel  { Gpt4, Gpt35, Llama3, Claude3 }
+pub enum InputFormat { PlainText, Markdown, Html }
 ```
 
 ---
@@ -258,20 +297,17 @@ pub enum TokenModel  { Gpt4, Gpt35, Llama3, Claude3 }
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum TranspileError {
-    #[error("Parse failed: {0}")]
-    ParseError(String),
+    #[error("parse failed: {0}")]
+    Parse(String),
 
-    #[error("Symbol table overflow (max {max} symbols)")]
-    SymbolTableOverflow { max: usize },
+    #[error("symbol table overflow: {0}")]
+    SymbolOverflow(#[from] symbol::SymbolOverflowError),
 
-    #[error("Token budget exceeded: required {required}, budget {budget}")]
-    BudgetExceeded { required: usize, budget: usize },
+    #[error("stream error: {0}")]
+    Stream(#[from] stream::StreamError),
 
-    #[error("Compression attempted in Lossless mode")]
+    #[error("compression attempted in Lossless mode")]
     LosslessModeViolation,
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
 }
 ```
 
@@ -279,61 +315,71 @@ pub enum TranspileError {
 
 ## 6. Dependencies (Cargo.toml)
 
-```toml
-[dependencies]
-# Parsing
-lopdf          = "0.31"
-html5ever      = "0.27"
-pulldown-cmark = "0.11"
+### Core (always compiled)
 
-# Serialization
+```toml
+pulldown-cmark = "0.11"      # Markdown parsing (CommonMark + GFM tables)
+ammonia        = "4"         # HTML tag stripping
 serde          = { version = "1", features = ["derive"] }
 serde_json     = "1"
-serde-norway   = "0.9"   # YAML 1.2 compliant (replaces serde_yaml)
-
-# Token counting
-tiktoken-rs    = "0.5"
-tokenizers     = "0.19"
-
-# Async
 tokio          = { version = "1", features = ["full"] }
 tokio-stream   = "0.1"
 futures        = "0.3"
-
-# Utilities
+aho-corasick   = "1"         # Multi-pattern string matching for SymbolDict
 regex          = "1"
 once_cell      = "1"
-itertools      = "0.12"
-rayon          = "1.8"
+itertools      = "0.13"
 thiserror      = "1"
-
-[dev-dependencies]
-tokio-test     = "0.4"
-criterion      = { version = "0.5", features = ["html_reports"] }
+clap           = { version = "4", features = ["derive"] }  # CLI binary
 ```
+
+### Optional features
+
+```toml
+[features]
+default  = []
+tiktoken = ["dep:tiktoken-rs"]   # Accurate token counting (cl100k_base)
+
+[dependencies]
+tiktoken-rs = { version = "0.5", optional = true }
+```
+
+> **Note**: `tiktoken-rs` adds ~5 MB to the binary and significantly increases
+> compile time. Enable only when token-budget accuracy is critical in production.
 
 ---
 
 ## 7. Non-Functional Requirements
 
 | Item | Requirement |
-|------|----------|
-| Thread safety | `SymbolDict` is single-document only; independent instance per document when processing in parallel |
-| Memory | Heap usage ≤ 10MB when processing a 1MB input document |
-| Test coverage | Core modules (ir, symbol, compressor) ≥ 80% |
-| MSRV | Rust 1.75+ (async fn in traits stable) |
+|------|-------------|
+| Thread safety | `SymbolDict` is `Send + Sync`; independent instance recommended per document |
+| Memory | Heap usage ≤ 10 MB when processing a 1 MB input document |
+| Test coverage | Core modules (ir, symbol, compressor, parser) ≥ 80 % |
+| MSRV | Rust 1.92 (`std::sync::OnceLock`, `async fn` in traits stable) |
+| Warnings | Zero compiler warnings (`cargo clippy -- -D warnings`) |
 
 ---
 
-## 8. Implementation Roadmap
+## 8. Known Limitations
 
-| Stage | Task | Status |
-|------|------|------|
-| 1 | Cargo project initialization + Cargo.toml | 🔲 |
-| 2 | `ir.rs` core types | 🔲 |
-| 3 | `symbol.rs` SymbolDict | 🔲 |
-| 4 | `renderer.rs` node renderer | 🔲 |
-| 5 | `compressor.rs` AdaptiveCompressor | 🔲 |
-| 6 | `stream.rs` Tokio streaming | 🔲 |
-| 7 | `lib.rs` public API integration | 🔲 |
-| 8 | Unit tests + benchmarks | 🔲 |
+| Limitation | Detail | Mitigation |
+|-----------|--------|------------|
+| Token counting accuracy | Default heuristic can be 2–3× off for Korean/CJK | Enable `tiktoken` feature |
+| Korean morphological analysis | Grammatical particles (은/는/이/가…) not stripped | Use `with_stopwords` + KoNLP pre-processing |
+| Streaming symbol substitution | Only pre-populated dictionaries work in streaming | Use `StreamingTranspiler::with_dict` |
+| PDF input | Not supported | Pre-convert with `pdf2md` or `pdftotext` |
+| Lossless integrity | 90.9 % on evaluation corpus (Apache licence misclassified) | Under investigation |
+
+---
+
+## 9. Roadmap
+
+| Priority | Task | Notes |
+|----------|------|-------|
+| P0 | Lossless mode 100 % integrity | Fix licence-header misclassification |
+| P1 | Korean morphological stop-list | Integrate `lindera` or `mecab-ko` |
+| P1 | Streaming two-pass symbol analysis | Collect terms → encode on second pass |
+| P2 | PDF input support | Integrate `pdf-extract` or `lopdf` |
+| P2 | MSRV bump to 1.80 → replace `once_cell` with `std::sync::OnceLock` | |
+| P3 | Per-language token heuristic calibration | Benchmark against real tokenisers |

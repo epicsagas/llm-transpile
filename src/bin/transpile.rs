@@ -8,7 +8,7 @@
 //!   transpile --input doc.md --json
 
 use clap::{Parser, ValueEnum};
-use llm_transpiler::{FidelityLevel, InputFormat, token_count, transpile};
+use llm_transpile::{FidelityLevel, InputFormat, token_count, transpile};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process;

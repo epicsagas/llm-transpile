@@ -7,7 +7,7 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use llm_transpiler::{transpile, FidelityLevel, InputFormat};
+//! use llm_transpile::{transpile, FidelityLevel, InputFormat};
 //!
 //! let md = "# Contract\n\nThis agreement was concluded in 2024.";
 //! let result = transpile(md, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))
@@ -18,7 +18,7 @@
 //! ## Streaming Usage
 //!
 //! ```rust,no_run
-//! use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
+//! use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
 //! use futures::StreamExt;
 //!
 //! async fn example() {

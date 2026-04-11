@@ -1,5 +1,5 @@
 /// examples/test_docs.rs — integration validation of llm-transpiler with real documents
-use llm_transpiler::{FidelityLevel, InputFormat, transpile};
+use llm_transpile::{FidelityLevel, InputFormat, transpile};
 use std::fs;
 use std::time::Instant;
 
@@ -12,11 +12,11 @@ fn test_file(path: &str, format: InputFormat, fidelity: FidelityLevel, budget: O
         }
     };
 
-    let input_tokens = llm_transpiler::token_count(&content);
+    let input_tokens = llm_transpile::token_count(&content);
     let t0 = Instant::now();
     match transpile(&content, format, fidelity, budget) {
         Ok(output) => {
-            let output_tokens = llm_transpiler::token_count(&output);
+            let output_tokens = llm_transpile::token_count(&output);
             let reduction = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
             let elapsed = t0.elapsed().as_millis();
             println!(

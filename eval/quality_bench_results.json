@@ -1,0 +1,259 @@
+{
+  "models": {
+    "answer": "google/gemini-2.0-flash-001",
+    "judge": "anthropic/claude-haiku-4-5"
+  },
+  "summary": {
+    "avg": {
+      "raw": 6.266666666666667,
+      "semantic": 6.533333333333333,
+      "compressed": 6.066666666666666
+    },
+    "wins": {
+      "raw": 5,
+      "semantic": 7,
+      "compressed": 3,
+      "tie": 0
+    },
+    "avg_token_saving_pct": 36.96,
+    "sem_quality_drop": -0.2666666666666666,
+    "cmp_quality_drop": 0.20000000000000018
+  },
+  "documents": [
+    {
+      "file": "hub-docs_security.md",
+      "questions": [
+        {
+          "q": "What are the two types of User Access Tokens described?",
+          "scores": {
+            "raw": 3,
+            "semantic": 3,
+            "compressed": 3,
+            "best": "compressed",
+            "note": "All three answers fail to provide the requested information about the two types of User Access Tokens, instead only acknowledging the topic exists in the document."
+          },
+          "raw": "The document does not describe the types of User Access Tokens, but it does link to a page about them.",
+          "sem": "The document does not describe the types of User Access Tokens, but it does list \"User Access Tokens\" as a topic covered in the contents section.",
+          "cmp": "The provided document does not describe the types of User Access Tokens, but it does list \"User Access Tokens\" as a topic covered in the document."
+        },
+        {
+          "q": "What should you do immediately if a token is leaked or compromised?",
+          "scores": {
+            "raw": 0,
+            "semantic": 0,
+            "compressed": 0,
+            "best": "raw",
+            "note": "All three answers correctly identify that the document lacks information on token compromise procedures, but none provide the actual security best practices that should be followed (revoke token, rotate credentials, audit access logs, etc.)."
+          },
+          "raw": "This document does not contain information about what to do if a token is leaked or compromised.",
+          "sem": "The provided document does not contain information about what to do if a token is leaked or compromised. It only describes the security features offered by Hugging Face Hub.",
+          "cmp": "The provided document does not contain information about what to do if a token is leaked or compromised. It only describes the security features offered by Hugging Face Hub."
+        },
+        {
+          "q": "Is Hugging Face SOC2 certified, and what type?",
+          "scores": {
+            "raw": 7,
+            "semantic": 7,
+            "compressed": 7,
+            "best": "semantic",
+            "note": "All three answers correctly identify SOC2 Type 2 certification, though the claim about 'actively monitor and patch' is somewhat vague and not definitively verifiable from public sources."
+          },
+          "raw": "Yes, Hugging Face is SOC2 Type 2 certified, meaning they provide security certification to customers and actively monitor and patch any security weaknesses.",
+          "sem": "Hugging Face is SOC2 Type 2 certified, meaning they provide security certification and actively monitor and patch any security weaknesses.",
+          "cmp": "Hugging Face is SOC2 Type 2 certified, meaning they provide security certification and actively monitor and patch any security weaknesses."
+        }
+      ],
+      "in_tok": 422,
+      "sem_tok": 254,
+      "cmp_tok": 254
+    },
+    {
+      "file": "repositories-getting-started.md",
+      "questions": [
+        {
+          "q": "What version control system does Hugging Face use for repositories?",
+          "scores": {
+            "raw": 7,
+            "semantic": 9,
+            "compressed": 6,
+            "best": "semantic",
+            "note": "The semantic answer is most complete, accurately explaining both Git for version control and Git-LFS (not Git-Xet) for large files, though Git-LFS is the actual system Hugging Face uses rather than Git-Xet."
+          },
+          "raw": "Hugging Face uses Git for version control in repositories. To handle large files, it uses Git-Xet.",
+          "sem": "Hugging Face uses Git to save new files and any changes to already existing files. It also uses Git-Xet to handle large files, images, and model weights.",
+          "cmp": "Hugging Face uses Git for version control in its repositories. You can use Git to save new files or any changes to existing files."
+        },
+        {
+          "q": "What command-line tool is recommended for cloning large repositories?",
+          "scores": {
+            "raw": 9,
+            "semantic": 7,
+            "compressed": 4,
+            "best": "raw",
+            "note": "The raw answer provides the most accurate and complete information about git-xet as the recommended tool for large repositories, including specific commands and usage details."
+          },
+          "raw": "For files larger than 10MB, the document recommends using `git-xet`, which can be initialized with the command `git xet install`. When creating a repository with Hugging Face, a list of common file extensions for Machine Learning large files is automatically provided in the `.gitattributes` file, which `git-xet` uses to efficiently track changes. You can add new extensions with `git xet track \"*.your_extension\"`.",
+          "sem": "Git is recommended for cloning repositories, and Git-Xet is used to handle large files, images, and model weights. To use Git-Xet, you must first install it.",
+          "cmp": "The document recommends using `git clone` to download repositories to your local machine. When you use Hugging Face to create a repository, Hugging Face automatically provides a list of common file extensions for common Machine Learning large files."
+        },
+        {
+          "q": "What is the maximum file size recommended without Git LFS?",
+          "scores": {
+            "raw": 2,
+            "semantic": 3,
+            "compressed": 5,
+            "best": "compressed",
+            "note": "The raw answer provides a specific claim (10MB) without source verification; semantic and compressed answers correctly acknowledge the document lacks this information, with compressed being most accurate."
+          },
+          "raw": "Files larger than 10MB should be tracked with `git-xet`.",
+          "sem": "The document does not specify a maximum file size. However, it mentions that Git-Xet is used to handle large files, images, and model weights.",
+          "cmp": "The provided document does not contain information about maximum file sizes or Git LFS."
+        }
+      ],
+      "in_tok": 2589,
+      "sem_tok": 1269,
+      "cmp_tok": 783
+    },
+    {
+      "file": "hub-docs_spaces_docker.md",
+      "questions": [
+        {
+          "q": "What port must a Docker Space expose by default?",
+          "scores": {
+            "raw": 9,
+            "semantic": 9,
+            "compressed": 9,
+            "best": "compressed",
+            "note": "All three answers are accurate and complete; the compressed version is most concise while maintaining full clarity about the default port and configuration method."
+          },
+          "raw": "By default, a Docker Space must expose port `7860`, but this can be changed by setting `app_port: 7860` in the Space's `README.md` file.",
+          "sem": "A Docker Space must expose port 7860 by default, but this can be changed by setting `app_port: 7860` in the README.md file.",
+          "cmp": "By default, a Docker Space exposes port 7860, which can be changed by setting `app_port: 7860` in the README.md file's YAML block."
+        },
+        {
+          "q": "What is the maximum disk size for a free-tier Docker Space?",
+          "scores": {
+            "raw": 8,
+            "semantic": 8,
+            "compressed": 8,
+            "best": "semantic",
+            "note": "All three answers correctly identify that the document lacks specific disk size information, with semantic providing slightly more context about data persistence alternatives."
+          },
+          "raw": "The provided document does not contain information about disk size for Docker Spaces.",
+          "sem": "The document does not specify the maximum disk size for a free-tier Docker Space. The document only mentions that data written to disk is lost whenever a Docker Space restarts, and suggests using a Storage Bucket to persist data across restarts.",
+          "cmp": "The document does not mention the maximum disk size for a free-tier Docker Space. The document only mentions that data written to disk is lost whenever a Docker Space restarts, and suggests using a Storage Bucket or Datasets Hub for data persistence."
+        },
+        {
+          "q": "What environment variable contains the Space's subdomain URL?",
+          "scores": {
+            "raw": 0,
+            "semantic": 0,
+            "compressed": 0,
+            "best": "semantic",
+            "note": "All three answers are equivalent in stating the document lacks this information, with 'semantic' being marginally clearer in phrasing."
+          },
+          "raw": "The provided document does not mention what environment variable contains the Space's subdomain URL.",
+          "sem": "The provided document does not mention any environment variable that contains the Space's subdomain URL.",
+          "cmp": "The provided document does not mention what environment variable contains the Space's subdomain URL."
+        }
+      ],
+      "in_tok": 1438,
+      "sem_tok": 1113,
+      "cmp_tok": 896
+    },
+    {
+      "file": "hub-docs_api.md",
+      "questions": [
+        {
+          "q": "What Python client library is provided for Hub API access?",
+          "scores": {
+            "raw": 10,
+            "semantic": 10,
+            "compressed": 10,
+            "best": "raw",
+            "note": "All three answers are accurate and complete; the raw version is selected as it matches the original phrasing most directly."
+          },
+          "raw": "The `huggingface_hub` Python client library is provided for easy access to Hub API endpoints.",
+          "sem": "The huggingface_hub Python client library is provided for easy access to Hub API endpoints.",
+          "cmp": "The Python client library huggingface_hub is provided for easy access to the Hub API endpoints."
+        },
+        {
+          "q": "Where has the Hub API Endpoints documentation been relocated?",
+          "scores": {
+            "raw": 6,
+            "semantic": 9,
+            "compressed": 9,
+            "best": "semantic",
+            "note": "Semantic and compressed answers provide specific, actionable URLs while raw answer lacks concrete details; semantic is marginally better as it appears first and maintains clarity."
+          },
+          "raw": "The Hub API Endpoints documentation has been moved to the OpenAPI Playground, which provides a comprehensive and up-to-date reference. You can access the OpenAPI specification directly or in Markdown version.",
+          "sem": "The Hub API Endpoints documentation has been moved to the OpenAPI Playground. You can access the OpenAPI specification directly at https://huggingface.co/.well-known/openapi.json, or a Markdown version at https://huggingface.co/.well-known/openapi.md.",
+          "cmp": "The Hub API Endpoints documentation has been moved to the OpenAPI Playground. You can access the OpenAPI specification directly at https://huggingface.co/.well-known/openapi.json, or a Markdown version at https://huggingface.co/.well-known/openapi.md."
+        },
+        {
+          "q": "In what format can you retrieve the API spec for sending to an AI agent?",
+          "scores": {
+            "raw": 6,
+            "semantic": 6,
+            "compressed": 6,
+            "best": "semantic",
+            "note": "All answers correctly identify Markdown format and provide the endpoint URL, but lack verification that this specific endpoint actually exists and may be incomplete regarding other available formats (JSON, YAML)."
+          },
+          "raw": "You can access the OpenAPI specification in Markdown format at https://huggingface.co/.well-known/openapi.md if you want to send it to your Agent.",
+          "sem": "You can retrieve the Hub API specification in Markdown format for sending to an AI agent. The link to the Markdown version is https://huggingface.co/.well-known/openapi.md.",
+          "cmp": "You can retrieve the Hub API specification in Markdown format for sending to an AI agent. The link to the Markdown version is https://huggingface.co/.well-known/openapi.md."
+        }
+      ],
+      "in_tok": 363,
+      "sem_tok": 188,
+      "cmp_tok": 188
+    },
+    {
+      "file": "hub-docs_model_cards_metadata.md",
+      "questions": [
+        {
+          "q": "What file in a repository is used as the model card?",
+          "scores": {
+            "raw": 9,
+            "semantic": 9,
+            "compressed": 9,
+            "best": "raw",
+            "note": "All three answers are accurate; the raw answer provides the most complete explanation by mentioning both the file name and that it's a Markdown file with metadata."
+          },
+          "raw": "The `README.md` file in a model repository is rendered as the model card. Model cards are Markdown files with additional metadata.",
+          "sem": "The model card is the README.md file in a model repository.",
+          "cmp": "The model card is rendered from the README file in the model repository."
+        },
+        {
+          "q": "Which metadata field specifies the ML task type?",
+          "scores": {
+            "raw": 9,
+            "semantic": 9,
+            "compressed": 8,
+            "best": "raw",
+            "note": "All answers correctly identify `pipeline_tag` as the metadata field for ML task type; raw version provides most complete context about functionality and user benefits."
+          },
+          "raw": "The `pipeline_tag` metadata field indicates the type of task the model is intended for. This tag will be displayed on the model page, and users can filter models on the Hub by task.",
+          "sem": "The `pipeline_tag` metadata field indicates the type of task the model is intended for. This tag is displayed on the model page and allows users to filter models by task on the Hub.",
+          "cmp": "The `pipeline_tag` field in the model card metadata specifies the ML task type."
+        },
+        {
+          "q": "What section of the model card must contain the YAML front matter?",
+          "scores": {
+            "raw": 9,
+            "semantic": 9,
+            "compressed": 7,
+            "best": "semantic",
+            "note": "All answers correctly identify the README.md file as the location, with semantic being most concise while maintaining full accuracy."
+          },
+          "raw": "The YAML section containing metadata about the model must be at the top of the `README.md` file.",
+          "sem": "The YAML section containing metadata must be at the top of the README.md file.",
+          "cmp": "The YAML front matter must be in the README.md file."
+        }
+      ],
+      "in_tok": 2080,
+      "sem_tok": 1597,
+      "cmp_tok": 1102
+    }
+  ]
+}

@@ -4,6 +4,20 @@
 //! - `InputFormat::Markdown`  — pulldown-cmark based
 //! - `InputFormat::PlainText` — paragraph-splitting parser
 //! - `InputFormat::Html`      — strips HTML tags then delegates to PlainText
+//!
+//! ## Paragraph importance scoring
+//!
+//! Every `DocNode::Para` is assigned an `importance` value in `0.1..=1.0`
+//! using a lightweight heuristic that combines three signals:
+//!
+//! | Signal | Weight | Rationale |
+//! |--------|--------|-----------|
+//! | Position | 50% | Inverted-pyramid principle: earlier paragraphs introduce the topic |
+//! | Length   | 40% | Very short paragraphs (captions, footnotes) carry less information |
+//! | Heading proximity | 10% | Paragraphs immediately after a heading introduce a new section |
+//!
+//! This ensures that `AdaptiveCompressor::prune_low_importance` (Stage 2) has
+//! genuinely differentiated scores to work with rather than a flat `1.0` for all nodes.
 
 use crate::InputFormat;
 use crate::ir::{DocNode, FidelityLevel, IRDocument};
@@ -28,6 +42,50 @@ pub fn parse(
     }
 
     Ok(doc)
+}
+
+// ────────────────────────────────────────────────
+// Importance scoring
+// ────────────────────────────────────────────────
+
+/// Computes the importance score for a paragraph.
+///
+/// # Parameters
+/// - `para_idx`          — 0-based index among all paragraphs seen so far
+/// - `char_count`        — length of the paragraph text in Unicode scalar values
+/// - `just_after_heading`— `true` when the preceding node was a heading
+///
+/// # Scoring
+/// Score = position_score × 0.5 + length_score × 0.4 + heading_bonus × 0.1,
+/// clamped to `[0.1, 1.0]`.
+fn calc_importance(para_idx: usize, char_count: usize, just_after_heading: bool) -> f32 {
+    // ── Position score: first paragraphs are more important ──────────────
+    // Inspired by the "inverted pyramid" principle in journalism.
+    let position_score: f32 = match para_idx {
+        0 => 1.00,
+        1 => 0.95,
+        2 => 0.90,
+        3..=5 => 0.80,
+        6..=10 => 0.65,
+        _ => 0.50,
+    };
+
+    // ── Length score: very short paragraphs are often captions/footnotes ─
+    let length_score: f32 = match char_count {
+        0..=15 => 0.30,
+        16..=40 => 0.55,
+        41..=80 => 0.75,
+        81..=200 => 0.90,
+        _ => 1.00,
+    };
+
+    // ── Heading proximity bonus ───────────────────────────────────────────
+    // A paragraph immediately after a heading introduces the section topic.
+    let heading_bonus: f32 = if just_after_heading { 1.0 } else { 0.0 };
+
+    // Weighted blend (weights sum to 1.0 when heading_bonus is active)
+    let score = position_score * 0.5 + length_score * 0.4 + heading_bonus * 0.1;
+    score.clamp(0.1, 1.0)
 }
 
 // ────────────────────────────────────────────────
@@ -56,6 +114,9 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
     let mut current_row: Vec<String> = Vec::new();
     let mut current_cell = String::new();
     let mut in_table_head = false;
+    // Importance tracking
+    let mut para_idx: usize = 0;
+    let mut just_after_heading: bool = true; // treat the very first paragraph as post-heading
 
     for event in parser {
         match event {
@@ -71,6 +132,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                         text: current_text.trim().to_string(),
                     });
                     current_text.clear();
+                    just_after_heading = true; // next paragraph is a section intro
                 }
             }
 
@@ -81,10 +143,11 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
             Event::End(TagEnd::Paragraph) => {
                 let text = current_text.trim().to_string();
                 if !text.is_empty() {
-                    doc.push(DocNode::Para {
-                        text,
-                        importance: 1.0,
-                    });
+                    let importance =
+                        calc_importance(para_idx, text.chars().count(), just_after_heading);
+                    doc.push(DocNode::Para { text, importance });
+                    para_idx += 1;
+                    just_after_heading = false;
                 }
                 current_text.clear();
             }
@@ -208,6 +271,9 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
 // ────────────────────────────────────────────────
 
 fn parse_plaintext(input: &str, doc: &mut IRDocument) {
+    let mut para_idx: usize = 0;
+    let mut just_after_heading: bool = true; // treat the very first paragraph as post-heading
+
     // Split paragraphs on blank lines
     for para in input.split("\n\n") {
         let text = para.trim();
@@ -220,16 +286,22 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
                 level: 1,
                 text: stripped.to_string(),
             });
+            just_after_heading = true;
         } else if let Some(stripped) = text.strip_prefix("## ") {
             doc.push(DocNode::Header {
                 level: 2,
                 text: stripped.to_string(),
             });
+            just_after_heading = true;
         } else {
+            let body = text.replace('\n', " ");
+            let importance = calc_importance(para_idx, body.chars().count(), just_after_heading);
             doc.push(DocNode::Para {
-                text: text.replace('\n', " "),
-                importance: 1.0,
+                text: body,
+                importance,
             });
+            para_idx += 1;
+            just_after_heading = false;
         }
     }
 }
@@ -363,5 +435,92 @@ mod tests {
             .collect();
         assert!(!all_text.contains('<'), "HTML tags must be stripped");
         assert!(all_text.contains("제목") || all_text.contains("본문"));
+    }
+
+    /// First paragraph (idx=0) must have higher importance than a later one (idx=12).
+    #[test]
+    fn importance_position_decay() {
+        let first = calc_importance(0, 120, false);
+        let later = calc_importance(12, 120, false);
+        assert!(
+            first > later,
+            "first paragraph ({first}) must be more important than a later one ({later})"
+        );
+    }
+
+    /// A short paragraph must have lower importance than a long one at the same position.
+    #[test]
+    fn importance_length_effect() {
+        let short = calc_importance(3, 10, false); // 10 chars — caption-length
+        let long = calc_importance(3, 300, false); // 300 chars — full paragraph
+        assert!(
+            long > short,
+            "long paragraph ({long}) must be more important than a short one ({short})"
+        );
+    }
+
+    /// A paragraph just after a heading must score higher than the same paragraph elsewhere.
+    #[test]
+    fn importance_heading_bonus() {
+        let after_heading = calc_importance(5, 80, true);
+        let no_heading = calc_importance(5, 80, false);
+        assert!(
+            after_heading > no_heading,
+            "paragraph after heading ({after_heading}) must score higher than \
+             the same paragraph without heading context ({no_heading})"
+        );
+    }
+
+    /// Importance scores must always be within the defined range.
+    #[test]
+    fn importance_range_invariant() {
+        for idx in [0usize, 1, 5, 10, 50] {
+            for chars in [5usize, 20, 100, 500] {
+                for after in [true, false] {
+                    let score = calc_importance(idx, chars, after);
+                    assert!(
+                        (0.1..=1.0).contains(&score),
+                        "importance out of range [{score}] for idx={idx}, chars={chars}, after_heading={after}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Paragraph importance values in a multi-paragraph document must be differentiated
+    /// (not all equal to 1.0).
+    #[test]
+    fn markdown_para_importances_are_differentiated() {
+        let md = "# Intro\n\n\
+                  This is the first paragraph after the heading.\n\n\
+                  Second paragraph with moderate content here.\n\n\
+                  Third paragraph.\n\n\
+                  Fourth paragraph.\n\n\
+                  Fifth paragraph with some text.\n\n\
+                  Sixth paragraph.\n\n\
+                  Seventh paragraph.\n\n\
+                  Eighth.\n\n\
+                  Ninth paragraph with a few words.\n\n\
+                  Tenth paragraph ends the document.";
+        let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
+        let importances: Vec<f32> = doc
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                if let DocNode::Para { importance, .. } = n {
+                    Some(*importance)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(importances.len() >= 3, "expected at least 3 paragraphs");
+        let all_same = importances
+            .windows(2)
+            .all(|w| (w[0] - w[1]).abs() < f32::EPSILON);
+        assert!(
+            !all_same,
+            "paragraph importance scores must be differentiated, got: {importances:?}"
+        );
     }
 }

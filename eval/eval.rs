@@ -10,7 +10,7 @@
 ///   - HTML      : eval/dataset/html/
 ///   - PlainText : eval/dataset/plaintext/
 ///   - Multilingual Markdown: eval/dataset/multilingual/
-use llm_transpiler::{FidelityLevel, InputFormat, token_count, transpile};
+use llm_transpile::{FidelityLevel, InputFormat, token_count, transpile};
 use std::fs;
 use std::time::Instant;
 

@@ -1,8 +1,8 @@
-# llm-transpiler
+# llm-transpile
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpiler.svg)](https://crates.io/crates/llm-transpiler)
-[![docs.rs](https://docs.rs/llm-transpiler/badge.svg)](https://docs.rs/llm-transpiler)
-[![CI](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
+[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
+[![CI](https://github.com/epicsagas/llm-transpile/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpile/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
@@ -61,7 +61,7 @@ LLMs perform better when context is clean and dense. This library handles the me
 
 ```toml
 [dependencies]
-llm-transpiler = "0.1"
+llm-transpile = "0.1"
 ```
 
 Requires **Rust 1.75+**.
@@ -69,14 +69,14 @@ Requires **Rust 1.75+**.
 ### CLI binary
 
 ```bash
-cargo install llm-transpiler
+cargo install llm-transpile
 ```
 
 Or from source:
 
 ```bash
-git clone https://github.com/epicsagas/llm-transpiler
-cd llm-transpiler
+git clone https://github.com/epicsagas/llm-transpile
+cd llm-transpile
 cargo install --path .
 ```
 
@@ -283,7 +283,7 @@ cp .claude/commands/*.md ~/.claude/commands/
 | Skill | Command | Description |
 |-------|---------|-------------|
 | `/transpile` | Transpile any document to bridge format via CLI |
-| `/transpile-integrate` | Add `llm-transpiler` to your Rust project and generate integration code |
+| `/transpile-integrate` | Add `llm-transpile` to your Rust project and generate integration code |
 | `/transpile-batch` | Generate a batch script to process an entire directory |
 
 ---
@@ -294,8 +294,8 @@ Contributions are welcome — bug reports, feature requests, and pull requests.
 
 ```bash
 # Clone and build
-git clone https://github.com/epicsagas/llm-transpiler
-cd llm-transpiler
+git clone https://github.com/epicsagas/llm-transpile
+cd llm-transpile
 cargo build
 
 # Run tests

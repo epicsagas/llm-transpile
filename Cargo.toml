@@ -1,13 +1,13 @@
 [package]
-name         = "llm-transpiler"
+name         = "llm-transpile"
 version      = "0.1.0"
 edition      = "2024"
 description  = "High-performance LLM context bridge — token-optimized document transpiler"
 rust-version = "1.92"
 license      = "Apache-2.0"
 readme       = "README.md"
-repository   = "https://github.com/epicsagas/llm-transpiler"
-homepage     = "https://github.com/epicsagas/llm-transpiler"
+repository   = "https://github.com/epicsagas/llm-transpile"
+homepage     = "https://github.com/epicsagas/llm-transpile"
 keywords     = ["llm", "tokenizer", "markdown", "compression", "rag"]
 categories   = ["text-processing", "command-line-utilities", "encoding"]
 exclude      = [
@@ -31,7 +31,7 @@ default  = []
 tiktoken = ["dep:tiktoken-rs"]
 
 [lib]
-name = "llm_transpiler"
+name = "llm_transpile"
 path = "src/lib.rs"
 
 [dependencies]

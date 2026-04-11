@@ -9,6 +9,23 @@
 //!                                        ↑
 //!                              Switches to Compressed at 80% budget usage
 //! ```
+//!
+//! # Symbol substitution in streaming
+//!
+//! The single-pass streaming pipeline cannot discover all domain terms before the
+//! stream starts, so [`SymbolDict`] **remains empty by default**. Use
+//! [`StreamingTranspiler::with_dict`] to inject a pre-populated dictionary when
+//! domain terms are known in advance.
+//!
+//! # Token counting
+//!
+//! By default, [`estimate_tokens`] uses a Unicode-script heuristic (chars-per-token).
+//! Enable the `tiktoken` Cargo feature for accurate `cl100k_base` counting:
+//!
+//! ```toml
+//! [dependencies]
+//! llm-transpiler = { features = ["tiktoken"] }
+//! ```
 
 use std::pin::Pin;
 
@@ -32,7 +49,10 @@ pub struct TranspileChunk {
     pub sequence: usize,
     /// Rendered text fragment.
     pub content: String,
-    /// Approximate token count (character-count / 4 heuristic).
+    /// Approximate token count for this chunk.
+    ///
+    /// Uses the `tiktoken` feature (cl100k_base) when enabled; otherwise falls back
+    /// to the Unicode-script character heuristic.
     pub token_count: usize,
     /// Whether this is the final chunk.
     pub is_final: bool,
@@ -50,22 +70,53 @@ impl TranspileChunk {
     }
 }
 
-/// Approximate token count (heuristic for use without tiktoken).
+// ────────────────────────────────────────────────
+// 2. Token estimation
+// ────────────────────────────────────────────────
+
+/// Returns the approximate token count for `text`.
 ///
+/// ## Feature: `tiktoken` (accurate)
+/// When the `tiktoken` Cargo feature is enabled, uses OpenAI's `cl100k_base` tokenizer
+/// (GPT-4 / GPT-3.5-turbo vocabulary, also a reasonable approximation for Claude).
+/// The tokenizer is initialised once and cached in a `OnceLock`.
+///
+/// ## Default (heuristic)
 /// Applies a chars-per-token weight based on each character's Unicode script range,
-/// sums `1/cpt`, then takes the ceiling.
+/// sums `1/cpt`, then takes the ceiling. **Not accurate for real models** — intended
+/// only as a lightweight approximation for systems that cannot carry the tiktoken
+/// dependency. For production use, enable the `tiktoken` feature.
 ///
-/// Replace with `tiktoken-rs` or the `tokenizers` crate for production use.
+/// | Script range | chars/token |
+/// |-------------|-------------|
+/// | Hiragana / Katakana / CJK / Hangul | 2 |
+/// | Arabic / Devanagari / Bengali / Tamil / Thai | 3 |
+/// | Emoji | 2 |
+/// | Latin and everything else | 4 |
 pub fn estimate_tokens(text: &str) -> usize {
-    let mut total = 0.0f64;
-    for c in text.chars() {
-        let cpt = chars_per_token(c);
-        total += 1.0 / cpt as f64;
+    #[cfg(feature = "tiktoken")]
+    {
+        use std::sync::OnceLock;
+        static BPE: OnceLock<tiktoken_rs::CoreBPE> = OnceLock::new();
+        let bpe = BPE.get_or_init(|| tiktoken_rs::cl100k_base().expect("cl100k_base init failed"));
+        bpe.encode_ordinary(text).len().max(1)
     }
-    (total.ceil() as usize).max(1)
+
+    #[cfg(not(feature = "tiktoken"))]
+    {
+        let mut total = 0.0f64;
+        for c in text.chars() {
+            let cpt = chars_per_token(c);
+            total += 1.0 / cpt as f64;
+        }
+        (total.ceil() as usize).max(1)
+    }
 }
 
 /// Returns the chars-per-token value based on the Unicode codepoint range.
+///
+/// Not used when the `tiktoken` feature is active.
+#[cfg(not(feature = "tiktoken"))]
 fn chars_per_token(c: char) -> u32 {
     let cp = c as u32;
     match cp {
@@ -95,30 +146,76 @@ fn chars_per_token(c: char) -> u32 {
 }
 
 // ────────────────────────────────────────────────
-// 2. StreamingTranspiler
+// 3. StreamingTranspiler
 // ────────────────────────────────────────────────
 
 /// Tokio channel-based streaming transpiler.
+///
+/// # Symbol dictionary injection
+///
+/// By default the streaming path uses an **empty** [`SymbolDict`] because a
+/// single-pass stream cannot discover domain terms before it starts. Use
+/// [`StreamingTranspiler::with_dict`] to supply a pre-populated dictionary
+/// when terms are known in advance:
+///
+/// ```rust,no_run
+/// use llm_transpile::{FidelityLevel, SymbolDict, StreamingTranspiler};
+///
+/// let mut dict = SymbolDict::new();
+/// dict.intern("large language model").unwrap();
+/// dict.intern("retrieval-augmented generation").unwrap();
+///
+/// let transpiler = StreamingTranspiler::with_dict(4096, FidelityLevel::Semantic, dict);
+/// ```
 pub struct StreamingTranspiler {
     compressor: AdaptiveCompressor,
     budget: usize,
     fidelity: FidelityLevel,
+    /// Pre-populated symbol dictionary used during streaming.
+    /// Empty by default; populate via `with_dict()` for domain-specific compression.
+    dict: SymbolDict,
 }
 
 impl StreamingTranspiler {
-    /// Creates a new transpiler.
+    /// Creates a new transpiler with an empty symbol dictionary.
     pub fn new(budget: usize, fidelity: FidelityLevel) -> Self {
         Self {
             compressor: AdaptiveCompressor::new(),
             budget,
             fidelity,
+            dict: SymbolDict::new(),
+        }
+    }
+
+    /// Creates a transpiler with a **pre-populated** symbol dictionary.
+    ///
+    /// Domain terms already registered in `dict` will be substituted with PUA
+    /// symbols during streaming and the `<D>` block will be emitted in the first
+    /// chunk. This is the recommended path when the document vocabulary is known
+    /// before streaming begins.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use llm_transpile::{FidelityLevel, SymbolDict, StreamingTranspiler};
+    ///
+    /// let mut dict = SymbolDict::new();
+    /// dict.intern("transformer model").unwrap();
+    ///
+    /// let transpiler = StreamingTranspiler::with_dict(8192, FidelityLevel::Semantic, dict);
+    /// ```
+    pub fn with_dict(budget: usize, fidelity: FidelityLevel, dict: SymbolDict) -> Self {
+        Self {
+            compressor: AdaptiveCompressor::new(),
+            budget,
+            fidelity,
+            dict,
         }
     }
 
     /// Converts an `IRDocument` into a chunk stream.
     ///
-    /// The first chunk always contains `<D>` + `<H>`.
-    /// Automatically switches to `Compressed` mode when 80% of the budget is reached.
+    /// The first chunk always contains `<D>` (if non-empty) + `<H><B>`.
+    /// Automatically switches to `Compressed` fidelity when 80% of the budget is reached.
     pub fn transpile(
         self,
         doc: IRDocument,
@@ -127,10 +224,17 @@ impl StreamingTranspiler {
         let stream = ReceiverStream::new(rx);
 
         tokio::spawn(async move {
-            if let Err(e) =
-                Self::run_pipeline(doc, self.budget, self.fidelity, &self.compressor, tx).await
+            if let Err(e) = Self::run_pipeline(
+                doc,
+                self.budget,
+                self.fidelity,
+                self.compressor,
+                self.dict,
+                tx,
+            )
+            .await
             {
-                // Error already sent over the channel; ignore at spawn level
+                // Error already sent over the channel; ignore at spawn level.
                 let _ = e;
             }
         });
@@ -142,18 +246,14 @@ impl StreamingTranspiler {
         doc: IRDocument,
         budget: usize,
         fidelity: FidelityLevel,
-        compressor: &AdaptiveCompressor,
+        compressor: AdaptiveCompressor,
+        dict: SymbolDict,
         tx: mpsc::Sender<Result<TranspileChunk, StreamError>>,
     ) -> Result<(), StreamError> {
-        // NOTE: SymbolDict remains empty in the streaming path.
-        // Symbol substitution (PUA encoding) is not currently supported because the single-pass
-        // design cannot know all terms before the stream starts.
-        // Use the synchronous `transpile()` if full symbol substitution is required.
-        let dict = SymbolDict::new();
         let mut accumulated_tokens: usize = 0;
         let mut sequence: usize = 0;
 
-        // ── Chunk 0: header (always first) ──────────
+        // ── Chunk 0: header (always first) ──────────────────────────────
         let header_content = build_header_chunk(&doc, &dict);
         accumulated_tokens += estimate_tokens(&header_content);
 
@@ -173,7 +273,7 @@ impl StreamingTranspiler {
             return Ok(());
         }
 
-        // ── Stream body nodes ────────────────────────
+        // ── Stream body nodes ────────────────────────────────────────────
         let body_nodes: Vec<DocNode> = doc
             .nodes
             .into_iter()
@@ -185,12 +285,11 @@ impl StreamingTranspiler {
             let is_last = idx == body_len - 1;
 
             // Switch to Compressed at 80% budget usage.
-            // If budget=0, 0/0 = NaN → NaN >= 0.80 is false so the branch never triggers.
-            // budget=0 is not a valid value for the public API (transpile_stream); caller's responsibility.
+            // If budget=0, treat as immediately over-budget (immediate Compressed mode).
             let usage = if budget > 0 {
                 accumulated_tokens as f64 / budget as f64
             } else {
-                1.0 // budget=0: immediately switch to Compressed
+                1.0
             };
             let effective_fidelity = if fidelity != FidelityLevel::Lossless && usage >= 0.80 {
                 FidelityLevel::Compressed
@@ -256,7 +355,7 @@ impl StreamingTranspiler {
 }
 
 // ────────────────────────────────────────────────
-// 3. Helper functions
+// 4. Helper functions
 // ────────────────────────────────────────────────
 
 /// Builds the document header chunk text (`<D>?<H><B>` opening).
@@ -278,7 +377,7 @@ fn build_header_chunk(doc: &IRDocument, dict: &SymbolDict) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 4. Error type
+// 5. Error type
 // ────────────────────────────────────────────────
 
 /// Streaming transpile error.
@@ -292,7 +391,7 @@ pub enum StreamError {
 }
 
 // ────────────────────────────────────────────────
-// 5. Unit tests
+// 6. Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -365,6 +464,26 @@ mod tests {
         assert_eq!(finals.len(), 1, "exactly one chunk must have is_final=true");
     }
 
+    #[tokio::test]
+    async fn with_dict_emits_dict_block_in_first_chunk() {
+        let mut dict = SymbolDict::new();
+        dict.intern("대규모언어모델").unwrap();
+
+        let doc = make_doc(FidelityLevel::Semantic, &["대규모언어모델 연구 동향"]);
+        let transpiler = StreamingTranspiler::with_dict(10_000, FidelityLevel::Semantic, dict);
+        let mut stream = transpiler.transpile(doc);
+
+        let first = stream.next().await.unwrap().unwrap();
+        assert!(
+            first.content.contains("<D>"),
+            "first chunk must contain the <D> dictionary block when dict is pre-populated"
+        );
+        assert!(
+            first.content.contains("대규모언어모델"),
+            "dictionary block must list the interned term"
+        );
+    }
+
     #[test]
     fn estimate_tokens_nonzero() {
         assert!(estimate_tokens("hello world") > 0);
@@ -382,6 +501,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "tiktoken"))]
     fn estimate_tokens_cjk_more_than_latin_same_char_count() {
         // CJK 5 chars: 5 * (1/2) = 2.5 → ceil → 3 tokens
         // Latin 5 chars: 5 * (1/4) = 1.25 → ceil → 2 tokens
@@ -395,6 +515,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "tiktoken"))]
     fn estimate_tokens_hangul_more_than_latin() {
         // Hangul 4 chars: 4 * (1/2) = 2.0 → ceil → 2 tokens
         // Latin 4 chars: 4 * (1/4) = 1.0 → ceil → 1 token
