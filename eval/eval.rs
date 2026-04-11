@@ -1,10 +1,10 @@
-/// examples/eval.rs — llm-transpiler 정량 평가
+/// examples/eval.rs — llm-transpiler quantitative evaluation
 ///
-/// 평가 지표:
-///   - 토큰 절감률 (fidelity 별)
-///   - 처리 속도 (tok/ms)
-///   - Lossless 무결성 검증
-///   - 스트리밍 TTFT (첫 청크 도달 시간)
+/// Metrics:
+///   - Token reduction rate (per fidelity level)
+///   - Throughput (tok/ms)
+///   - Lossless integrity verification
+///   - Streaming TTFT (time to first chunk)
 use llm_transpiler::{transpile, token_count, FidelityLevel, InputFormat};
 use std::fs;
 use std::time::Instant;
@@ -38,10 +38,10 @@ fn eval_file(path: &str) -> Option<Result> {
     let compressed_ms = t0.elapsed().as_millis();
     let compressed_tok = token_count(&cmp);
 
-    // Lossless — 주요 단어 보존 확인
+    // Lossless — verify key word preservation
     let los = transpile(&content, InputFormat::Markdown, FidelityLevel::Lossless, None).ok()?;
     let lossless_tok = token_count(&los);
-    // 원문의 임의 단어 3개가 출력에 모두 포함되어야 함
+    // All 3 sampled words from the source must appear in the output
     let sample_words: Vec<&str> = content
         .split_whitespace()
         .filter(|w| w.len() > 5 && w.chars().all(|c| c.is_alphabetic()))
@@ -90,7 +90,7 @@ fn main() {
     ];
 
     println!("{:<36} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>7} {:>7} {:>8}",
-        "파일", "입력tok", "Sem절감%", "Cmp절감%", "Sem_ms", "Cmp_ms", "tok/ms", "Loss절감%", "Loss무결", "입력KB");
+        "file", "in_tok", "Sem%red", "Cmp%red", "Sem_ms", "Cmp_ms", "tok/ms", "Loss%red", "Loss_ok", "in_KB");
     println!("{}", "-".repeat(110));
 
     let mut total_input = 0usize;
@@ -131,7 +131,7 @@ fn main() {
     let avg_cmp_ms = if count > 0 { total_cmp_ms / count as u128 } else { 0 };
     let total_tokms = if total_sem_ms > 0 { total_input as f64 / total_sem_ms as f64 } else { 0.0 };
     println!("{:<36} {:>6} {:>8.1} {:>8.1} {:>8} {:>8} {:>7.0} {:>8} {:>8}",
-        "합계/평균",
+        "total/avg",
         total_input,
         pct(total_semantic, total_input),
         pct(total_compressed, total_input),
@@ -142,11 +142,11 @@ fn main() {
         format!("{lossless_pass}/{count}"),
     );
 
-    println!("\n📊 요약:");
-    println!("  • Semantic   평균 절감: {:.1}%", pct(total_semantic, total_input));
-    println!("  • Compressed 평균 절감: {:.1}%", pct(total_compressed, total_input));
-    println!("  • Lossless 무결성:      {lossless_pass}/{count} 통과");
-    println!("  • 처리 속도 (Semantic): {total_tokms:.0} tok/ms");
-    println!("  • 총 입력 토큰:         {total_input}");
-    println!("  • 총 출력 (Semantic):   {total_semantic}");
+    println!("\n📊 Summary:");
+    println!("  • Semantic   avg reduction: {:.1}%", pct(total_semantic, total_input));
+    println!("  • Compressed avg reduction: {:.1}%", pct(total_compressed, total_input));
+    println!("  • Lossless integrity:       {lossless_pass}/{count} passed");
+    println!("  • Throughput (Semantic):    {total_tokms:.0} tok/ms");
+    println!("  • Total input tokens:       {total_input}");
+    println!("  • Total output (Semantic):  {total_semantic}");
 }

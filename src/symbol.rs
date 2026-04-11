@@ -1,22 +1,22 @@
 //! symbol.rs — SymbolDict (Token Substitution)
 //!
-//! 자주 등장하는 전문 용어를 Unicode Private Use Area(PUA) 문자로
-//! 치환하여 토큰 수를 절감한다.
+//! Reduces token count by replacing frequently occurring technical terms
+//! with Unicode Private Use Area (PUA) characters.
 //!
-//! # 설계 원칙
-//! - 치환 기호: U+E000–U+F8FF (PUA) 사용
-//!   → 가시적 `$1`, `$2` 방식 대비 역치환 충돌 제로
-//! - `intern()` / `decode_str()` 쌍으로 encode ↔ decode 완전 대칭
-//! - `<D>` 전역 사전 블록을 문서 상단에 1회만 출력
+//! # Design principles
+//! - Substitution characters: U+E000–U+F8FF (PUA)
+//!   → Zero reverse-substitution collisions compared to visible `$1`, `$2` patterns
+//! - `intern()` / `decode_str()` pair provides fully symmetric encode ↔ decode
+//! - The `<D>` global dictionary block is emitted only once at the top of the document
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-/// Unicode PUA 시작 코드포인트.
+/// Unicode PUA start codepoint.
 const PUA_START: u32 = 0xE000;
-/// Unicode PUA 종료 코드포인트 (포함).
+/// Unicode PUA end codepoint (inclusive).
 const PUA_END: u32 = 0xF8FF;
-/// 최대 심볼 수.
+/// Maximum number of symbols.
 pub const MAX_SYMBOLS: usize = (PUA_END - PUA_START + 1) as usize;
 
 // ────────────────────────────────────────────────
@@ -25,20 +25,20 @@ pub const MAX_SYMBOLS: usize = (PUA_END - PUA_START + 1) as usize;
 
 type AcCache = (Vec<String>, Vec<String>, aho_corasick::AhoCorasick);
 
-/// 전문 용어 ↔ PUA 기호 양방향 매핑 테이블.
+/// Bidirectional mapping table between technical terms and PUA symbols.
 ///
-/// # 스레드 안전성
-/// `RefCell` 내부 가변성을 사용하므로 `!Send`입니다.
-/// `tokio::spawn` 등에 직접 전달할 수 없으며, 필요 시 `Arc<Mutex<SymbolDict>>` 래핑이 필요합니다.
+/// # Thread safety
+/// Uses `RefCell` interior mutability, so this type is `!Send`.
+/// It cannot be passed directly to `tokio::spawn`; wrap in `Arc<Mutex<SymbolDict>>` if needed.
 pub struct SymbolDict {
-    /// term → PUA 문자
+    /// term → PUA character
     encode: HashMap<String, char>,
-    /// PUA 문자 → term
+    /// PUA character → term
     decode: HashMap<char, String>,
-    /// 다음에 할당할 PUA 코드포인트
+    /// Next PUA codepoint to assign
     next_code: u32,
-    /// `encode_str` lazy build 캐시 (내부 가변성).
-    /// `intern()` 호출 시 무효화, `encode_str()` 첫 호출 시 lazy build.
+    /// Lazy-build cache for `encode_str` (interior mutability).
+    /// Invalidated on `intern()` calls; lazily rebuilt on the first `encode_str()` call.
     ac_cache: RefCell<Option<AcCache>>,
 }
 
@@ -49,7 +49,7 @@ impl Default for SymbolDict {
 }
 
 impl SymbolDict {
-    /// 빈 사전을 생성한다.
+    /// Creates an empty dictionary.
     pub fn new() -> Self {
         Self {
             encode: HashMap::new(),
@@ -59,22 +59,22 @@ impl SymbolDict {
         }
     }
 
-    /// 등록된 심볼 수를 반환한다.
+    /// Returns the number of registered symbols.
     pub fn len(&self) -> usize {
         self.encode.len()
     }
 
-    /// 사전이 비어 있으면 `true`를 반환한다.
+    /// Returns `true` if the dictionary is empty.
     pub fn is_empty(&self) -> bool {
         self.encode.is_empty()
     }
 
-    /// 용어를 사전에 등록하고 대응하는 PUA 기호를 반환한다.
+    /// Registers a term in the dictionary and returns its corresponding PUA symbol.
     ///
-    /// 이미 등록된 용어라면 기존 기호를 반환한다 (멱등성 보장).
+    /// If the term is already registered, the existing symbol is returned (idempotent).
     ///
     /// # Errors
-    /// PUA 할당 한도 초과 시 `Err(SymbolOverflowError)` 반환.
+    /// Returns `Err(SymbolOverflowError)` when the PUA allocation limit is exceeded.
     pub fn intern(&mut self, term: &str) -> Result<char, SymbolOverflowError> {
         if let Some(&sym) = self.encode.get(term) {
             return Ok(sym);
@@ -83,17 +83,17 @@ impl SymbolDict {
             return Err(SymbolOverflowError { max: MAX_SYMBOLS });
         }
         let sym = char::from_u32(self.next_code)
-            .expect("PUA 범위 내 코드포인트는 항상 유효하다");
+            .expect("codepoints within the PUA range are always valid");
         self.encode.insert(term.to_string(), sym);
         self.decode.insert(sym, term.to_string());
         self.next_code += 1;
-        *self.ac_cache.borrow_mut() = None; // 사전 변경 시 캐시 무효화
+        *self.ac_cache.borrow_mut() = None; // Invalidate cache when the dictionary changes
         Ok(sym)
     }
 
-    /// 입력 문자열에서 PUA 기호를 원래 용어로 복원한다.
+    /// Restores PUA symbols in the input string back to their original terms.
     ///
-    /// 알 수 없는 PUA 문자는 그대로 통과시킨다.
+    /// Unknown PUA characters are passed through unchanged.
     #[cfg(test)]
     pub(crate) fn decode_str(&self, input: &str) -> String {
         input
@@ -108,16 +108,16 @@ impl SymbolDict {
             .collect()
     }
 
-    /// 입력 문자열에서 사전에 등록된 용어를 PUA 기호로 치환한다.
+    /// Replaces dictionary-registered terms in the input string with PUA symbols.
     ///
-    /// aho-corasick LeftmostLongest 단일 패스로 O(n+T) 복잡도.
-    /// automaton은 첫 호출 시 lazy build되고 `intern()` 호출 전까지 캐시된다.
+    /// Single aho-corasick LeftmostLongest pass, O(n+T) complexity.
+    /// The automaton is lazily built on the first call and cached until the next `intern()` call.
     pub fn encode_str(&self, input: &str) -> String {
         if self.encode.is_empty() {
             return input.to_string();
         }
 
-        // 캐시 히트 경로: 단일 borrow() (공유 참조)
+        // Cache hit path: single borrow() (shared reference)
         {
             let cache = self.ac_cache.borrow();
             if let Some((_, replacements, ac)) = cache.as_ref() {
@@ -125,15 +125,15 @@ impl SymbolDict {
             }
         }
 
-        // 캐시 미스: automaton 빌드 후 borrow_mut()으로 저장
+        // Cache miss: build automaton then store with borrow_mut()
         {
             let mut pairs: Vec<(String, String)> = self
                 .encode
                 .iter()
                 .map(|(k, v)| (k.clone(), v.to_string()))
                 .collect();
-            // LeftmostLongest가 길이 기준으로 선택하지만, 동일 길이 충돌 시
-            // 등록 순서(ID)가 낮은 쪽이 선택되므로 긴 것부터 정렬하여 ID를 부여한다.
+            // LeftmostLongest selects by length, but on equal-length conflicts it picks
+            // the pattern with the lower registration ID, so sort longest-first to assign IDs.
             pairs.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
 
             let patterns: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
@@ -142,7 +142,7 @@ impl SymbolDict {
             let ac = aho_corasick::AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::LeftmostLongest)
                 .build(&patterns)
-                .expect("유효한 패턴으로 AhoCorasick 빌드 실패 불가");
+                .expect("AhoCorasick build cannot fail with valid patterns");
 
             let pattern_strs: Vec<String> = pairs.into_iter().map(|(k, _)| k).collect();
             *self.ac_cache.borrow_mut() = Some((pattern_strs, replacements, ac));
@@ -153,14 +153,14 @@ impl SymbolDict {
         ac.replace_all(input, replacements)
     }
 
-    /// `<D>` 전역 사전 블록을 생성한다.
+    /// Generates the `<D>` global dictionary block.
     ///
-    /// 사전이 비어 있으면 빈 문자열을 반환한다.
+    /// Returns an empty string if the dictionary is empty.
     pub fn render_dict_header(&self) -> String {
         if self.is_empty() {
             return String::new();
         }
-        // 코드포인트 순서로 정렬하여 결정론적 출력 보장
+        // Sort by codepoint order for deterministic output
         let mut entries: Vec<(char, &str)> =
             self.decode.iter().map(|(c, s)| (*c, s.as_str())).collect();
         entries.sort_by_key(|(c, _)| *c as u32);
@@ -176,10 +176,10 @@ impl SymbolDict {
 }
 
 // ────────────────────────────────────────────────
-// 에러 타입
+// Error type
 // ────────────────────────────────────────────────
 
-/// PUA 기호 할당 한도 초과 에러.
+/// Error returned when the PUA symbol allocation limit is exceeded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolOverflowError {
     pub max: usize,
@@ -187,14 +187,14 @@ pub struct SymbolOverflowError {
 
 impl std::fmt::Display for SymbolOverflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "심볼 테이블 초과: 최대 {} 기호", self.max)
+        write!(f, "symbol table overflow: maximum {} symbols", self.max)
     }
 }
 
 impl std::error::Error for SymbolOverflowError {}
 
 // ────────────────────────────────────────────────
-// 단위 테스트
+// Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -206,7 +206,7 @@ mod tests {
         let mut dict = SymbolDict::new();
         let sym1 = dict.intern("법률용어").unwrap();
         let sym2 = dict.intern("법률용어").unwrap();
-        assert_eq!(sym1, sym2, "동일 용어 재 intern은 동일 기호를 반환해야 한다");
+        assert_eq!(sym1, sym2, "re-interning the same term must return the same symbol");
     }
 
     #[test]
@@ -219,23 +219,23 @@ mod tests {
         let encoded = dict.encode_str(original);
         let decoded = dict.decode_str(&encoded);
 
-        assert_eq!(decoded, original, "encode → decode 라운드트립이 원문을 복원해야 한다");
+        assert_eq!(decoded, original, "encode → decode round-trip must restore the original text");
     }
 
     #[test]
     fn no_collision_with_dollar_sign() {
         let mut dict = SymbolDict::new();
         let sym = dict.intern("테스트용어").unwrap();
-        // PUA 문자는 가시적 '$1' 패턴과 겹치지 않는다
+        // PUA characters do not overlap with visible '$1' patterns
         assert!(sym as u32 >= PUA_START);
         assert!(sym as u32 <= PUA_END);
     }
 
     #[test]
     fn decode_passes_through_unknown_pua() {
-        let dict = SymbolDict::new(); // 빈 사전
+        let dict = SymbolDict::new(); // empty dictionary
         let unknown = "\u{E100}hello";
-        // 등록되지 않은 PUA 문자는 그대로 통과
+        // Unregistered PUA characters are passed through unchanged
         assert_eq!(dict.decode_str(unknown), unknown);
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn overflow_returns_error() {
-        // 한도 초과 시뮬레이션: next_code를 강제로 PUA_END + 1로 밀기
+        // Simulate overflow: force next_code past PUA_END + 1
         let mut dict = SymbolDict::new();
         dict.next_code = PUA_END + 1;
         let result = dict.intern("overflow_term");
@@ -271,9 +271,9 @@ mod tests {
         dict.intern("abc").unwrap();
         let sym_ab  = *dict.encode.get("ab").unwrap();
         let sym_abc = *dict.encode.get("abc").unwrap();
-        // "abc"는 "ab"로 부분 매칭되지 않고 "abc" 전체로 치환되어야 한다
+        // "abc" must not be partially matched as "ab" — the entire "abc" should be substituted
         let encoded = dict.encode_str("abc");
         assert_eq!(encoded, sym_abc.to_string(),
-            "LeftmostLongest: 'abc' 전체가 치환되어야 함, sym_ab={:?}", sym_ab);
+            "LeftmostLongest: full 'abc' must be substituted, sym_ab={:?}", sym_ab);
     }
 }

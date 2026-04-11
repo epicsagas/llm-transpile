@@ -1,34 +1,34 @@
 //! compressor.rs — AdaptiveCompressor
 //!
-//! 토큰 예산 소모율에 따라 4단계 압축 전략을 자동으로 적용한다.
+//! Automatically applies a four-stage compression strategy based on token budget usage.
 //!
-//! | 예산 소모율 | 적용 전략                                           |
-//! |-----------|-----------------------------------------------------|
-//! | 0–60%     | 불용어 제거만                                        |
-//! | 60–80%    | 불용어 + 중요도 하위 20% 단락 제거                    |
-//! | 80–95%    | 위 + 중복 문장 제거 + 수치 데이터 선형화              |
-//! | 95%+      | 위 + 모든 단락 → 첫 문장만 유지 (Semantic 이상 전용) |
+//! | Budget usage | Strategy applied                                          |
+//! |-------------|-----------------------------------------------------------|
+//! | 0–60%       | Stopword removal only                                     |
+//! | 60–80%      | Stopwords + prune bottom-20% importance paragraphs        |
+//! | 80–95%      | Above + deduplicate sentences + linearize numeric data    |
+//! | 95%+        | Above + truncate all paragraphs to first sentence (Semantic+) |
 
 use crate::ir::{DocNode, FidelityLevel};
 use regex::Regex;
 
 // ────────────────────────────────────────────────
-// 1. 압축 설정
+// 1. Compression configuration
 // ────────────────────────────────────────────────
 
-/// 압축기 실행 시 제공하는 컨텍스트.
+/// Context provided when running the compressor.
 #[derive(Debug, Clone)]
 pub struct CompressionConfig {
-    /// 최대 허용 토큰 수.
+    /// Maximum allowed token count.
     pub budget: usize,
-    /// 현재까지 소모한 토큰 수 (근사치).
+    /// Tokens consumed so far (approximate).
     pub current_tokens: usize,
-    /// 의미 보존 레벨.
+    /// Semantic preservation level.
     pub fidelity: FidelityLevel,
 }
 
 impl CompressionConfig {
-    /// 현재 예산 소모율 (0.0–1.0).
+    /// Current budget usage ratio (0.0–1.0).
     pub fn usage_ratio(&self) -> f64 {
         if self.budget == 0 {
             return 1.0;
@@ -36,7 +36,7 @@ impl CompressionConfig {
         self.current_tokens as f64 / self.budget as f64
     }
 
-    /// 현재 소모율에 따른 압축 단계를 반환한다.
+    /// Returns the compression stage for the current usage ratio.
     pub fn stage(&self) -> CompressionStage {
         match self.usage_ratio() {
             r if r < 0.60 => CompressionStage::StopwordOnly,
@@ -47,16 +47,16 @@ impl CompressionConfig {
     }
 }
 
-/// 압축 단계 열거형.
+/// Compression stage enumeration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompressionStage {
-    /// 불용어 제거만.
+    /// Stopword removal only.
     StopwordOnly,
-    /// 불용어 + 중요도 하위 20% 단락 제거.
+    /// Stopwords + prune bottom-20% importance paragraphs.
     PruneLowImportance,
-    /// 위 + 중복 문장 제거.
+    /// Above + deduplicate sentences.
     DeduplicateAndLinearize,
-    /// 위 + 단락을 첫 문장으로 축약.
+    /// Above + truncate paragraphs to their first sentence.
     MaxCompression,
 }
 
@@ -64,10 +64,10 @@ pub enum CompressionStage {
 // 2. AdaptiveCompressor
 // ────────────────────────────────────────────────
 
-/// 예산 기반 적응형 문서 압축기.
+/// Budget-based adaptive document compressor.
 pub struct AdaptiveCompressor {
-    /// 생성자에서 사전 컴파일된 불용어 정규식 목록.
-    /// 호출마다 재컴파일하지 않도록 생성 시점에 한 번만 빌드한다.
+    /// Stopword regex list pre-compiled in the constructor.
+    /// Built once at construction time to avoid recompilation on every call.
     stopword_regexes: Vec<Regex>,
 }
 
@@ -78,20 +78,21 @@ impl Default for AdaptiveCompressor {
 }
 
 impl AdaptiveCompressor {
-    /// 기본 불용어 목록(빈 목록)으로 압축기를 생성한다.
+    /// Creates a compressor with the default stopword list (empty).
     pub fn new() -> Self {
         Self::with_stopwords(default_stopwords())
     }
 
-    /// 사용자 정의 불용어 목록으로 압축기를 생성한다.
-    /// 불용어는 생성 시점에 정규식으로 컴파일되어 캐시된다.
+    /// Creates a compressor with a custom stopword list.
+    /// Stopwords are compiled into regexes at construction time and cached.
     pub fn with_stopwords(stopwords: Vec<String>) -> Self {
         let stopword_regexes = stopwords
             .iter()
             .filter_map(|sw| {
-                // `\b`는 ASCII 단어 경계만 인식한다.
-                // 비ASCII 불용어(아랍어·힌디어 등)는 경계 매칭이 동작하지 않아 조용히 무시될 수 있다.
-                // TODO: 비ASCII 불용어는 공백 기반 split-replace 전략으로 별도 처리 필요.
+                // `\b` only recognizes ASCII word boundaries.
+                // Non-ASCII stopwords (Arabic, Hindi, etc.) may be silently ignored
+                // because boundary matching does not work for them.
+                // TODO: Non-ASCII stopwords need a separate whitespace-based split-replace strategy.
                 let pattern = format!(r"(?i)\b{}\b\s*", regex::escape(sw));
                 Regex::new(&pattern).ok()
             })
@@ -99,31 +100,31 @@ impl AdaptiveCompressor {
         Self { stopword_regexes }
     }
 
-    /// 노드 목록에 압축을 적용하고 결과를 반환한다.
+    /// Applies compression to the node list and returns the result.
     ///
-    /// `FidelityLevel::Lossless`에서는 불용어 제거도 수행하지 않는다.
+    /// Stopword removal is also skipped at `FidelityLevel::Lossless`.
     pub fn compress(&self, mut nodes: Vec<DocNode>, cfg: &CompressionConfig) -> Vec<DocNode> {
         if cfg.fidelity == FidelityLevel::Lossless {
-            return nodes; // Lossless: 압축 완전 금지
+            return nodes; // Lossless: compression entirely forbidden
         }
 
         let stage = cfg.stage();
 
-        // ① 불용어 제거 (모든 단계)
+        // ① Stopword removal (all stages)
         nodes = self.remove_stopwords(nodes);
 
-        // ② 중요도 하위 20% 단락 제거
+        // ② Prune bottom-20% importance paragraphs
         if stage >= CompressionStage::PruneLowImportance {
             nodes = prune_low_importance(nodes, 0.20);
         }
 
-        // ③ 중복 문장 제거
+        // ③ Deduplicate sentences
         if stage >= CompressionStage::DeduplicateAndLinearize {
             nodes = deduplicate_paras(nodes);
         }
 
-        // ④ 단락 → 첫 문장으로 축약
-        // Lossless는 함수 상단에서 early return했으므로 여기서는 fidelity != Lossless가 보장됨.
+        // ④ Truncate paragraphs to their first sentence
+        // Lossless early-returns at the top of the function, so fidelity != Lossless is guaranteed here.
         if stage >= CompressionStage::MaxCompression {
             nodes = truncate_to_first_sentence(nodes);
         }
@@ -131,7 +132,7 @@ impl AdaptiveCompressor {
         nodes
     }
 
-    // ── 내부 헬퍼 ───────────────────────────────
+    // ── Internal helpers ─────────────────────────
 
     fn remove_stopwords(&self, nodes: Vec<DocNode>) -> Vec<DocNode> {
         if self.stopword_regexes.is_empty() {
@@ -154,26 +155,26 @@ impl AdaptiveCompressor {
     }
 
     fn strip_stopwords(&self, text: &str) -> String {
-        // 불용어당 1회 패스(O(N × |text|)). 불용어가 `\b` ASCII 경계 regex를 사용하므로
-        // aho-corasick 단일 패스로 대체할 수 없습니다.
-        // 기본 불용어 목록은 비어 있으므로 `remove_stopwords`의 early return으로 이 함수는
-        // 사용자가 명시적으로 불용어를 구성한 경우에만 호출됩니다.
+        // One pass per stopword (O(N × |text|)). Because stopwords use `\b` ASCII-boundary regexes,
+        // they cannot be replaced with a single aho-corasick pass.
+        // The default stopword list is empty, so `remove_stopwords` early-returns and this function
+        // is only called when the caller explicitly configures stopwords.
         let mut result = text.to_string();
         for re in &self.stopword_regexes {
             result = re.replace_all(&result, "").into_owned();
         }
-        // 연속 공백 정리 (1회만 수행)
+        // Collapse consecutive whitespace (single pass)
         result.split_whitespace().collect::<Vec<_>>().join(" ")
     }
 }
 
 // ────────────────────────────────────────────────
-// 3. 내부 압축 함수들
+// 3. Internal compression functions
 // ────────────────────────────────────────────────
 
-/// 중요도 하위 `threshold` 비율의 `Para` 노드를 제거한다.
+/// Removes `Para` nodes in the bottom `threshold` fraction by importance.
 fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
-    // 단락만 필터링 대상
+    // Only paragraphs are subject to filtering
     let para_importances: Vec<f32> = nodes
         .iter()
         .filter_map(|n| {
@@ -189,7 +190,7 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
         return nodes;
     }
 
-    // 하위 threshold 비율의 컷오프 값 계산
+    // Calculate the cutoff value for the bottom threshold fraction
     let mut sorted = para_importances.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let cutoff_idx = ((sorted.len() as f32 * threshold) as usize).min(sorted.len() - 1);
@@ -201,14 +202,14 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
             if let DocNode::Para { importance, .. } = n {
                 *importance > cutoff
             } else {
-                true // 단락 외 노드는 보존
+                true // non-paragraph nodes are always preserved
             }
         })
         .cloned()
         .collect();
 
-    // 안전망: 원본에 Para가 있었는데 필터 후 Para가 하나도 없으면 원본 반환.
-    // (모든 단락의 중요도가 동일한 경우 cutoff == 모든 importance → 전부 탈락 방지)
+    // Safety net: if the input had Para nodes but none remain after filtering, return the original.
+    // (When all paragraphs share the same importance, cutoff == all importances → prevents total elimination)
     let filtered_has_para = filtered.iter().any(|n| matches!(n, DocNode::Para { .. }));
     let input_had_para = nodes.iter().any(|n| matches!(n, DocNode::Para { .. }));
 
@@ -219,7 +220,7 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
     }
 }
 
-/// 내용이 동일한 `Para` 노드를 제거한다 (첫 번째만 유지).
+/// Removes `Para` nodes with identical content, keeping only the first occurrence.
 fn deduplicate_paras(nodes: Vec<DocNode>) -> Vec<DocNode> {
     use std::collections::HashSet;
     let mut seen: HashSet<String> = HashSet::new();
@@ -236,7 +237,7 @@ fn deduplicate_paras(nodes: Vec<DocNode>) -> Vec<DocNode> {
         .collect()
 }
 
-/// 각 `Para`를 첫 번째 문장으로 잘라낸다.
+/// Truncates each `Para` to its first sentence.
 fn truncate_to_first_sentence(nodes: Vec<DocNode>) -> Vec<DocNode> {
     nodes
         .into_iter()
@@ -250,12 +251,12 @@ fn truncate_to_first_sentence(nodes: Vec<DocNode>) -> Vec<DocNode> {
         .collect()
 }
 
-/// 텍스트에서 첫 번째 문장(`.`, `!`, `?` 기준)을 추출한다.
+/// Extracts the first sentence from text (delimited by `.`, `!`, or `?`).
 fn first_sentence(text: &str) -> String {
     for (i, c) in text.char_indices() {
         if matches!(c,
             '.' | '!' | '?'           // ASCII
-            | '。' | '！' | '？'      // CJK 전각 (U+3002, U+FF01, U+FF1F)
+            | '。' | '！' | '？'      // CJK fullwidth (U+3002, U+FF01, U+FF1F)
             | '।' | '॥'              // Devanagari Danda / Double Danda (U+0964, U+0965)
             | '۔'                    // Arabic Full Stop (U+06D4)
             | '።'                    // Ethiopic Full Stop (U+1362)
@@ -268,18 +269,18 @@ fn first_sentence(text: &str) -> String {
             return text[..i + c.len_utf8()].trim().to_string();
         }
     }
-    text.trim().to_string() // 문장 부호 없으면 전체 반환
+    text.trim().to_string() // No sentence terminator found — return the full text
 }
 
-/// 기본 불용어 목록 — 언어 중립적으로 빈 목록을 반환한다.
+/// Default stopword list — returns an empty list for language neutrality.
 ///
-/// 언어별 불용어가 필요한 경우 `AdaptiveCompressor::with_stopwords()`를 사용하라.
+/// For language-specific stopwords, use `AdaptiveCompressor::with_stopwords()`.
 fn default_stopwords() -> Vec<String> {
     vec![]
 }
 
 // ────────────────────────────────────────────────
-// 4. 단위 테스트
+// 4. Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -300,7 +301,7 @@ mod tests {
         };
         let compressor = AdaptiveCompressor::new();
         let result = compressor.compress(nodes.clone(), &cfg);
-        // Lossless: 원본 그대로
+        // Lossless: original must be returned unchanged
         if let (DocNode::Para { text: t1, .. }, DocNode::Para { text: t2, .. }) =
             (&nodes[0], &result[0])
         {
@@ -311,25 +312,25 @@ mod tests {
     #[test]
     fn new_compressor_has_empty_stopwords() {
         let compressor = AdaptiveCompressor::new();
-        // new()로 생성한 compressor는 불용어 정규식 목록이 비어 있어야 한다.
+        // A compressor created with new() must have an empty stopword regex list.
         assert!(compressor.stopword_regexes.is_empty(),
-            "new()의 불용어 정규식 목록은 비어 있어야 한다");
+            "stopword regex list from new() must be empty");
     }
 
     #[test]
     fn stopword_removal_works() {
-        // with_stopwords를 통해 명시적으로 불용어를 지정해야 제거가 동작한다.
+        // Stopword removal only works when stopwords are explicitly specified via with_stopwords.
         let compressor = AdaptiveCompressor::with_stopwords(vec!["the".into()]);
         let nodes = vec![make_para("the quick brown fox", 1.0)];
         let cfg = CompressionConfig {
             budget: 1000,
-            current_tokens: 100, // ~10% — StopwordOnly 단계
+            current_tokens: 100, // ~10% — StopwordOnly stage
             fidelity: FidelityLevel::Semantic,
         };
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
             assert!(!text.to_lowercase().contains("the "),
-                "불용어 'the'가 제거되어야 한다: got '{}'", text);
+                "stopword 'the' must be removed: got '{}'", text);
         }
     }
 
@@ -345,10 +346,10 @@ mod tests {
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
             assert!(!text.to_lowercase().contains("hello"),
-                "'hello'가 제거되어야 한다: got '{}'", text);
+                "'hello' must be removed: got '{}'", text);
             assert!(!text.to_lowercase().contains("world"),
-                "'world'가 제거되어야 한다: got '{}'", text);
-            assert!(text.contains("foo"), "'foo'는 남아 있어야 한다: got '{}'", text);
+                "'world' must be removed: got '{}'", text);
+            assert!(text.contains("foo"), "'foo' must remain: got '{}'", text);
         }
     }
 
@@ -362,8 +363,8 @@ mod tests {
             make_para("낮은 단락3", 0.02),
         ];
         let result = prune_low_importance(nodes, 0.20);
-        // 중요도 하위 20% (5개 중 1개, cutoff=0.02) 제거
-        assert!(result.len() < 5, "일부 노드가 제거되어야 한다");
+        // Bottom 20% importance (1 out of 5, cutoff=0.02) should be removed
+        assert!(result.len() < 5, "some nodes must be removed");
     }
 
     #[test]
@@ -374,7 +375,7 @@ mod tests {
             make_para("동일한 내용입니다.", 0.9),
         ];
         let result = deduplicate_paras(nodes);
-        assert_eq!(result.len(), 2, "중복 단락 1개가 제거되어야 한다");
+        assert_eq!(result.len(), 2, "one duplicate paragraph must be removed");
     }
 
     #[test]
@@ -386,13 +387,13 @@ mod tests {
 
     #[test]
     fn first_sentence_multilingual() {
-        // 힌디어 Devanagari Danda (U+0964)
+        // Hindi Devanagari Danda (U+0964)
         assert_eq!(first_sentence("यह पहला वाक्य है। यह दूसरा है।"), "यह पहला वाक्य है।");
-        // 아랍어 Full Stop (U+06D4)
+        // Arabic Full Stop (U+06D4)
         assert_eq!(first_sentence("هذه الجملة الأولى۔ هذه الثانية۔"), "هذه الجملة الأولى۔");
-        // 암하라어 Ethiopic Full Stop (U+1362)
+        // Amharic Ethiopic Full Stop (U+1362)
         assert_eq!(first_sentence("ይህ የመጀመሪያ ዓረፍተ ነገር ነው። ሁለተኛ።"), "ይህ የመጀመሪያ ዓረፍተ ነገር ነው።");
-        // 전각 마침표 Small Full Stop (U+FE52)
+        // Fullwidth Small Full Stop (U+FE52)
         assert_eq!(first_sentence("これが最初の文です．これが二番目です．"), "これが最初の文です．");
     }
 
@@ -402,7 +403,7 @@ mod tests {
         let nodes = vec![make_para("only paragraph", 0.1)]; // low importance
         let cfg = CompressionConfig { budget: 100, current_tokens: 65, fidelity: FidelityLevel::Semantic };
         let result = compressor.compress(nodes, &cfg);
-        assert_eq!(result.len(), 1, "단락 1개짜리 문서에서 유일한 단락이 제거되면 안 됩니다");
+        assert_eq!(result.len(), 1, "the sole paragraph in a single-paragraph document must not be removed");
     }
 
     #[test]
@@ -416,7 +417,7 @@ mod tests {
         ];
         let cfg = CompressionConfig { budget: 100, current_tokens: 65, fidelity: FidelityLevel::Semantic };
         let result = compressor.compress(nodes, &cfg);
-        assert_eq!(result.len(), 3, "동일 중요도 단락은 전체 제거되면 안 됩니다");
+        assert_eq!(result.len(), 3, "paragraphs with equal importance must not all be removed");
     }
 
     #[test]

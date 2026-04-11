@@ -1,16 +1,16 @@
-//! renderer.rs — DocNode → 브릿지 포맷 렌더러
+//! renderer.rs — DocNode → bridge format renderer
 //!
-//! 최종 출력 포맷:
+//! Final output format:
 //! ```text
-//! <D>                   ← SymbolDict 전역 사전 (없으면 생략)
-//! SymA=전문용어A
+//! <D>                   ← SymbolDict global dictionary (omitted if empty)
+//! SymA=TermA
 //! </D>
-//! <H>                   ← YAML 헤더 (title, summary, keywords)
-//! t: 문서 제목
-//! s: 한줄 요약
+//! <H>                   ← YAML header (title, summary, keywords)
+//! t: document title
+//! s: one-line summary
 //! k: [kw1, kw2]
 //! </H>
-//! <B>                   ← 본문 (압축·치환 적용)
+//! <B>                   ← body (compression + substitution applied)
 //! ...
 //! </B>
 //! ```
@@ -19,12 +19,12 @@ use crate::ir::{DocNode, IRDocument};
 use crate::symbol::SymbolDict;
 
 // ────────────────────────────────────────────────
-// 1. 개별 노드 렌더러
+// 1. Individual node renderer
 // ────────────────────────────────────────────────
 
-/// 단일 `DocNode`를 브릿지 텍스트로 렌더링한다.
+/// Renders a single `DocNode` as bridge text.
 ///
-/// `dict`가 제공되면 본문 내 등록 용어를 PUA 기호로 치환한다.
+/// If `dict` is provided, registered terms in the body are replaced with PUA symbols.
 pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String {
     match node {
         DocNode::Header { level, text } => {
@@ -34,7 +34,7 @@ pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String {
         }
 
         DocNode::Para { text, .. } => {
-            // 연속 공백·줄바꿈 최소화
+            // Minimize consecutive whitespace and newlines
             let normalized = normalize_whitespace(text);
             dict.encode_str(&normalized)
         }
@@ -63,8 +63,8 @@ pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String {
         }
 
         DocNode::Metadata { key, value } => {
-            // 메타데이터는 렌더러 수준에서 직접 출력하지 않는다.
-            // YAML 헤더 빌더(`build_yaml_header`)가 별도로 처리한다.
+            // Metadata is not emitted directly at the renderer level.
+            // The YAML header builder (`build_yaml_header`) handles it separately.
             let _ = (key, value);
             String::new()
         }
@@ -72,15 +72,15 @@ pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 2. 테이블 선형화
+// 2. Table linearization
 // ────────────────────────────────────────────────
 
-/// 테이블을 토큰 효율적인 텍스트로 변환한다.
+/// Converts a table into token-efficient text.
 ///
-/// | 행 수    | 출력 형식                        |
-/// |---------|----------------------------------|
-/// | ≤ 5     | `Key:Val, Key:Val` 시퀀스        |
-/// | > 5     | JSON Lines (1행 = 1 JSON 객체)   |
+/// | Row count | Output format                       |
+/// |-----------|-------------------------------------|
+/// | ≤ 5       | `Key:Val, Key:Val` sequence         |
+/// | > 5       | JSON Lines (1 row = 1 JSON object)  |
 pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
     if rows.is_empty() {
         return String::new();
@@ -116,16 +116,16 @@ pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 3. YAML 헤더 빌더
+// 3. YAML header builder
 // ────────────────────────────────────────────────
 
-/// IRDocument의 메타데이터에서 YAML 헤더 블록을 생성한다.
+/// Builds a YAML header block from the IRDocument's metadata.
 ///
-/// 출력 예:
+/// Example output:
 /// ```yaml
-/// t: 계약서 분석 보고서
-/// s: 2024년 체결된 소프트웨어 라이선스 계약의 핵심 조항 요약
-/// k: [라이선스, 계약, 소프트웨어]
+/// t: Contract Analysis Report
+/// s: Summary of key clauses in the software license agreement signed in 2024
+/// k: [license, contract, software]
 /// ```
 pub fn build_yaml_header(doc: &IRDocument) -> String {
     let title   = doc.get_metadata("title").unwrap_or("");
@@ -140,7 +140,7 @@ pub fn build_yaml_header(doc: &IRDocument) -> String {
         lines.push(format!("s: {}", summary.trim()));
     }
     if !keywords.is_empty() {
-        // "kw1, kw2, kw3" → "[kw1, kw2, kw3]"
+        // "kw1, kw2, kw3" → "[kw1, kw2, kw3]"  (wrap in brackets)
         let kws: Vec<&str> = keywords.split(',').map(str::trim).collect();
         lines.push(format!("k: [{}]", kws.join(", ")));
     }
@@ -148,19 +148,19 @@ pub fn build_yaml_header(doc: &IRDocument) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 4. 전체 문서 렌더러
+// 4. Full document renderer
 // ────────────────────────────────────────────────
 
-/// 전체 IRDocument를 브릿지 포맷 문자열로 렌더링한다.
+/// Renders an entire IRDocument as a bridge-format string.
 ///
-/// 출력 구조: `<D>?` + `<H>` + `<B>`
+/// Output structure: `<D>?` + `<H>` + `<B>`
 pub fn render_full(doc: &IRDocument, dict: &mut SymbolDict) -> String {
-    // ① 본문 먼저 렌더링 (치환 과정에서 사전이 채워진다)
+    // ① Render body first (the dictionary is populated during substitution)
     let body_lines: Vec<String> = doc
         .nodes
         .iter()
         .filter_map(|node| {
-            // Metadata는 헤더에서 처리
+            // Metadata is handled by the header builder
             if matches!(node, crate::ir::DocNode::Metadata { .. }) {
                 return None;
             }
@@ -174,13 +174,13 @@ pub fn render_full(doc: &IRDocument, dict: &mut SymbolDict) -> String {
         .collect();
     let body = body_lines.join("\n");
 
-    // ② 전역 사전 블록
+    // ② Global dictionary block
     let dict_block = dict.render_dict_header();
 
-    // ③ YAML 헤더
+    // ③ YAML header
     let yaml_header = build_yaml_header(doc);
 
-    // ④ 조립
+    // ④ Assemble output
     let mut output = String::new();
     if !dict_block.is_empty() {
         output.push_str(&dict_block);
@@ -198,10 +198,10 @@ pub fn render_full(doc: &IRDocument, dict: &mut SymbolDict) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 5. 내부 유틸리티
+// 5. Internal utilities
 // ────────────────────────────────────────────────
 
-/// 연속된 공백과 줄바꿈을 단일 공백으로 정규화한다.
+/// Normalizes consecutive whitespace and newlines to a single space.
 fn normalize_whitespace(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut prev_space = false;
@@ -220,7 +220,7 @@ fn normalize_whitespace(s: &str) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 6. 단위 테스트
+// 6. Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -272,7 +272,7 @@ mod tests {
         let out = linearize_table(&headers, &rows);
         // JSON Lines: 각 줄이 JSON 객체
         for line in out.lines() {
-            let parsed: serde_json::Value = serde_json::from_str(line).expect("유효한 JSON");
+            let parsed: serde_json::Value = serde_json::from_str(line).expect("valid JSON");
             assert!(parsed.get("id").is_some());
         }
     }

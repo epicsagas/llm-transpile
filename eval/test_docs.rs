@@ -1,4 +1,4 @@
-/// examples/test_docs.rs — 실제 문서로 llm-transpiler 통합 검증
+/// examples/test_docs.rs — integration validation of llm-transpiler with real documents
 use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 use std::fs;
 use std::time::Instant;
@@ -20,7 +20,7 @@ fn test_file(path: &str, format: InputFormat, fidelity: FidelityLevel, budget: O
             let reduction = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
             let elapsed = t0.elapsed().as_millis();
             println!(
-                "✓ {path}\n  입력 {input_tokens} tok → 출력 {output_tokens} tok  ({reduction:.1}% 절감)  {elapsed}ms\n  ---\n{}\n",
+                "✓ {path}\n  input {input_tokens} tok → output {output_tokens} tok  ({reduction:.1}% reduction)  {elapsed}ms\n  ---\n{}\n",
                 output.lines().take(8).collect::<Vec<_>>().join("\n")
             );
         }
@@ -33,7 +33,7 @@ fn test_file(path: &str, format: InputFormat, fidelity: FidelityLevel, budget: O
 fn main() {
     let base = concat!(env!("CARGO_MANIFEST_DIR"), "/eval");
 
-    println!("═══ Semantic / 4096 토큰 예산 ═══\n");
+    println!("═══ Semantic / 4096 token budget ═══\n");
     let docs = [
         (format!("{base}/dataset/policy/01_auth_policy.md"),    InputFormat::Markdown),
         (format!("{base}/dataset/policy/02_api_access.md"),     InputFormat::Markdown),
@@ -49,7 +49,7 @@ fn main() {
         test_file(path, *fmt, FidelityLevel::Semantic, Some(4096));
     }
 
-    println!("\n═══ Lossless (무손실) ═══\n");
+    println!("\n═══ Lossless (no information loss) ═══\n");
     test_file(
         &format!("{base}/dataset/policy/01_auth_policy.md"),
         InputFormat::Markdown,
@@ -57,7 +57,7 @@ fn main() {
         None,
     );
 
-    println!("\n═══ Compressed (최대 압축) / 1024 토큰 ═══\n");
+    println!("\n═══ Compressed (maximum compression) / 1024 tokens ═══\n");
     test_file(
         &format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"),
         InputFormat::Markdown,

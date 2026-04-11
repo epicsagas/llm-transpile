@@ -1,14 +1,14 @@
-//! parser.rs — 입력 포맷 → IRDocument 파서
+//! parser.rs — input format → IRDocument parser
 //!
-//! 현재 지원 포맷:
-//! - `InputFormat::Markdown`  — pulldown-cmark 기반
-//! - `InputFormat::PlainText` — 문단 분리 파서
-//! - `InputFormat::Html`      — HTML 태그 제거 후 PlainText 처리
+//! Currently supported formats:
+//! - `InputFormat::Markdown`  — pulldown-cmark based
+//! - `InputFormat::PlainText` — paragraph-splitting parser
+//! - `InputFormat::Html`      — strips HTML tags then delegates to PlainText
 
 use crate::ir::{DocNode, FidelityLevel, IRDocument};
 use crate::InputFormat;
 
-/// 입력 텍스트를 `IRDocument`로 변환한다.
+/// Converts input text into an `IRDocument`.
 pub fn parse(
     input: &str,
     format: InputFormat,
@@ -21,7 +21,7 @@ pub fn parse(
         InputFormat::Markdown => parse_markdown(input, &mut doc),
         InputFormat::PlainText => parse_plaintext(input, &mut doc),
         InputFormat::Html => {
-            // HTML → PlainText 후 단락 파서 위임
+            // Strip HTML → delegate to PlainText paragraph parser
             let plain = strip_html_tags(input);
             parse_plaintext(&plain, &mut doc);
         }
@@ -31,7 +31,7 @@ pub fn parse(
 }
 
 // ────────────────────────────────────────────────
-// Markdown 파서 (pulldown-cmark)
+// Markdown parser (pulldown-cmark)
 // ────────────────────────────────────────────────
 
 fn parse_markdown(input: &str, doc: &mut IRDocument) {
@@ -49,7 +49,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
     let mut list_ordered = false;
     let mut list_items: Vec<String> = Vec::new();
     let mut current_list_item = String::new();
-    // 테이블 상태
+    // Table state
     let mut in_table = false;
     let mut table_headers: Vec<String> = Vec::new();
     let mut table_rows: Vec<Vec<String>> = Vec::new();
@@ -59,7 +59,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
 
     for event in parser {
         match event {
-            // ── 제목 ────────────────────────────
+            // ── Heading ─────────────────────────
             Event::Start(Tag::Heading { level, .. }) => {
                 current_heading = Some(heading_level_to_u8(level));
                 current_text.clear();
@@ -74,7 +74,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 }
             }
 
-            // ── 단락 ────────────────────────────
+            // ── Paragraph ───────────────────────
             Event::Start(Tag::Paragraph) => {
                 current_text.clear();
             }
@@ -86,7 +86,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 current_text.clear();
             }
 
-            // ── 코드 블록 ────────────────────────
+            // ── Code block ──────────────────────
             Event::Start(Tag::CodeBlock(kind)) => {
                 in_code_block = true;
                 code_lang = match kind {
@@ -107,7 +107,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 code_body.clear();
             }
 
-            // ── 목록 ────────────────────────────
+            // ── List ────────────────────────────
             Event::Start(Tag::List(num)) => {
                 in_list = true;
                 list_ordered = num.is_some();
@@ -133,7 +133,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 current_list_item.clear();
             }
 
-            // ── 테이블 ────────────────────────────
+            // ── Table ───────────────────────────
             Event::Start(Tag::Table(_)) => {
                 in_table = true;
                 table_headers.clear();
@@ -167,7 +167,7 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 current_cell.clear();
             }
 
-            // ── 텍스트 ────────────────────────────
+            // ── Text ────────────────────────────
             Event::Text(text) | Event::Code(text) => {
                 let s = text.as_ref();
                 if in_code_block {
@@ -193,17 +193,17 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
 }
 
 // ────────────────────────────────────────────────
-// PlainText 파서
+// PlainText parser
 // ────────────────────────────────────────────────
 
 fn parse_plaintext(input: &str, doc: &mut IRDocument) {
-    // 빈 줄로 문단을 분리
+    // Split paragraphs on blank lines
     for para in input.split("\n\n") {
         let text = para.trim();
         if text.is_empty() {
             continue;
         }
-        // '#'으로 시작하면 제목으로 처리
+        // Lines starting with '#' are treated as headings
         if let Some(stripped) = text.strip_prefix("# ") {
             doc.push(DocNode::Header { level: 1, text: stripped.to_string() });
         } else if let Some(stripped) = text.strip_prefix("## ") {
@@ -218,12 +218,12 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
 }
 
 // ────────────────────────────────────────────────
-// HTML 태그 제거 (ammonia 기반 안전한 파싱)
+// HTML tag stripping (safe parsing via ammonia)
 // ────────────────────────────────────────────────
 
 fn strip_html_tags(input: &str) -> String {
-    // ammonia에 빈 허용 태그 집합을 전달하면 모든 태그가 제거되고 엔티티가 디코딩된다.
-    // 정규식 방식과 달리 중첩 태그·주석·악성 HTML도 안전하게 처리한다.
+    // Passing an empty allowed-tag set to ammonia removes all tags and decodes entities.
+    // Unlike a regex approach, this safely handles nested tags, comments, and malicious HTML.
     ammonia::Builder::new()
         .tags(std::collections::HashSet::new())
         .clean(input)
@@ -231,7 +231,7 @@ fn strip_html_tags(input: &str) -> String {
 }
 
 // ────────────────────────────────────────────────
-// 내부 유틸리티
+// Internal utilities
 // ────────────────────────────────────────────────
 
 fn heading_level_to_u8(level: pulldown_cmark::HeadingLevel) -> u8 {
@@ -247,7 +247,7 @@ fn heading_level_to_u8(level: pulldown_cmark::HeadingLevel) -> u8 {
 }
 
 // ────────────────────────────────────────────────
-// 단위 테스트
+// Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -320,7 +320,7 @@ mod tests {
         let all_text: String = doc.nodes.iter().filter_map(|n| {
             if let DocNode::Para { text, .. } = n { Some(text.clone()) } else { None }
         }).collect();
-        assert!(!all_text.contains('<'), "HTML 태그가 제거되어야 한다");
+        assert!(!all_text.contains('<'), "HTML tags must be stripped");
         assert!(all_text.contains("제목") || all_text.contains("본문"));
     }
 }

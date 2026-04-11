@@ -1,76 +1,77 @@
 //! ir.rs — Intermediate Representation
 //!
-//! Raw 문서를 LLM 브릿지 포맷으로 변환하기 전에 보관하는
-//! 언어 중립적 내부 표현(IR). 의미 보존 레벨을 명시적으로 제어한다.
+//! A language-neutral internal representation (IR) that holds raw documents
+//! before they are converted into the LLM bridge format.
+//! Semantic preservation level is controlled explicitly.
 
 // ────────────────────────────────────────────────
-// 1. 의미 보존 레벨
+// 1. Semantic preservation level
 // ────────────────────────────────────────────────
 
-/// 문서 변환 시 허용되는 정보 손실 수준.
+/// The degree of information loss permitted during document conversion.
 ///
-/// 파이프라인 최상단에서 결정하면 이후 모든 변환 단계가
-/// 해당 제약을 일관되게 따른다.
+/// Decided once at the top of the pipeline; every subsequent transformation
+/// stage consistently respects this constraint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FidelityLevel {
-    /// 감사·법률 문서 — 원문 100% 보존, 압축 금지.
+    /// Audit/legal documents — 100% source preservation, compression forbidden.
     Lossless,
-    /// 일반 RAG 파이프라인 — 의미 단위로 최소 압축 허용.
+    /// General RAG pipeline — minimal compression at the semantic unit level.
     Semantic,
-    /// 요약 파이프라인 — 최대 압축, 핵심 정보만 유지.
+    /// Summarization pipeline — maximum compression, only key information kept.
     Compressed,
 }
 
 impl FidelityLevel {
-    /// 압축(손실) 변환이 허용되는지 여부 반환.
+    /// Returns whether lossy compression is permitted.
     pub fn allows_compression(self) -> bool {
         matches!(self, FidelityLevel::Semantic | FidelityLevel::Compressed)
     }
 }
 
 // ────────────────────────────────────────────────
-// 2. 문서 노드 (DocNode)
+// 2. Document node (DocNode)
 // ────────────────────────────────────────────────
 
-/// 문서를 구성하는 의미 단위.
+/// A semantic unit that makes up a document.
 ///
-/// 파서가 생성하고, 렌더러·압축기·기호화기가 소비한다.
+/// Produced by the parser and consumed by the renderer, compressor, and symbolizer.
 #[derive(Debug, Clone)]
 pub enum DocNode {
-    /// 제목 (H1–H6).
+    /// Heading (H1–H6).
     Header {
-        /// 제목 레벨 (1–6).
+        /// Heading level (1–6).
         level: u8,
         text: String,
     },
 
-    /// 일반 단락.
+    /// Regular paragraph.
     Para {
         text: String,
-        /// 중요도 스코어 (0.0 = 가장 낮음, 1.0 = 가장 높음).
-        /// 압축기가 우선순위 기반 트리밍에 활용한다.
+        /// Importance score (0.0 = lowest, 1.0 = highest).
+        /// Used by the compressor for priority-based trimming.
         importance: f32,
     },
 
-    /// 표.
+    /// Table.
     Table {
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
     },
 
-    /// 코드 블록.
+    /// Code block.
     Code {
         lang: Option<String>,
         body: String,
     },
 
-    /// 목록 (순서 있음 / 없음).
+    /// List (ordered or unordered).
     List {
         ordered: bool,
         items: Vec<String>,
     },
 
-    /// 키-값 메타데이터 (제목, 요약, 키워드 등).
+    /// Key-value metadata (title, summary, keywords, etc.).
     Metadata {
         key: String,
         value: String,
@@ -78,9 +79,9 @@ pub enum DocNode {
 }
 
 impl DocNode {
-    /// 노드의 중요도를 반환한다.
+    /// Returns the importance score of the node.
     ///
-    /// `Para` 이외의 노드는 기본 중요도 1.0을 가진다.
+    /// Nodes other than `Para` have a default importance of 1.0.
     pub fn importance(&self) -> f32 {
         match self {
             DocNode::Para { importance, .. } => *importance,
@@ -88,8 +89,8 @@ impl DocNode {
         }
     }
 
-    /// 노드가 보유한 텍스트의 대략적인 문자 수를 반환한다.
-    /// 토큰 예산 사전 필터링에 활용된다.
+    /// Returns the approximate character count of the text held by the node.
+    /// Used for pre-filtering against the token budget.
     pub fn char_len(&self) -> usize {
         match self {
             DocNode::Header { text, .. } => text.len(),
@@ -106,24 +107,24 @@ impl DocNode {
 }
 
 // ────────────────────────────────────────────────
-// 3. IR 문서
+// 3. IR document
 // ────────────────────────────────────────────────
 
-/// 파싱된 문서의 전체 IR 표현.
+/// The complete IR representation of a parsed document.
 ///
-/// `fidelity`와 `token_budget`은 이후 모든 변환 단계의 제약으로 작용한다.
+/// `fidelity` and `token_budget` act as constraints for every subsequent transformation stage.
 #[derive(Debug, Clone)]
 pub struct IRDocument {
-    /// 의미 보존 레벨.
+    /// Semantic preservation level.
     pub fidelity: FidelityLevel,
-    /// 문서 노드 시퀀스.
+    /// Sequence of document nodes.
     pub nodes: Vec<DocNode>,
-    /// 최대 허용 토큰 수. `None`이면 무제한.
+    /// Maximum allowed token count. `None` means unlimited.
     pub token_budget: Option<usize>,
 }
 
 impl IRDocument {
-    /// 새 IR 문서를 생성한다.
+    /// Creates a new IR document.
     pub fn new(fidelity: FidelityLevel, token_budget: Option<usize>) -> Self {
         Self {
             fidelity,
@@ -132,17 +133,17 @@ impl IRDocument {
         }
     }
 
-    /// 노드를 추가한다.
+    /// Appends a node.
     pub fn push(&mut self, node: DocNode) {
         self.nodes.push(node);
     }
 
-    /// 문서의 전체 문자 수 (토큰 예산 사전 검증용).
+    /// Total character count of the document (for pre-validation against the token budget).
     pub fn total_char_len(&self) -> usize {
         self.nodes.iter().map(|n| n.char_len()).sum()
     }
 
-    /// 메타데이터 노드에서 특정 키의 값을 조회한다.
+    /// Looks up the value for a specific key from metadata nodes.
     pub fn get_metadata(&self, key: &str) -> Option<&str> {
         self.nodes.iter().find_map(|n| {
             if let DocNode::Metadata { key: k, value } = n {
@@ -156,7 +157,7 @@ impl IRDocument {
 }
 
 // ────────────────────────────────────────────────
-// 4. 단위 테스트
+// 4. Unit tests
 // ────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -196,7 +197,7 @@ mod tests {
             headers: vec!["이름".into(), "나이".into()],
             rows: vec![vec!["홍길동".into(), "30".into()]],
         };
-        // "이름"(6) + "나이"(6) + "홍길동"(9) + "30"(2) = 23
+        // "이름"(6) + "나이"(6) + "홍길동"(9) + "30"(2) = 23 bytes
         assert_eq!(node.char_len(), 23);
     }
 }
