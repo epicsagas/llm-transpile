@@ -5,6 +5,11 @@
 
 set -euo pipefail
 
+# Skip on native Windows (non-WSL) — no bash/python3/wc available
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) exit 0 ;;
+esac
+
 HOOK_DEST="$HOME/.claude/transpile-hook.sh"
 
 # ── 1. Ensure transpile binary is installed ────────────────────────────────────
