@@ -12,14 +12,14 @@
 cargo run --example eval
 ```
 
-소스: `examples/eval.rs`
+소스: `eval/eval.rs`
 
 ### 데이터셋
 
 | 경로 | 설명 | 문서 수 |
 |------|------|---------|
-| `eval/dataset/` | 직접 제작한 정책 문서 (인증, API, 데이터 보존) | 3 |
-| `eval/hf_dataset/` | HuggingFace 공개 기술 문서 | 8 |
+| `eval/dataset/policy/` | 직접 제작한 정책 문서 (인증, API, 데이터 보존) | 3 |
+| `eval/dataset/hf/` | HuggingFace 공개 기술 문서 | 8 |
 
 ### 측정 지표
 
@@ -59,9 +59,7 @@ cargo run --example eval
 | model-cards.md | 4404 | 51.0 | 51.0 | 2 | 2 | 2202 | 25.9 | ✓ | 17.2 |
 | safetensors_README.md | 2697 | 14.7 | 16.4 | 1 | 1 | 2697 | 14.7 | ✓ | 10.6 |
 | transformers_CONTRIBUTING.md | 7841 | 31.6 | 31.6 | 3 | 3 | 2614 | 13.2 | ✗ | 30.7 |
-| **합계/평균** | **25428** | **27.4** | **35.3** | 1 | 1 | — | — | **10/11** | — |
-
-> 위 합계는 ai-ir 고유 문서 3개(MULTILANG_TEST_REPORT, README, RESEARCH)를 제외한 수치입니다.
+| **합계/평균** | **25428** | **29.7** | **35.7** | 1 | 1 | — | — | **10/11** | — |
 
 ---
 
@@ -69,8 +67,8 @@ cargo run --example eval
 
 | 지표 | 값 | 목표 |
 |------|-----|------|
-| Semantic 평균 절감 | **27.4%** | 15–30% ✓ |
-| Compressed 평균 절감 | **35.3%** | ≥ Semantic ✓ |
+| Semantic 평균 절감 | **29.7%** | 15–30% ✓ |
+| Compressed 평균 절감 | **35.7%** | ≥ Semantic ✓ |
 | Lossless 무결성 | **10/11 (90.9%)** | 100% △ |
 | 처리 속도 (Semantic) | **≥ 2,000 tok/ms** | Python 대비 ≥10× ✓ |
 | 단위 테스트 통과 | **52/52** | 100% ✓ |

@@ -35,15 +35,14 @@ fn main() {
 
     println!("═══ Semantic / 4096 토큰 예산 ═══\n");
     let docs = [
-        (format!("{base}/dataset/01_auth_policy.md"),    InputFormat::Markdown),
-        (format!("{base}/dataset/02_api_access.md"),     InputFormat::Markdown),
-        (format!("{base}/dataset/03_data_retention.md"), InputFormat::Markdown),
-        (format!("{base}/hf_dataset/hub-docs_security.md"),        InputFormat::Markdown),
-        (format!("{base}/hf_dataset/security-tokens.md"),          InputFormat::Markdown),
-        (format!("{base}/hf_dataset/transformers_CONTRIBUTING.md"),InputFormat::Markdown),
-        (format!("{base}/README.md"),                         InputFormat::Markdown),
-        (format!("{base}/README.md"),                            InputFormat::Markdown),
-        (format!("{base}/RESEARCH.md"),                       InputFormat::Markdown),
+        (format!("{base}/dataset/policy/01_auth_policy.md"),    InputFormat::Markdown),
+        (format!("{base}/dataset/policy/02_api_access.md"),     InputFormat::Markdown),
+        (format!("{base}/dataset/policy/03_data_retention.md"), InputFormat::Markdown),
+        (format!("{base}/dataset/hf/hub-docs_security.md"),     InputFormat::Markdown),
+        (format!("{base}/dataset/hf/security-tokens.md"),       InputFormat::Markdown),
+        (format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"), InputFormat::Markdown),
+        (format!("{base}/dataset/hf/model-cards.md"),           InputFormat::Markdown),
+        (format!("{base}/dataset/hf/safetensors_README.md"),    InputFormat::Markdown),
     ];
 
     for (path, fmt) in &docs {
@@ -52,7 +51,7 @@ fn main() {
 
     println!("\n═══ Lossless (무손실) ═══\n");
     test_file(
-        &format!("{base}/dataset/01_auth_policy.md"),
+        &format!("{base}/dataset/policy/01_auth_policy.md"),
         InputFormat::Markdown,
         FidelityLevel::Lossless,
         None,
@@ -60,7 +59,7 @@ fn main() {
 
     println!("\n═══ Compressed (최대 압축) / 1024 토큰 ═══\n");
     test_file(
-        &format!("{base}/hf_dataset/transformers_CONTRIBUTING.md"),
+        &format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"),
         InputFormat::Markdown,
         FidelityLevel::Compressed,
         Some(1024),

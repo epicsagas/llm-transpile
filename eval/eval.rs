@@ -76,17 +76,17 @@ fn pct(a: usize, b: usize) -> f64 {
 fn main() {
     let base = concat!(env!("CARGO_MANIFEST_DIR"), "/eval");
     let files = [
-        format!("{base}/dataset/01_auth_policy.md"),
-        format!("{base}/dataset/02_api_access.md"),
-        format!("{base}/dataset/03_data_retention.md"),
-        format!("{base}/hf_dataset/hub-docs_security.md"),
-        format!("{base}/hf_dataset/security-tokens.md"),
-        format!("{base}/hf_dataset/datasets-cards.md"),
-        format!("{base}/hf_dataset/repositories-getting-started.md"),
-        format!("{base}/hf_dataset/spaces-overview.md"),
-        format!("{base}/hf_dataset/model-cards.md"),
-        format!("{base}/hf_dataset/safetensors_README.md"),
-        format!("{base}/hf_dataset/transformers_CONTRIBUTING.md"),
+        format!("{base}/dataset/policy/01_auth_policy.md"),
+        format!("{base}/dataset/policy/02_api_access.md"),
+        format!("{base}/dataset/policy/03_data_retention.md"),
+        format!("{base}/dataset/hf/hub-docs_security.md"),
+        format!("{base}/dataset/hf/security-tokens.md"),
+        format!("{base}/dataset/hf/datasets-cards.md"),
+        format!("{base}/dataset/hf/repositories-getting-started.md"),
+        format!("{base}/dataset/hf/spaces-overview.md"),
+        format!("{base}/dataset/hf/model-cards.md"),
+        format!("{base}/dataset/hf/safetensors_README.md"),
+        format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"),
     ];
 
     println!("{:<36} {:>6} {:>8} {:>8} {:>8} {:>8} {:>8} {:>7} {:>7} {:>8}",
