@@ -66,7 +66,24 @@ llm-transpile = "0.1"
 
 Requires **Rust 1.75+**.
 
-### CLI binary
+### CLI binary + tool integration (one command)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/epicsagas/llm-transpile/main/install.sh | bash
+```
+
+Detects and configures whichever tools are installed:
+
+| Tool | What gets configured |
+|------|---------------------|
+| **Claude Code** | PostToolUse hook (large-file hint) + `/tctx` slash command |
+| **Gemini CLI** | `tgemini <file> "<prompt>"` shell wrapper |
+| **Codex CLI** | `tcodex <file> "<prompt>"` shell wrapper |
+| **Cursor** | `.cursor/transpile-ctx.sh` context regeneration script |
+| **OpenCode** | `topencode [files...]` wrapper with system prompt injection |
+| **Any tool** | `tctx`, `talias`, `trun` general-purpose helpers |
+
+Or install the binary only:
 
 ```bash
 cargo install llm-transpile
