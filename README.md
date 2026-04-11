@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpiler.svg)](https://crates.io/crates/llm-transpiler)
 [![docs.rs](https://docs.rs/llm-transpiler/badge.svg)](https://docs.rs/llm-transpiler)
 [![CI](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpiler/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
 **Token-optimized document transpiler for LLM pipelines**
@@ -287,4 +287,4 @@ cargo fmt
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
