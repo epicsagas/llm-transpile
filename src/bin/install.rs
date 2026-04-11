@@ -644,19 +644,18 @@ const TRANSPILE_SKILL_MD: &str = "\
 ---
 name: transpile
 description: >
-  ALWAYS run this before reading any file larger than ~8KB.
-  Produces a token-compressed version (~30% smaller) that preserves all meaning.
+  ALWAYS run this instead of directly reading .md, .html, or .txt files.
+  No size check needed — just apply it whenever the file extension matches.
 ---
 
-# transpile — Auto-compress before reading large files
+# transpile — Use instead of reading document files directly
 
 ## Activation rule
 
-**Before reading any file, check its size. If it exceeds ~8KB, run this skill first
-and use its output instead of reading the raw file.**
+**Whenever you are about to read a `.md`, `.html`, or `.txt` file, run this
+instead. Do not read the raw file — use transpile's output as the content.**
 
-This is not optional — skipping it wastes context on files the LLM can process
-equally well in compressed form.
+The file extension alone is sufficient to trigger this. No size check needed.
 
 ## Usage
 
@@ -664,13 +663,11 @@ equally well in compressed form.
 transpile --input <file> --fidelity semantic --quiet
 ```
 
-Use the output as the file content. Never read the raw file afterward.
-
 ## Fidelity options
 
 - `semantic` (default) — ~30% reduction, preserves all meaning
 - `compressed`         — ~40% reduction, use when near context limit
-- `lossless`           — no compression, for legal/config/binary-adjacent files
+- `lossless`           — no compression, for files where every word matters
 ";
 
 // ── Per-tool install ───────────────────────────────────────────────────────────
