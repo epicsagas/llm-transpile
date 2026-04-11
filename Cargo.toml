@@ -34,6 +34,14 @@ thiserror  = "1"
 tokio     = { version = "1", features = ["full", "test-util"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 
+[[example]]
+name = "eval"
+path = "eval/eval.rs"
+
+[[example]]
+name = "test_docs"
+path = "eval/test_docs.rs"
+
 [[bench]]
 name    = "transpile_bench"
 harness = false
