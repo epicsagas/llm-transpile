@@ -41,7 +41,12 @@ pub struct TranspileChunk {
 impl TranspileChunk {
     fn new(sequence: usize, content: String, is_final: bool) -> Self {
         let token_count = estimate_tokens(&content);
-        Self { sequence, content, token_count, is_final }
+        Self {
+            sequence,
+            content,
+            token_count,
+            is_final,
+        }
     }
 }
 
@@ -64,28 +69,28 @@ pub fn estimate_tokens(text: &str) -> usize {
 fn chars_per_token(c: char) -> u32 {
     let cp = c as u32;
     match cp {
-        0x3040..=0x30FF   => 2,  // Hiragana / Katakana
-        0x3400..=0x4DBF   => 2,  // CJK Extension A
-        0x4E00..=0x9FFF   => 2,  // CJK Unified Ideographs (BMP)
-        0xF900..=0xFAFF   => 2,  // CJK Compatibility Ideographs
-        0xAC00..=0xD7FF   => 2,  // Hangul Syllables (U+D7B0–D7FF: includes Jamo Extended-B)
-        0x1100..=0x11FF   => 2,  // Hangul Jamo
-        0xA960..=0xA97F   => 2,  // Hangul Jamo Extended-A
-        0x20000..=0x2A6DF => 2,  // CJK Extension B
-        0x2A700..=0x2CEAF => 2,  // CJK Extension C–F
-        0x2CEB0..=0x2EBEF => 2,  // CJK Extension G
-        0x30000..=0x323AF => 2,  // CJK Extension H–I
-        0x0600..=0x06FF   => 3,  // Arabic
-        0x0750..=0x077F   => 3,  // Arabic Supplement
-        0x0900..=0x097F   => 3,  // Devanagari
-        0x0980..=0x09FF   => 3,  // Bengali
-        0x0A00..=0x0A7F   => 3,  // Gurmukhi
-        0x0B80..=0x0BFF   => 3,  // Tamil
-        0x0E00..=0x0E7F   => 3,  // Thai
+        0x3040..=0x30FF => 2,   // Hiragana / Katakana
+        0x3400..=0x4DBF => 2,   // CJK Extension A
+        0x4E00..=0x9FFF => 2,   // CJK Unified Ideographs (BMP)
+        0xF900..=0xFAFF => 2,   // CJK Compatibility Ideographs
+        0xAC00..=0xD7FF => 2,   // Hangul Syllables (U+D7B0–D7FF: includes Jamo Extended-B)
+        0x1100..=0x11FF => 2,   // Hangul Jamo
+        0xA960..=0xA97F => 2,   // Hangul Jamo Extended-A
+        0x20000..=0x2A6DF => 2, // CJK Extension B
+        0x2A700..=0x2CEAF => 2, // CJK Extension C–F
+        0x2CEB0..=0x2EBEF => 2, // CJK Extension G
+        0x30000..=0x323AF => 2, // CJK Extension H–I
+        0x0600..=0x06FF => 3,   // Arabic
+        0x0750..=0x077F => 3,   // Arabic Supplement
+        0x0900..=0x097F => 3,   // Devanagari
+        0x0980..=0x09FF => 3,   // Bengali
+        0x0A00..=0x0A7F => 3,   // Gurmukhi
+        0x0B80..=0x0BFF => 3,   // Tamil
+        0x0E00..=0x0E7F => 3,   // Thai
         // Emoji: ~1–2 tokens per char per GPT-4 → approximate as cpt=2
-        0x1F300..=0x1F9FF => 2,  // Misc Symbols & Pictographs, Emoticons, Supplemental Symbols
-        0x1FA00..=0x1FAFF => 2,  // Symbols and Pictographs Extended-A
-        _                 => 4,  // Latin and other scripts
+        0x1F300..=0x1F9FF => 2, // Misc Symbols & Pictographs, Emoticons, Supplemental Symbols
+        0x1FA00..=0x1FAFF => 2, // Symbols and Pictographs Extended-A
+        _ => 4,                 // Latin and other scripts
     }
 }
 
@@ -122,7 +127,9 @@ impl StreamingTranspiler {
         let stream = ReceiverStream::new(rx);
 
         tokio::spawn(async move {
-            if let Err(e) = Self::run_pipeline(doc, self.budget, self.fidelity, &self.compressor, tx).await {
+            if let Err(e) =
+                Self::run_pipeline(doc, self.budget, self.fidelity, &self.compressor, tx).await
+            {
                 // Error already sent over the channel; ignore at spawn level
                 let _ = e;
             }
@@ -153,9 +160,13 @@ impl StreamingTranspiler {
         let total_nodes = doc.nodes.len();
         let is_final_header = total_nodes == 0;
 
-        tx.send(Ok(TranspileChunk::new(sequence, header_content, is_final_header)))
-            .await
-            .map_err(|_| StreamError::ChannelClosed)?;
+        tx.send(Ok(TranspileChunk::new(
+            sequence,
+            header_content,
+            is_final_header,
+        )))
+        .await
+        .map_err(|_| StreamError::ChannelClosed)?;
         sequence += 1;
 
         if is_final_header {
@@ -181,9 +192,7 @@ impl StreamingTranspiler {
             } else {
                 1.0 // budget=0: immediately switch to Compressed
             };
-            let effective_fidelity = if fidelity != FidelityLevel::Lossless
-                && usage >= 0.80
-            {
+            let effective_fidelity = if fidelity != FidelityLevel::Lossless && usage >= 0.80 {
                 FidelityLevel::Compressed
             } else {
                 fidelity
@@ -294,9 +303,15 @@ mod tests {
 
     fn make_doc(fidelity: FidelityLevel, paras: &[&str]) -> IRDocument {
         let mut doc = IRDocument::new(fidelity, None);
-        doc.push(DocNode::Metadata { key: "title".into(), value: "스트리밍 테스트".into() });
+        doc.push(DocNode::Metadata {
+            key: "title".into(),
+            value: "스트리밍 테스트".into(),
+        });
         for (i, &text) in paras.iter().enumerate() {
-            doc.push(DocNode::Para { text: text.into(), importance: 1.0 - (i as f32 * 0.1) });
+            doc.push(DocNode::Para {
+                text: text.into(),
+                importance: 1.0 - (i as f32 * 0.1),
+            });
         }
         doc
     }
@@ -309,8 +324,14 @@ mod tests {
 
         let first = stream.next().await.unwrap().unwrap();
         assert_eq!(first.sequence, 0);
-        assert!(first.content.contains("<H>"), "first chunk must contain the header");
-        assert!(first.content.contains("<B>"), "first chunk must contain the <B> opening");
+        assert!(
+            first.content.contains("<H>"),
+            "first chunk must contain the header"
+        );
+        assert!(
+            first.content.contains("<B>"),
+            "first chunk must contain the <B> opening"
+        );
     }
 
     #[tokio::test]
@@ -330,14 +351,17 @@ mod tests {
     #[tokio::test]
     async fn budget_triggers_force_final() {
         // Extremely low budget → force-final on the first body chunk
-        let doc = make_doc(FidelityLevel::Semantic, &["긴 내용 단락1", "긴 내용 단락2", "긴 내용 단락3"]);
+        let doc = make_doc(
+            FidelityLevel::Semantic,
+            &["긴 내용 단락1", "긴 내용 단락2", "긴 내용 단락3"],
+        );
         let transpiler = StreamingTranspiler::new(5, FidelityLevel::Semantic); // 5-token budget
-        let chunks: Vec<_> = transpiler
-            .transpile(doc)
-            .collect::<Vec<_>>()
-            .await;
+        let chunks: Vec<_> = transpiler.transpile(doc).collect::<Vec<_>>().await;
 
-        let finals: Vec<_> = chunks.iter().filter(|c| c.as_ref().unwrap().is_final).collect();
+        let finals: Vec<_> = chunks
+            .iter()
+            .filter(|c| c.as_ref().unwrap().is_final)
+            .collect();
         assert_eq!(finals.len(), 1, "exactly one chunk must have is_final=true");
     }
 
@@ -363,7 +387,7 @@ mod tests {
         // Latin 5 chars: 5 * (1/4) = 1.25 → ceil → 2 tokens
         // CJK token count > Latin token count
         let cjk = estimate_tokens("こんにちは"); // Hiragana, 5 chars
-        let latin = estimate_tokens("hello");    // Latin, 5 chars
+        let latin = estimate_tokens("hello"); // Latin, 5 chars
         assert!(
             cjk > latin,
             "CJK 5 chars ({cjk}) must have more tokens than Latin 5 chars ({latin})"
@@ -385,7 +409,10 @@ mod tests {
     #[test]
     fn estimate_tokens_never_zero_for_nonempty() {
         for text in &["a", "안", "あ", "ع", "क", "ก"] {
-            assert!(estimate_tokens(text) >= 1, "'{text}' must be at least 1 token");
+            assert!(
+                estimate_tokens(text) >= 1,
+                "'{text}' must be at least 1 token"
+            );
         }
     }
 }

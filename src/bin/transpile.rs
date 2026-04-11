@@ -8,9 +8,9 @@
 //!   transpile --input doc.md --json
 
 use clap::{Parser, ValueEnum};
-use llm_transpiler::{token_count, transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{FidelityLevel, InputFormat, token_count, transpile};
 use std::io::{self, Read};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 #[derive(Parser)]
@@ -80,7 +80,7 @@ impl FidelityArg {
 }
 
 /// Detect format from file extension, falling back to the CLI flag.
-fn detect_format(path: &PathBuf, flag: &FormatArg) -> InputFormat {
+fn detect_format(path: &Path, flag: &FormatArg) -> InputFormat {
     match path.extension().and_then(|e| e.to_str()) {
         Some("html") | Some("htm") => InputFormat::Html,
         Some("txt") => InputFormat::PlainText,

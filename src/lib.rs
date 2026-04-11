@@ -97,7 +97,10 @@ pub enum TranspileError {
 /// Strips Unicode PUA range (U+E000–U+F8FF) characters from the input string.
 /// Prevents external input from colliding with the internal symbol substitution scheme.
 fn strip_pua(input: &str) -> std::borrow::Cow<'_, str> {
-    if input.chars().any(|c| ('\u{E000}'..='\u{F8FF}').contains(&c)) {
+    if input
+        .chars()
+        .any(|c| ('\u{E000}'..='\u{F8FF}').contains(&c))
+    {
         std::borrow::Cow::Owned(
             input
                 .chars()
@@ -136,8 +139,7 @@ pub fn transpile(
     let input = input.as_ref();
 
     // 1. Parse → IR
-    let mut doc = parser::parse(input, format, fidelity, budget)
-        .map_err(TranspileError::Parse)?;
+    let mut doc = parser::parse(input, format, fidelity, budget).map_err(TranspileError::Parse)?;
 
     // 2. Compress (only when a budget is provided)
     if let Some(b) = budget {
@@ -185,9 +187,9 @@ pub async fn transpile_stream(
         Err(msg) => {
             // Parse failure: immediately return a stream containing a single Err chunk.
             // futures::future::ready() is Unpin, so it can be safely used with stream::once.
-            return Box::pin(futures::stream::once(futures::future::ready(
-                Err(StreamError::Parse(msg)),
-            )));
+            return Box::pin(futures::stream::once(futures::future::ready(Err(
+                StreamError::Parse(msg),
+            ))));
         }
     };
 
@@ -232,11 +234,23 @@ mod tests {
 
     #[test]
     fn transpile_markdown_produces_bridge_format() {
-        let result = transpile(SAMPLE_MD, InputFormat::Markdown, FidelityLevel::Semantic, Some(2048));
-        assert!(result.is_ok(), "transpile should succeed: {:?}", result.err());
+        let result = transpile(
+            SAMPLE_MD,
+            InputFormat::Markdown,
+            FidelityLevel::Semantic,
+            Some(2048),
+        );
+        assert!(
+            result.is_ok(),
+            "transpile should succeed: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
         assert!(output.contains("<B>"), "output must contain <B> tag");
-        assert!(output.contains("</B>"), "output must contain </B> closing tag");
+        assert!(
+            output.contains("</B>"),
+            "output must contain </B> closing tag"
+        );
     }
 
     #[test]
@@ -259,10 +273,22 @@ mod tests {
     #[test]
     fn pua_chars_stripped_from_input() {
         let input_with_pua = "hello \u{E000}world\u{F8FF}";
-        let output = transpile(input_with_pua, InputFormat::PlainText, FidelityLevel::Lossless, None).unwrap();
-        assert!(!output.contains('\u{E000}'), "PUA characters must not appear in output");
+        let output = transpile(
+            input_with_pua,
+            InputFormat::PlainText,
+            FidelityLevel::Lossless,
+            None,
+        )
+        .unwrap();
+        assert!(
+            !output.contains('\u{E000}'),
+            "PUA characters must not appear in output"
+        );
         assert!(output.contains("hello"), "plain text must be preserved");
-        assert!(output.contains("world"), "adjacent text after PUA removal must be preserved");
+        assert!(
+            output.contains("world"),
+            "adjacent text after PUA removal must be preserved"
+        );
     }
 
     #[tokio::test]
@@ -275,8 +301,18 @@ mod tests {
         _assert_send(StreamError::Parse("test".to_string()));
 
         // Verify normal streaming behavior
-        let mut stream = transpile_stream(SAMPLE_MD, InputFormat::Markdown, FidelityLevel::Semantic, 8192).await;
+        let mut stream = transpile_stream(
+            SAMPLE_MD,
+            InputFormat::Markdown,
+            FidelityLevel::Semantic,
+            8192,
+        )
+        .await;
         let first = stream.next().await.expect("at least one chunk must exist");
-        assert!(first.is_ok(), "valid input must yield an Ok chunk: {:?}", first.err());
+        assert!(
+            first.is_ok(),
+            "valid input must yield an Ok chunk: {:?}",
+            first.err()
+        );
     }
 }

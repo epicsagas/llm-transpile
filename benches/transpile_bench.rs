@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use llm_transpiler::{transpile, FidelityLevel, InputFormat};
+use criterion::{Criterion, criterion_group, criterion_main};
+use llm_transpiler::{FidelityLevel, InputFormat, transpile};
 
 const SAMPLE_MD: &str = r#"
 # 소프트웨어 라이선스 계약
@@ -23,8 +23,13 @@ const SAMPLE_MD: &str = r#"
 fn bench_transpile_semantic(c: &mut Criterion) {
     c.bench_function("transpile_semantic_4096", |b| {
         b.iter(|| {
-            transpile(SAMPLE_MD, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))
-                .unwrap()
+            transpile(
+                SAMPLE_MD,
+                InputFormat::Markdown,
+                FidelityLevel::Semantic,
+                Some(4096),
+            )
+            .unwrap()
         })
     });
 }
@@ -32,8 +37,13 @@ fn bench_transpile_semantic(c: &mut Criterion) {
 fn bench_transpile_lossless(c: &mut Criterion) {
     c.bench_function("transpile_lossless", |b| {
         b.iter(|| {
-            transpile(SAMPLE_MD, InputFormat::Markdown, FidelityLevel::Lossless, None)
-                .unwrap()
+            transpile(
+                SAMPLE_MD,
+                InputFormat::Markdown,
+                FidelityLevel::Lossless,
+                None,
+            )
+            .unwrap()
         })
     });
 }

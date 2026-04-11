@@ -1,5 +1,5 @@
 /// examples/test_docs.rs — integration validation of llm-transpiler with real documents
-use llm_transpiler::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{FidelityLevel, InputFormat, transpile};
 use std::fs;
 use std::time::Instant;
 
@@ -35,14 +35,38 @@ fn main() {
 
     println!("═══ Semantic / 4096 token budget ═══\n");
     let docs = [
-        (format!("{base}/dataset/policy/01_auth_policy.md"),    InputFormat::Markdown),
-        (format!("{base}/dataset/policy/02_api_access.md"),     InputFormat::Markdown),
-        (format!("{base}/dataset/policy/03_data_retention.md"), InputFormat::Markdown),
-        (format!("{base}/dataset/hf/hub-docs_security.md"),     InputFormat::Markdown),
-        (format!("{base}/dataset/hf/security-tokens.md"),       InputFormat::Markdown),
-        (format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"), InputFormat::Markdown),
-        (format!("{base}/dataset/hf/model-cards.md"),           InputFormat::Markdown),
-        (format!("{base}/dataset/hf/safetensors_README.md"),    InputFormat::Markdown),
+        (
+            format!("{base}/dataset/policy/01_auth_policy.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/policy/02_api_access.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/policy/03_data_retention.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/hf/hub-docs_security.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/hf/security-tokens.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/hf/transformers_CONTRIBUTING.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/hf/model-cards.md"),
+            InputFormat::Markdown,
+        ),
+        (
+            format!("{base}/dataset/hf/safetensors_README.md"),
+            InputFormat::Markdown,
+        ),
     ];
 
     for (path, fmt) in &docs {

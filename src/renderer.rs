@@ -46,21 +46,19 @@ pub fn render_node(node: &DocNode, dict: &SymbolDict) -> String {
             format!("```{}\n{}\n```", lang_tag, body.trim())
         }
 
-        DocNode::List { ordered, items } => {
-            items
-                .iter()
-                .enumerate()
-                .map(|(i, item)| {
-                    let encoded = dict.encode_str(item);
-                    if *ordered {
-                        format!("{}. {}", i + 1, encoded.trim())
-                    } else {
-                        format!("- {}", encoded.trim())
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
+        DocNode::List { ordered, items } => items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let encoded = dict.encode_str(item);
+                if *ordered {
+                    format!("{}. {}", i + 1, encoded.trim())
+                } else {
+                    format!("- {}", encoded.trim())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
 
         DocNode::Metadata { key, value } => {
             // Metadata is not emitted directly at the renderer level.
@@ -105,7 +103,10 @@ pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
                     .iter()
                     .zip(row.iter())
                     .map(|(h, v)| {
-                        (h.trim().to_string(), serde_json::Value::String(v.trim().to_string()))
+                        (
+                            h.trim().to_string(),
+                            serde_json::Value::String(v.trim().to_string()),
+                        )
                     })
                     .collect();
                 serde_json::to_string(&obj).unwrap_or_default()
@@ -128,7 +129,7 @@ pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
 /// k: [license, contract, software]
 /// ```
 pub fn build_yaml_header(doc: &IRDocument) -> String {
-    let title   = doc.get_metadata("title").unwrap_or("");
+    let title = doc.get_metadata("title").unwrap_or("");
     let summary = doc.get_metadata("summary").unwrap_or("");
     let keywords = doc.get_metadata("keywords").unwrap_or("");
 
@@ -234,7 +235,10 @@ mod tests {
 
     #[test]
     fn header_renders_with_hashes() {
-        let node = DocNode::Header { level: 2, text: "제목".into() };
+        let node = DocNode::Header {
+            level: 2,
+            text: "제목".into(),
+        };
         let out = render_node(&node, &empty_dict());
         assert_eq!(out, "## 제목");
     }
@@ -291,9 +295,18 @@ mod tests {
     #[test]
     fn render_full_structure() {
         let mut doc = IRDocument::new(FidelityLevel::Semantic, None);
-        doc.push(DocNode::Metadata { key: "title".into(),   value: "테스트".into() });
-        doc.push(DocNode::Metadata { key: "summary".into(), value: "요약".into() });
-        doc.push(DocNode::Para { text: "본문 내용".into(), importance: 1.0 });
+        doc.push(DocNode::Metadata {
+            key: "title".into(),
+            value: "테스트".into(),
+        });
+        doc.push(DocNode::Metadata {
+            key: "summary".into(),
+            value: "요약".into(),
+        });
+        doc.push(DocNode::Para {
+            text: "본문 내용".into(),
+            importance: 1.0,
+        });
 
         let mut dict = SymbolDict::new();
         let output = render_full(&doc, &mut dict);

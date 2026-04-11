@@ -5,8 +5,8 @@
 //! - `InputFormat::PlainText` — paragraph-splitting parser
 //! - `InputFormat::Html`      — strips HTML tags then delegates to PlainText
 
-use crate::ir::{DocNode, FidelityLevel, IRDocument};
 use crate::InputFormat;
+use crate::ir::{DocNode, FidelityLevel, IRDocument};
 
 /// Converts input text into an `IRDocument`.
 pub fn parse(
@@ -81,7 +81,10 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
             Event::End(TagEnd::Paragraph) => {
                 let text = current_text.trim().to_string();
                 if !text.is_empty() {
-                    doc.push(DocNode::Para { text, importance: 1.0 });
+                    doc.push(DocNode::Para {
+                        text,
+                        importance: 1.0,
+                    });
                 }
                 current_text.clear();
             }
@@ -148,15 +151,23 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                     });
                 }
             }
-            Event::Start(Tag::TableHead) => { in_table_head = true; }
-            Event::End(TagEnd::TableHead) => { in_table_head = false; }
-            Event::Start(Tag::TableRow) => { current_row.clear(); }
+            Event::Start(Tag::TableHead) => {
+                in_table_head = true;
+            }
+            Event::End(TagEnd::TableHead) => {
+                in_table_head = false;
+            }
+            Event::Start(Tag::TableRow) => {
+                current_row.clear();
+            }
             Event::End(TagEnd::TableRow) => {
                 if !in_table_head {
                     table_rows.push(std::mem::take(&mut current_row));
                 }
             }
-            Event::Start(Tag::TableCell) => { current_cell.clear(); }
+            Event::Start(Tag::TableCell) => {
+                current_cell.clear();
+            }
             Event::End(TagEnd::TableCell) => {
                 let cell = current_cell.trim().to_string();
                 if in_table_head {
@@ -205,9 +216,15 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
         }
         // Lines starting with '#' are treated as headings
         if let Some(stripped) = text.strip_prefix("# ") {
-            doc.push(DocNode::Header { level: 1, text: stripped.to_string() });
+            doc.push(DocNode::Header {
+                level: 1,
+                text: stripped.to_string(),
+            });
         } else if let Some(stripped) = text.strip_prefix("## ") {
-            doc.push(DocNode::Header { level: 2, text: stripped.to_string() });
+            doc.push(DocNode::Header {
+                level: 2,
+                text: stripped.to_string(),
+            });
         } else {
             doc.push(DocNode::Para {
                 text: text.replace('\n', " "),
@@ -258,7 +275,11 @@ mod tests {
     fn markdown_heading_parsed() {
         let md = "# 제목1\n\n## 제목2";
         let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
-        let headers: Vec<_> = doc.nodes.iter().filter(|n| matches!(n, DocNode::Header { .. })).collect();
+        let headers: Vec<_> = doc
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, DocNode::Header { .. }))
+            .collect();
         assert_eq!(headers.len(), 2);
         if let DocNode::Header { level, text } = &headers[0] {
             assert_eq!(*level, 1);
@@ -270,7 +291,11 @@ mod tests {
     fn markdown_para_parsed() {
         let md = "첫 번째 단락입니다.\n\n두 번째 단락입니다.";
         let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
-        let paras: Vec<_> = doc.nodes.iter().filter(|n| matches!(n, DocNode::Para { .. })).collect();
+        let paras: Vec<_> = doc
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, DocNode::Para { .. }))
+            .collect();
         assert_eq!(paras.len(), 2);
     }
 
@@ -278,7 +303,11 @@ mod tests {
     fn markdown_table_parsed() {
         let md = "| 이름 | 나이 |\n|------|------|\n| 홍길동 | 30 |";
         let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
-        let tables: Vec<_> = doc.nodes.iter().filter(|n| matches!(n, DocNode::Table { .. })).collect();
+        let tables: Vec<_> = doc
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, DocNode::Table { .. }))
+            .collect();
         assert_eq!(tables.len(), 1);
         if let DocNode::Table { headers, rows } = &tables[0] {
             assert_eq!(headers[0].trim(), "이름");
@@ -290,7 +319,11 @@ mod tests {
     fn markdown_list_parsed() {
         let md = "- 항목1\n- 항목2\n- 항목3";
         let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
-        let lists: Vec<_> = doc.nodes.iter().filter(|n| matches!(n, DocNode::List { .. })).collect();
+        let lists: Vec<_> = doc
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, DocNode::List { .. }))
+            .collect();
         assert_eq!(lists.len(), 1);
         if let DocNode::List { ordered, items } = &lists[0] {
             assert!(!ordered);
@@ -317,9 +350,17 @@ mod tests {
     fn html_tags_stripped() {
         let html = "<h1>제목</h1><p>본문 내용</p>";
         let doc = parse(html, InputFormat::Html, FidelityLevel::Semantic, None).unwrap();
-        let all_text: String = doc.nodes.iter().filter_map(|n| {
-            if let DocNode::Para { text, .. } = n { Some(text.clone()) } else { None }
-        }).collect();
+        let all_text: String = doc
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                if let DocNode::Para { text, .. } = n {
+                    Some(text.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
         assert!(!all_text.contains('<'), "HTML tags must be stripped");
         assert!(all_text.contains("제목") || all_text.contains("본문"));
     }

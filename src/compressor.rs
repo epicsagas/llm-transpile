@@ -42,7 +42,7 @@ impl CompressionConfig {
             r if r < 0.60 => CompressionStage::StopwordOnly,
             r if r < 0.80 => CompressionStage::PruneLowImportance,
             r if r < 0.95 => CompressionStage::DeduplicateAndLinearize,
-            _              => CompressionStage::MaxCompression,
+            _ => CompressionStage::MaxCompression,
         }
     }
 }
@@ -244,7 +244,10 @@ fn truncate_to_first_sentence(nodes: Vec<DocNode>) -> Vec<DocNode> {
         .map(|node| match node {
             DocNode::Para { text, importance } => {
                 let first = first_sentence(&text);
-                DocNode::Para { text: first, importance }
+                DocNode::Para {
+                    text: first,
+                    importance,
+                }
             }
             other => other,
         })
@@ -254,7 +257,8 @@ fn truncate_to_first_sentence(nodes: Vec<DocNode>) -> Vec<DocNode> {
 /// Extracts the first sentence from text (delimited by `.`, `!`, or `?`).
 fn first_sentence(text: &str) -> String {
     for (i, c) in text.char_indices() {
-        if matches!(c,
+        if matches!(
+            c,
             '.' | '!' | '?'           // ASCII
             | '。' | '！' | '？'      // CJK fullwidth (U+3002, U+FF01, U+FF1F)
             | '।' | '॥'              // Devanagari Danda / Double Danda (U+0964, U+0965)
@@ -264,7 +268,7 @@ fn first_sentence(text: &str) -> String {
             | '꓿'                    // Lisu Punctuation Full Stop (U+A4FF)
             | '︒'                    // Presentation Form Vertical Ideographic Full Stop (U+FE12)
             | '﹒'                    // Small Full Stop (U+FE52)
-            | '．'                    // Fullwidth Full Stop (U+FF0E)
+            | '．' // Fullwidth Full Stop (U+FF0E)
         ) {
             return text[..i + c.len_utf8()].trim().to_string();
         }
@@ -288,7 +292,10 @@ mod tests {
     use super::*;
 
     fn make_para(text: &str, importance: f32) -> DocNode {
-        DocNode::Para { text: text.into(), importance }
+        DocNode::Para {
+            text: text.into(),
+            importance,
+        }
     }
 
     #[test]
@@ -313,8 +320,10 @@ mod tests {
     fn new_compressor_has_empty_stopwords() {
         let compressor = AdaptiveCompressor::new();
         // A compressor created with new() must have an empty stopword regex list.
-        assert!(compressor.stopword_regexes.is_empty(),
-            "stopword regex list from new() must be empty");
+        assert!(
+            compressor.stopword_regexes.is_empty(),
+            "stopword regex list from new() must be empty"
+        );
     }
 
     #[test]
@@ -329,8 +338,11 @@ mod tests {
         };
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
-            assert!(!text.to_lowercase().contains("the "),
-                "stopword 'the' must be removed: got '{}'", text);
+            assert!(
+                !text.to_lowercase().contains("the "),
+                "stopword 'the' must be removed: got '{}'",
+                text
+            );
         }
     }
 
@@ -345,10 +357,16 @@ mod tests {
         };
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
-            assert!(!text.to_lowercase().contains("hello"),
-                "'hello' must be removed: got '{}'", text);
-            assert!(!text.to_lowercase().contains("world"),
-                "'world' must be removed: got '{}'", text);
+            assert!(
+                !text.to_lowercase().contains("hello"),
+                "'hello' must be removed: got '{}'",
+                text
+            );
+            assert!(
+                !text.to_lowercase().contains("world"),
+                "'world' must be removed: got '{}'",
+                text
+            );
             assert!(text.contains("foo"), "'foo' must remain: got '{}'", text);
         }
     }
@@ -381,29 +399,52 @@ mod tests {
     #[test]
     fn first_sentence_extraction() {
         assert_eq!(first_sentence("안녕하세요. 반갑습니다."), "안녕하세요.");
-        assert_eq!(first_sentence("문장 부호 없는 텍스트"), "문장 부호 없는 텍스트");
+        assert_eq!(
+            first_sentence("문장 부호 없는 텍스트"),
+            "문장 부호 없는 텍스트"
+        );
         assert_eq!(first_sentence("Hello world! Bye."), "Hello world!");
     }
 
     #[test]
     fn first_sentence_multilingual() {
         // Hindi Devanagari Danda (U+0964)
-        assert_eq!(first_sentence("यह पहला वाक्य है। यह दूसरा है।"), "यह पहला वाक्य है।");
+        assert_eq!(
+            first_sentence("यह पहला वाक्य है। यह दूसरा है।"),
+            "यह पहला वाक्य है।"
+        );
         // Arabic Full Stop (U+06D4)
-        assert_eq!(first_sentence("هذه الجملة الأولى۔ هذه الثانية۔"), "هذه الجملة الأولى۔");
+        assert_eq!(
+            first_sentence("هذه الجملة الأولى۔ هذه الثانية۔"),
+            "هذه الجملة الأولى۔"
+        );
         // Amharic Ethiopic Full Stop (U+1362)
-        assert_eq!(first_sentence("ይህ የመጀመሪያ ዓረፍተ ነገር ነው። ሁለተኛ።"), "ይህ የመጀመሪያ ዓረፍተ ነገር ነው።");
+        assert_eq!(
+            first_sentence("ይህ የመጀመሪያ ዓረፍተ ነገር ነው። ሁለተኛ።"),
+            "ይህ የመጀመሪያ ዓረፍተ ነገር ነው።"
+        );
         // Fullwidth Small Full Stop (U+FE52)
-        assert_eq!(first_sentence("これが最初の文です．これが二番目です．"), "これが最初の文です．");
+        assert_eq!(
+            first_sentence("これが最初の文です．これが二番目です．"),
+            "これが最初の文です．"
+        );
     }
 
     #[test]
     fn prune_keeps_single_paragraph() {
         let compressor = AdaptiveCompressor::new();
         let nodes = vec![make_para("only paragraph", 0.1)]; // low importance
-        let cfg = CompressionConfig { budget: 100, current_tokens: 65, fidelity: FidelityLevel::Semantic };
+        let cfg = CompressionConfig {
+            budget: 100,
+            current_tokens: 65,
+            fidelity: FidelityLevel::Semantic,
+        };
         let result = compressor.compress(nodes, &cfg);
-        assert_eq!(result.len(), 1, "the sole paragraph in a single-paragraph document must not be removed");
+        assert_eq!(
+            result.len(),
+            1,
+            "the sole paragraph in a single-paragraph document must not be removed"
+        );
     }
 
     #[test]
@@ -415,19 +456,34 @@ mod tests {
             make_para("second", 0.5),
             make_para("third", 0.5),
         ];
-        let cfg = CompressionConfig { budget: 100, current_tokens: 65, fidelity: FidelityLevel::Semantic };
+        let cfg = CompressionConfig {
+            budget: 100,
+            current_tokens: 65,
+            fidelity: FidelityLevel::Semantic,
+        };
         let result = compressor.compress(nodes, &cfg);
-        assert_eq!(result.len(), 3, "paragraphs with equal importance must not all be removed");
+        assert_eq!(
+            result.len(),
+            3,
+            "paragraphs with equal importance must not all be removed"
+        );
     }
 
     #[test]
     fn stage_thresholds() {
-        let base = CompressionConfig { budget: 100, current_tokens: 0, fidelity: FidelityLevel::Semantic };
-        let at = |tokens| CompressionConfig { current_tokens: tokens, ..base.clone() };
+        let base = CompressionConfig {
+            budget: 100,
+            current_tokens: 0,
+            fidelity: FidelityLevel::Semantic,
+        };
+        let at = |tokens| CompressionConfig {
+            current_tokens: tokens,
+            ..base.clone()
+        };
 
-        assert_eq!(at(50).stage(),  CompressionStage::StopwordOnly);
-        assert_eq!(at(70).stage(),  CompressionStage::PruneLowImportance);
-        assert_eq!(at(85).stage(),  CompressionStage::DeduplicateAndLinearize);
-        assert_eq!(at(96).stage(),  CompressionStage::MaxCompression);
+        assert_eq!(at(50).stage(), CompressionStage::StopwordOnly);
+        assert_eq!(at(70).stage(), CompressionStage::PruneLowImportance);
+        assert_eq!(at(85).stage(), CompressionStage::DeduplicateAndLinearize);
+        assert_eq!(at(96).stage(), CompressionStage::MaxCompression);
     }
 }

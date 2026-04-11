@@ -60,22 +60,13 @@ pub enum DocNode {
     },
 
     /// Code block.
-    Code {
-        lang: Option<String>,
-        body: String,
-    },
+    Code { lang: Option<String>, body: String },
 
     /// List (ordered or unordered).
-    List {
-        ordered: bool,
-        items: Vec<String>,
-    },
+    List { ordered: bool, items: Vec<String> },
 
     /// Key-value metadata (title, summary, keywords, etc.).
-    Metadata {
-        key: String,
-        value: String,
-    },
+    Metadata { key: String, value: String },
 }
 
 impl DocNode {
@@ -97,7 +88,11 @@ impl DocNode {
             DocNode::Para { text, .. } => text.len(),
             DocNode::Table { headers, rows } => {
                 headers.iter().map(|h| h.len()).sum::<usize>()
-                    + rows.iter().flat_map(|r| r.iter()).map(|c| c.len()).sum::<usize>()
+                    + rows
+                        .iter()
+                        .flat_map(|r| r.iter())
+                        .map(|c| c.len())
+                        .sum::<usize>()
             }
             DocNode::Code { body, .. } => body.len(),
             DocNode::List { items, .. } => items.iter().map(|i| i.len()).sum(),
@@ -146,10 +141,10 @@ impl IRDocument {
     /// Looks up the value for a specific key from metadata nodes.
     pub fn get_metadata(&self, key: &str) -> Option<&str> {
         self.nodes.iter().find_map(|n| {
-            if let DocNode::Metadata { key: k, value } = n {
-                if k == key {
-                    return Some(value.as_str());
-                }
+            if let DocNode::Metadata { key: k, value } = n
+                && k == key
+            {
+                return Some(value.as_str());
             }
             None
         })
@@ -173,10 +168,16 @@ mod tests {
 
     #[test]
     fn doc_node_importance_defaults() {
-        let header = DocNode::Header { level: 1, text: "제목".into() };
+        let header = DocNode::Header {
+            level: 1,
+            text: "제목".into(),
+        };
         assert_eq!(header.importance(), 1.0);
 
-        let para = DocNode::Para { text: "내용".into(), importance: 0.3 };
+        let para = DocNode::Para {
+            text: "내용".into(),
+            importance: 0.3,
+        };
         assert_eq!(para.importance(), 0.3);
     }
 

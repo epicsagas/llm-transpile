@@ -206,7 +206,10 @@ mod tests {
         let mut dict = SymbolDict::new();
         let sym1 = dict.intern("법률용어").unwrap();
         let sym2 = dict.intern("법률용어").unwrap();
-        assert_eq!(sym1, sym2, "re-interning the same term must return the same symbol");
+        assert_eq!(
+            sym1, sym2,
+            "re-interning the same term must return the same symbol"
+        );
     }
 
     #[test]
@@ -219,7 +222,10 @@ mod tests {
         let encoded = dict.encode_str(original);
         let decoded = dict.decode_str(&encoded);
 
-        assert_eq!(decoded, original, "encode → decode round-trip must restore the original text");
+        assert_eq!(
+            decoded, original,
+            "encode → decode round-trip must restore the original text"
+        );
     }
 
     #[test]
@@ -269,11 +275,15 @@ mod tests {
         let mut dict = SymbolDict::new();
         dict.intern("ab").unwrap();
         dict.intern("abc").unwrap();
-        let sym_ab  = *dict.encode.get("ab").unwrap();
+        let sym_ab = *dict.encode.get("ab").unwrap();
         let sym_abc = *dict.encode.get("abc").unwrap();
         // "abc" must not be partially matched as "ab" — the entire "abc" should be substituted
         let encoded = dict.encode_str("abc");
-        assert_eq!(encoded, sym_abc.to_string(),
-            "LeftmostLongest: full 'abc' must be substituted, sym_ab={:?}", sym_ab);
+        assert_eq!(
+            encoded,
+            sym_abc.to_string(),
+            "LeftmostLongest: full 'abc' must be substituted, sym_ab={:?}",
+            sym_ab
+        );
     }
 }
