@@ -4,7 +4,6 @@ version      = "0.1.0"
 edition      = "2021"
 description  = "High-performance LLM context bridge — token-optimized document transpiler"
 rust-version = "1.75"
-default-run  = "eval"
 
 [lib]
 name = "llm_transpiler"
@@ -35,11 +34,11 @@ thiserror  = "1"
 tokio     = { version = "1", features = ["full", "test-util"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 
-[[bin]]
+[[example]]
 name = "eval"
 path = "eval/eval.rs"
 
-[[bin]]
+[[example]]
 name = "test_docs"
 path = "eval/test_docs.rs"
 
