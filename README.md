@@ -69,10 +69,11 @@ Requires **Rust 1.75+**.
 ### CLI binary + tool integration (one command)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/epicsagas/llm-transpile/main/install.sh | bash
+cargo install llm-transpile
+transpile install
 ```
 
-Detects and configures whichever tools are installed:
+`transpile install` launches an interactive wizard that detects and configures whichever tools are installed:
 
 | Tool | What gets configured |
 |------|---------------------|
@@ -82,12 +83,6 @@ Detects and configures whichever tools are installed:
 | **Cursor** | `.cursor/transpile-ctx.sh` context regeneration script |
 | **OpenCode** | `topencode [files...]` wrapper with system prompt injection |
 | **Any tool** | `tctx`, `talias`, `trun` general-purpose helpers |
-
-Or install the binary only:
-
-```bash
-cargo install llm-transpile
-```
 
 Or from source:
 

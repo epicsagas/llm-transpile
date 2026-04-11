@@ -1,0 +1,437 @@
+//! install.rs — `transpile install` / `transpile uninstall` subcommands
+//!
+//! Configures shell wrappers and per-tool integrations.
+//! All state written to the shell profile is bracketed by:
+//!   # >>> llm-transpile
+//!   ...
+//!   # <<< llm-transpile
+//! so it can be cleanly updated or removed on re-run.
+
+use std::io::{self, IsTerminal, Write as IoWrite};
+use std::path::PathBuf;
+
+// ── Tool registry ─────────────────────────────────────────────────────────────
+
+struct Tool {
+    id: &'static str,
+    label: &'static str,
+    /// Returns true when the tool appears to be installed on this machine.
+    detect: fn() -> bool,
+}
+
+const TOOLS: &[Tool] = &[
+    Tool { id: "claude",   label: "Claude Code",  detect: || cmd_exists("claude") || dir_exists("~/.claude") },
+    Tool { id: "gemini",   label: "Gemini CLI",   detect: || cmd_exists("gemini") },
+    Tool { id: "codex",    label: "Codex CLI",    detect: || cmd_exists("codex") },
+    Tool { id: "cursor",   label: "Cursor",       detect: || cmd_exists("cursor") || dir_exists("~/.cursor") },
+    Tool { id: "opencode", label: "OpenCode",     detect: || cmd_exists("opencode") },
+];
+
+fn cmd_exists(name: &str) -> bool {
+    std::process::Command::new("which")
+        .arg(name)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn dir_exists(path: &str) -> bool {
+    let expanded = path.replacen("~", &home(), 1);
+    std::path::Path::new(&expanded).exists()
+}
+
+fn home() -> String {
+    std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())
+}
+
+// ── Public entry points ────────────────────────────────────────────────────────
+
+pub fn run_install(tools: Vec<String>, all: bool) -> i32 {
+    let selected = if all {
+        TOOLS.iter().map(|t| t.id).collect::<Vec<_>>()
+    } else if !tools.is_empty() {
+        // Validate names
+        let mut out = Vec::new();
+        for name in &tools {
+            if TOOLS.iter().any(|t| t.id == name.as_str()) {
+                out.push(name.as_str());
+            } else {
+                eprintln!("error: unknown tool '{name}'. Valid: {}", tool_names());
+                return 1;
+            }
+        }
+        out
+    } else {
+        wizard_select()
+    };
+
+    if selected.is_empty() {
+        eprintln!("No tools selected.");
+        return 0;
+    }
+
+    let profile = detect_profile();
+    upsert_shell_block(&profile, &selected);
+
+    for id in &selected {
+        match *id {
+            "claude"   => setup_claude(),
+            "cursor"   => setup_cursor(),
+            _ => {} // shell wrappers only (gemini, codex, opencode)
+        }
+    }
+
+    eprintln!();
+    eprintln!("Done. Restart your shell or:  source {profile}");
+    0
+}
+
+pub fn run_uninstall(tools: Vec<String>) -> i32 {
+    let ids: Vec<&str> = if tools.is_empty() {
+        TOOLS.iter().map(|t| t.id).collect()
+    } else {
+        tools.iter().map(|s| s.as_str()).collect()
+    };
+
+    let profile = detect_profile();
+    remove_shell_block(&profile);
+    eprintln!("  removed shell wrappers from {profile}");
+
+    for id in &ids {
+        match *id {
+            "claude" => remove_claude(),
+            "cursor" => remove_cursor(),
+            _ => {}
+        }
+    }
+
+    eprintln!("Done.");
+    0
+}
+
+// ── Interactive wizard ─────────────────────────────────────────────────────────
+
+fn wizard_select() -> Vec<&'static str> {
+    let tty = io::stdin().is_terminal() && io::stderr().is_terminal();
+
+    if tty {
+        wizard_tty()
+    } else {
+        wizard_pipe()
+    }
+}
+
+/// TTY: space-toggle checkbox list, Enter to confirm.
+fn wizard_tty() -> Vec<&'static str> {
+    let detected: Vec<bool> = TOOLS.iter().map(|t| (t.detect)()).collect();
+    // Pre-select detected tools
+    let mut checked: Vec<bool> = detected.clone();
+    let mut cursor = 0usize;
+
+    // Switch terminal to raw mode via stty
+    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+
+    loop {
+        // Render
+        eprint!("\x1b[2J\x1b[H"); // clear screen
+        eprintln!("transpile install — select integrations\r");
+        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
+        eprintln!("\r");
+
+        for (i, tool) in TOOLS.iter().enumerate() {
+            let check = if checked[i] { "◉" } else { "○" };
+            let arrow = if i == cursor { "▶" } else { " " };
+            let det   = if detected[i] { " (detected)" } else { "" };
+            eprintln!("  {} {} {}  {}{}\r", arrow, check, tool.id, tool.label, det);
+        }
+
+        let _ = io::stderr().flush();
+
+        // Read one keypress
+        let key = read_key();
+        match key {
+            b' ' => { checked[cursor] = !checked[cursor]; }
+            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
+            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
+            b'Q' | b'q' => {
+                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+                return vec![];
+            }
+            b'\r' | b'\n' => break,
+            27 => { // ESC sequences: [A = up, [B = down
+                let b2 = read_key();
+                if b2 == b'[' {
+                    match read_key() {
+                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'B' => { if cursor < TOOLS.len() - 1 { cursor += 1; } }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    eprint!("\x1b[2J\x1b[H"); // clear screen
+
+    TOOLS.iter().enumerate()
+        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
+        .collect()
+}
+
+fn read_key() -> u8 {
+    use std::io::Read;
+    let mut buf = [0u8; 1];
+    io::stdin().read_exact(&mut buf).ok();
+    buf[0]
+}
+
+/// Non-TTY fallback: numbered list, comma-separated input.
+fn wizard_pipe() -> Vec<&'static str> {
+    eprintln!("transpile install — select integrations");
+    eprintln!("────────────────────────────────────────");
+    for (i, t) in TOOLS.iter().enumerate() {
+        let det = if (t.detect)() { " *" } else { "" };
+        eprintln!("  [{}] {:<10} {}{}", i + 1, t.id, t.label, det);
+    }
+    eprintln!("  [a] All of the above");
+    eprintln!();
+    eprint!("Selection (e.g. 1,3 or a): ");
+    let _ = io::stderr().flush();
+
+    let mut line = String::new();
+    let _ = io::stdin().read_line(&mut line);
+    let line = line.trim().to_lowercase();
+
+    if line == "a" || line == "all" {
+        return TOOLS.iter().map(|t| t.id).collect();
+    }
+
+    let mut out = Vec::new();
+    for token in line.split(',') {
+        if let Ok(n) = token.trim().parse::<usize>() {
+            if n >= 1 && n <= TOOLS.len() {
+                out.push(TOOLS[n - 1].id);
+            }
+        }
+    }
+    out
+}
+
+fn tool_names() -> String {
+    TOOLS.iter().map(|t| t.id).collect::<Vec<_>>().join(", ")
+}
+
+// ── Shell profile block ────────────────────────────────────────────────────────
+
+const MARKER_BEGIN: &str = "# >>> llm-transpile";
+const MARKER_END:   &str = "# <<< llm-transpile";
+
+fn detect_profile() -> String {
+    let home = home();
+    for name in &[".zshrc", ".bashrc", ".profile"] {
+        let p = format!("{home}/{name}");
+        if std::path::Path::new(&p).exists() {
+            return p;
+        }
+    }
+    format!("{home}/.profile")
+}
+
+fn build_shell_block(tools: &[&str]) -> String {
+    let mut lines = vec![
+        "# Core helpers".to_string(),
+        r#"tctx()   { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }"#.to_string(),
+        r#"talias() { transpile --format "${1:-markdown}" --fidelity "${2:-semantic}" --quiet; }"#.to_string(),
+        r#"trun()   { local f="$1"; shift; transpile --input "$f" --quiet | "$@"; }"#.to_string(),
+    ];
+
+    if tools.contains(&"gemini") {
+        lines.push(String::new());
+        lines.push("# Gemini CLI".to_string());
+        lines.push(
+            r#"tgemini() { local f="$1"; shift; transpile --input "$f" --fidelity compressed --quiet | gemini "$@"; }"#.to_string()
+        );
+    }
+    if tools.contains(&"codex") {
+        lines.push(String::new());
+        lines.push("# Codex CLI".to_string());
+        lines.push(
+            r#"tcodex() { local f="$1"; shift; local t; t=$(mktemp); transpile --input "$f" --fidelity compressed --quiet > "$t"; codex --context "$t" "$@"; rm -f "$t"; }"#.to_string()
+        );
+    }
+    if tools.contains(&"opencode") {
+        lines.push(String::new());
+        lines.push("# OpenCode".to_string());
+        lines.push(
+            r#"topencode() { local c=""; for f in "$@"; do c+=$(transpile --input "$f" --fidelity compressed --quiet); c+=$'\n---\n'; done; OPENCODE_SYSTEM_PROMPT="$c" opencode; }"#.to_string()
+        );
+    }
+
+    lines.join("\n")
+}
+
+fn upsert_shell_block(profile: &str, tools: &[&str]) {
+    let block_body = build_shell_block(tools);
+    let full_block = format!("\n{MARKER_BEGIN}\n{block_body}\n{MARKER_END}\n");
+
+    let existing = std::fs::read_to_string(profile).unwrap_or_default();
+
+    let new_content = if existing.contains(MARKER_BEGIN) {
+        // Replace existing block
+        // Manual replace (no regex dep): find begin..end and splice
+        splice_block(&existing, MARKER_BEGIN, MARKER_END, &full_block.trim())
+    } else {
+        format!("{existing}{full_block}")
+    };
+
+    std::fs::write(profile, new_content).ok();
+    eprintln!("  {} shell wrappers in {profile}", if existing.contains(MARKER_BEGIN) { "updated" } else { "added" });
+}
+
+fn splice_block(text: &str, begin: &str, end: &str, replacement: &str) -> String {
+    let start = match text.find(begin) {
+        Some(i) => i,
+        None => return format!("{text}\n{replacement}\n"),
+    };
+    let after_end = match text[start..].find(end) {
+        Some(i) => start + i + end.len(),
+        None => text.len(),
+    };
+    // Trim any leading newline before the marker
+    let prefix_end = if start > 0 && text.as_bytes()[start - 1] == b'\n' { start - 1 } else { start };
+    format!("{}\n{}\n{}", &text[..prefix_end], replacement, &text[after_end..])
+}
+
+fn remove_shell_block(profile: &str) {
+    let existing = std::fs::read_to_string(profile).unwrap_or_default();
+    if !existing.contains(MARKER_BEGIN) { return; }
+    let cleaned = splice_block(&existing, MARKER_BEGIN, MARKER_END, "");
+    // Remove double-blank lines left behind
+    let cleaned = cleaned.trim_end().to_string() + "\n";
+    std::fs::write(profile, cleaned).ok();
+}
+
+// ── Claude Code ────────────────────────────────────────────────────────────────
+
+fn claude_settings_path() -> PathBuf {
+    PathBuf::from(home()).join(".claude").join("settings.json")
+}
+
+fn setup_claude() {
+    let path = claude_settings_path();
+    std::fs::create_dir_all(path.parent().unwrap()).ok();
+    if !path.exists() {
+        std::fs::write(&path, "{}").ok();
+    }
+
+    let raw = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".into());
+    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+
+    let hook = serde_json::json!({
+        "_id": "llm-transpile",
+        "matcher": "Read",
+        "hooks": [{
+            "type": "command",
+            "command": concat!(
+                "bash -c '",
+                "bytes=$(wc -c < \"$CLAUDE_TOOL_RESULT\" 2>/dev/null || echo 0); ",
+                "if [ \"$bytes\" -gt 8192 ]; then ",
+                "  echo \"[transpile] $(basename \\\"$CLAUDE_TOOL_INPUT_FILE_PATH\\\" 2>/dev/null) ",
+                "is ${bytes}B — consider: transpile --input <file> --quiet\" >&2; ",
+                "fi'"
+            )
+        }]
+    });
+
+    let post = cfg["hooks"]["PostToolUse"]
+        .as_array_mut()
+        .map(|arr| {
+            arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
+            true
+        })
+        .unwrap_or(false);
+
+    if !post {
+        cfg["hooks"]["PostToolUse"] = serde_json::json!([]);
+    }
+    cfg["hooks"]["PostToolUse"].as_array_mut().unwrap().push(hook);
+
+    let out = serde_json::to_string_pretty(&cfg).unwrap();
+    std::fs::write(&path, out).ok();
+    eprintln!("  Claude Code: hook upserted in {}", path.display());
+
+    // /tctx slash command
+    let cmd_dir = PathBuf::from(home()).join(".claude").join("commands");
+    std::fs::create_dir_all(&cmd_dir).ok();
+    std::fs::write(
+        cmd_dir.join("tctx.md"),
+        "---\nname: tctx\ndescription: Compress a file with llm-transpile and insert into context\n---\n\nRun and paste output:\n\n```bash\ntranspile --input $ARGUMENTS --quiet\n```\n",
+    ).ok();
+    eprintln!("  Claude Code: /tctx command written");
+}
+
+fn remove_claude() {
+    let path = claude_settings_path();
+    if !path.exists() { return; }
+
+    let raw = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".into());
+    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+
+    if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
+        arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
+    }
+    // Clean up empty containers
+    if cfg["hooks"]["PostToolUse"].as_array().map(|a| a.is_empty()).unwrap_or(false) {
+        cfg["hooks"].as_object_mut().map(|o| o.remove("PostToolUse"));
+    }
+    if cfg["hooks"].as_object().map(|o| o.is_empty()).unwrap_or(false) {
+        cfg.as_object_mut().map(|o| o.remove("hooks"));
+    }
+
+    std::fs::write(&path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
+    eprintln!("  Claude Code: hook removed");
+
+    let cmd = PathBuf::from(home()).join(".claude").join("commands").join("tctx.md");
+    if cmd.exists() { std::fs::remove_file(cmd).ok(); }
+    eprintln!("  Claude Code: /tctx command removed");
+}
+
+// ── Cursor ─────────────────────────────────────────────────────────────────────
+
+const CURSOR_SCRIPT: &str = r#"#!/usr/bin/env bash
+# Auto-generated by `transpile install`. Re-run to update.
+# Compresses project docs into .cursor/context.md.
+# Usage: bash .cursor/transpile-ctx.sh
+set -euo pipefail
+OUT=".cursor/context.md"; : > "$OUT"
+for f in README.md ARCHITECTURE.md CLAUDE.md SPEC.md; do
+  [[ -f "$f" ]] || continue
+  printf '### %s\n' "$f" >> "$OUT"
+  transpile --input "$f" --fidelity semantic --quiet >> "$OUT"
+  printf '\n' >> "$OUT"
+done
+echo "[transpile] $OUT regenerated ($(wc -c < "$OUT") bytes)"
+"#;
+
+fn setup_cursor() {
+    std::fs::create_dir_all(".cursor").ok();
+    std::fs::write(".cursor/transpile-ctx.sh", CURSOR_SCRIPT).ok();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(m) = std::fs::metadata(".cursor/transpile-ctx.sh") {
+            let mut p = m.permissions();
+            p.set_mode(0o755);
+            std::fs::set_permissions(".cursor/transpile-ctx.sh", p).ok();
+        }
+    }
+    eprintln!("  Cursor: .cursor/transpile-ctx.sh written  (add @.cursor/context.md to .cursorrules)");
+}
+
+fn remove_cursor() {
+    let p = std::path::Path::new(".cursor/transpile-ctx.sh");
+    if p.exists() { std::fs::remove_file(p).ok(); }
+    eprintln!("  Cursor: .cursor/transpile-ctx.sh removed");
+}
