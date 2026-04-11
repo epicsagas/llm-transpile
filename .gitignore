@@ -1,0 +1,13 @@
+/target
+
+# 민감 파일
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+*_secret.*
+credentials.*
+.harness/
