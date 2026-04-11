@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# install.sh — llm-transpile one-command setup
-#
-# Installs the transpile binary and wires it into whichever AI coding tools
-# are present on this machine (Claude Code, Gemini CLI, Codex, Cursor, OpenCode).
+# install.sh — llm-transpile setup / update / uninstall
 #
 # Usage:
+#   bash install.sh              # install or update
+#   bash install.sh install      # same
+#   bash install.sh uninstall    # remove everything this script added
+#
+# One-liner:
 #   curl -fsSL https://raw.githubusercontent.com/epicsagas/llm-transpile/main/install.sh | bash
-#   # or, after cloning:
-#   bash install.sh
 
 set -euo pipefail
 
@@ -16,95 +16,80 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
 info()    { echo -e "${CYAN}[llm-transpile]${RESET} $*"; }
-success() { echo -e "${GREEN}[llm-transpile]${RESET} $*"; }
-warn()    { echo -e "${YELLOW}[llm-transpile]${RESET} $*"; }
-error()   { echo -e "${RED}[llm-transpile]${RESET} $*" >&2; }
+success() { echo -e "${GREEN}✓${RESET} $*"; }
+warn()    { echo -e "${YELLOW}~${RESET} $*"; }
+error()   { echo -e "${RED}✗${RESET} $*" >&2; }
 
-# ── 1. Install binary ──────────────────────────────────────────────────────────
-install_binary() {
-  info "Installing transpile binary..."
+MARKER_BEGIN="# >>> llm-transpile"
+MARKER_END="# <<< llm-transpile"
 
-  if command -v transpile &>/dev/null; then
-    local ver
-    ver=$(transpile --version 2>/dev/null || echo "unknown")
-    warn "transpile already installed ($ver) — skipping. Run 'cargo install llm-transpile' to upgrade."
-    return 0
-  fi
-
-  if command -v cargo &>/dev/null; then
-    cargo install llm-transpile
-    success "transpile installed via cargo."
-  else
-    error "cargo not found. Install Rust first: https://rustup.rs"
-    exit 1
-  fi
-}
-
-# ── 2. Shell profile ───────────────────────────────────────────────────────────
+# ── Shell profile detection ────────────────────────────────────────────────────
 detect_profile() {
-  if [[ -n "${BASH_VERSION:-}" ]]; then
-    echo "${HOME}/.bashrc"
-  elif [[ -n "${ZSH_VERSION:-}" ]]; then
-    echo "${HOME}/.zshrc"
-  elif [[ -f "${HOME}/.zshrc" ]]; then
-    echo "${HOME}/.zshrc"
-  elif [[ -f "${HOME}/.bashrc" ]]; then
-    echo "${HOME}/.bashrc"
-  else
-    echo "${HOME}/.profile"
+  if [[ -f "${HOME}/.zshrc" ]];   then echo "${HOME}/.zshrc"
+  elif [[ -f "${HOME}/.bashrc" ]]; then echo "${HOME}/.bashrc"
+  else echo "${HOME}/.profile"
   fi
 }
 
-append_to_profile() {
+# ── Shell profile block management ────────────────────────────────────────────
+# Replace (or insert) the BEGIN…END block in the given profile file.
+# If the block doesn't exist yet, it is appended.
+upsert_block() {
   local profile="$1"
-  local marker="# llm-transpile"
-  if grep -q "$marker" "$profile" 2>/dev/null; then
-    warn "Shell wrappers already in $profile — skipping."
-    return 0
+  local content="$2"          # what goes between BEGIN and END
+
+  local full_block
+  printf -v full_block '\n%s\n%s\n%s\n' "$MARKER_BEGIN" "$content" "$MARKER_END"
+
+  if grep -q "$MARKER_BEGIN" "$profile" 2>/dev/null; then
+    # Replace the existing block using Python (portable, no temp-file race)
+    python3 - "$profile" "$MARKER_BEGIN" "$MARKER_END" "$full_block" << 'PYEOF'
+import sys
+path, begin, end, replacement = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(path) as f:
+    text = f.read()
+import re
+pattern = re.escape(begin) + r'.*?' + re.escape(end)
+new_text = re.sub(pattern, replacement.strip(), text, flags=re.DOTALL)
+with open(path, 'w') as f:
+    f.write(new_text)
+PYEOF
+    success "Updated shell block in $profile"
+  else
+    printf '%s' "$full_block" >> "$profile"
+    success "Added shell block to $profile"
   fi
-
-  cat >> "$profile" << 'EOF'
-
-# llm-transpile — AI tool wrappers (added by install.sh)
-# Compress a document and print to stdout
-tctx() { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }
-
-# Pipe stdin through transpile
-talias() { transpile --format "${1:-markdown}" --fidelity "${2:-semantic}" --quiet; }
-
-# Wrap any LLM CLI: compress a file, then pass to the CLI
-# Usage: trun <file> <cli-command> [cli-args...]
-trun() {
-  local file="$1"; shift
-  transpile --input "$file" --quiet | "$@"
-}
-EOF
-
-  success "Shell wrappers added to $profile"
-  info "  tctx <file>              — compress a file to stdout"
-  info "  talias                   — pipe stdin through transpile"
-  info "  trun <file> <cmd> [args] — compress then hand off to any CLI"
 }
 
-# ── 3. Claude Code ─────────────────────────────────────────────────────────────
-setup_claude_code() {
-  local settings="${HOME}/.claude/settings.json"
-
-  if ! command -v claude &>/dev/null && [[ ! -f "$settings" ]]; then
+# Remove the BEGIN…END block from the profile.
+remove_block() {
+  local profile="$1"
+  if ! grep -q "$MARKER_BEGIN" "$profile" 2>/dev/null; then
     return 0
   fi
+  python3 - "$profile" "$MARKER_BEGIN" "$MARKER_END" << 'PYEOF'
+import sys, re
+path, begin, end = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as f:
+    text = f.read()
+pattern = r'\n?' + re.escape(begin) + r'.*?' + re.escape(end) + r'\n?'
+new_text = re.sub(pattern, '', text, flags=re.DOTALL)
+with open(path, 'w') as f:
+    f.write(new_text)
+PYEOF
+  success "Removed shell block from $profile"
+}
 
-  info "Claude Code detected — configuring hooks..."
+# ── Claude Code settings.json ──────────────────────────────────────────────────
+claude_settings="${HOME}/.claude/settings.json"
 
+upsert_claude_hook() {
+  [[ ! -d "${HOME}/.claude" ]] && ! command -v claude &>/dev/null && return 0
+  info "Configuring Claude Code..."
   mkdir -p "${HOME}/.claude"
+  [[ ! -f "$claude_settings" ]] && echo '{}' > "$claude_settings"
 
-  if [[ ! -f "$settings" ]]; then
-    echo '{}' > "$settings"
-  fi
-
-  # Inject a PostToolUse hook that logs token savings when Read is used on large files.
-  # Uses python3 for portable JSON editing without requiring jq.
-  python3 - "$settings" << 'PYEOF'
+  python3 - "$claude_settings" << 'PYEOF'
 import json, sys
 
 path = sys.argv[1]
@@ -112,37 +97,36 @@ with open(path) as f:
     cfg = json.load(f)
 
 hooks = cfg.setdefault("hooks", {})
-post = hooks.setdefault("PostToolUse", [])
+post  = hooks.setdefault("PostToolUse", [])
 
-marker = "llm-transpile"
-if any(marker in str(h) for h in post):
-    print("[llm-transpile] Claude Code hook already present — skipping.")
-    sys.exit(0)
-
-post.append({
-    "_comment": marker,
+MARKER = "llm-transpile"
+NEW_HOOK = {
+    "_id": MARKER,
     "matcher": "Read",
     "hooks": [{
         "type": "command",
-        # Warns in Claude Code's output when a read file is large enough to benefit from transpile
         "command": (
             "bash -c '"
             "bytes=$(wc -c < \"$CLAUDE_TOOL_RESULT\" 2>/dev/null || echo 0); "
             "if [ \"$bytes\" -gt 8192 ]; then "
-            "  echo \"[transpile] hint: $(basename $CLAUDE_TOOL_INPUT_FILE_PATH 2>/dev/null) "
-            "is ${bytes}B — run: transpile --input <file> --quiet | pbcopy\" >&2; "
+            "  echo \"[transpile] $(basename \\\"$CLAUDE_TOOL_INPUT_FILE_PATH\\\" 2>/dev/null) "
+            "is ${bytes}B — consider: transpile --input <file> --quiet\" >&2; "
             "fi'"
         )
     }]
-})
+}
+
+# Remove existing entry (update), then re-insert
+hooks["PostToolUse"] = [h for h in post if h.get("_id") != MARKER]
+hooks["PostToolUse"].append(NEW_HOOK)
 
 with open(path, "w") as f:
     json.dump(cfg, f, indent=2)
 
-print("[llm-transpile] Claude Code hook added to " + path)
+print(f"  Claude Code hook upserted in {path}")
 PYEOF
 
-  # Add a project-level slash command
+  # /tctx slash command
   mkdir -p "${HOME}/.claude/commands"
   cat > "${HOME}/.claude/commands/tctx.md" << 'EOF'
 ---
@@ -155,156 +139,173 @@ Run the following shell command and paste the output into the conversation:
 ```bash
 transpile --input $ARGUMENTS --quiet
 ```
-
-Use this when you want to include a large document in context without consuming excess tokens.
 EOF
-
-  success "Claude Code: hook + /tctx command installed."
+  success "Claude Code: hook + /tctx command configured"
 }
 
-# ── 4. Gemini CLI ──────────────────────────────────────────────────────────────
-setup_gemini() {
-  if ! command -v gemini &>/dev/null; then return 0; fi
+remove_claude_hook() {
+  [[ ! -f "$claude_settings" ]] && return 0
+  info "Removing Claude Code hook..."
+  python3 - "$claude_settings" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    cfg = json.load(f)
+MARKER = "llm-transpile"
+if "hooks" in cfg and "PostToolUse" in cfg["hooks"]:
+    cfg["hooks"]["PostToolUse"] = [
+        h for h in cfg["hooks"]["PostToolUse"] if h.get("_id") != MARKER
+    ]
+    # Clean up empty arrays/objects
+    if not cfg["hooks"]["PostToolUse"]:
+        del cfg["hooks"]["PostToolUse"]
+    if not cfg["hooks"]:
+        del cfg["hooks"]
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2)
+print(f"  Claude Code hook removed from {path}")
+PYEOF
+  rm -f "${HOME}/.claude/commands/tctx.md"
+  success "Claude Code: hook + /tctx command removed"
+}
 
-  info "Gemini CLI detected — adding tgemini wrapper..."
-  local profile
-  profile=$(detect_profile)
+# ── Shell wrappers block ───────────────────────────────────────────────────────
+build_shell_block() {
+  # Core helpers — always added
+  local block
+  block=$(cat << 'EOF'
+# Core helpers
+tctx()   { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }
+talias() { transpile --format "${1:-markdown}" --fidelity "${2:-semantic}" --quiet; }
+trun()   { local f="$1"; shift; transpile --input "$f" --quiet | "$@"; }
+EOF
+)
 
-  local marker="tgemini()"
-  if grep -q "$marker" "$profile" 2>/dev/null; then
-    warn "tgemini already in $profile — skipping."; return 0
+  # Per-tool wrappers — only when the tool is present
+  if command -v gemini &>/dev/null; then
+    block+=$'\n\n# Gemini CLI\n'
+    block+='tgemini() { local f="$1"; shift; transpile --input "$f" --fidelity compressed --quiet | gemini "$@"; }'
   fi
 
-  cat >> "$profile" << 'EOF'
-
-# llm-transpile: gemini wrapper — compress file then query
-# Usage: tgemini <file> "<prompt>"
-tgemini() {
-  local file="$1"; shift
-  transpile --input "$file" --fidelity compressed --quiet | gemini "$@"
-}
-EOF
-  success "Gemini CLI: tgemini wrapper added to $profile"
-}
-
-# ── 5. OpenAI Codex CLI ────────────────────────────────────────────────────────
-setup_codex() {
-  if ! command -v codex &>/dev/null; then return 0; fi
-
-  info "Codex CLI detected — adding tcodex wrapper..."
-  local profile
-  profile=$(detect_profile)
-
-  local marker="tcodex()"
-  if grep -q "$marker" "$profile" 2>/dev/null; then
-    warn "tcodex already in $profile — skipping."; return 0
+  if command -v codex &>/dev/null; then
+    block+=$'\n\n# Codex CLI\n'
+    block+='tcodex() {
+  local f="$1"; shift
+  local tmp; tmp=$(mktemp /tmp/transpile.XXXXXX)
+  transpile --input "$f" --fidelity compressed --quiet > "$tmp"
+  codex --context "$tmp" "$@"; rm -f "$tmp"
+}'
   fi
 
-  cat >> "$profile" << 'EOF'
+  if command -v opencode &>/dev/null; then
+    block+=$'\n\n# OpenCode\n'
+    block+='topencode() {
+  local ctx=""
+  for f in "$@"; do ctx+=$(transpile --input "$f" --fidelity compressed --quiet); ctx+=$'"'"'\n---\n'"'"'; done
+  OPENCODE_SYSTEM_PROMPT="$ctx" opencode
+}'
+  fi
 
-# llm-transpile: codex wrapper — compress file then query
-# Usage: tcodex <file> "<prompt>"
-tcodex() {
-  local file="$1"; shift
-  local tmp
-  tmp=$(mktemp /tmp/transpile.XXXXXX)
-  transpile --input "$file" --fidelity compressed --quiet > "$tmp"
-  codex --context "$tmp" "$@"
-  rm -f "$tmp"
-}
-EOF
-  success "Codex CLI: tcodex wrapper added to $profile"
+  echo "$block"
 }
 
-# ── 6. Cursor ──────────────────────────────────────────────────────────────────
-setup_cursor() {
-  # Cursor doesn't have a CLI we can hook — instead we write a helper script
-  # that regenerates .cursor/context.md from project docs.
-  if [[ ! -d ".cursor" ]] && ! command -v cursor &>/dev/null; then return 0; fi
+# ── Cursor helper script ───────────────────────────────────────────────────────
+cursor_script=".cursor/transpile-ctx.sh"
 
-  info "Cursor detected — writing .cursor/transpile-ctx.sh..."
+upsert_cursor() {
+  [[ ! -d ".cursor" ]] && ! command -v cursor &>/dev/null && return 0
+  info "Configuring Cursor..."
   mkdir -p ".cursor"
-
-  cat > ".cursor/transpile-ctx.sh" << 'EOF'
+  cat > "$cursor_script" << 'EOF'
 #!/usr/bin/env bash
-# Regenerate .cursor/context.md by compressing all project docs through transpile.
-# Run this whenever your docs change, or add to a git pre-commit hook.
-#
-# Usage: bash .cursor/transpile-ctx.sh
-
+# Auto-generated by llm-transpile install.sh — safe to re-run.
+# Regenerates .cursor/context.md by compressing project docs.
+# Run whenever docs change, or wire into a git pre-commit hook.
 set -euo pipefail
 OUT=".cursor/context.md"
-> "$OUT"
-
+: > "$OUT"
 for f in README.md ARCHITECTURE.md CLAUDE.md SPEC.md; do
   [[ -f "$f" ]] || continue
-  echo "### $f" >> "$OUT"
+  printf '### %s\n' "$f" >> "$OUT"
   transpile --input "$f" --fidelity semantic --quiet >> "$OUT"
-  echo "" >> "$OUT"
+  printf '\n' >> "$OUT"
 done
-
 echo "[transpile] $OUT regenerated ($(wc -c < "$OUT") bytes)"
 EOF
-
-  chmod +x ".cursor/transpile-ctx.sh"
-  success "Cursor: .cursor/transpile-ctx.sh written. Run it to build your context file."
-  info "  Add to .cursorrules:  @.cursor/context.md"
+  chmod +x "$cursor_script"
+  success "Cursor: $cursor_script written (add '@.cursor/context.md' to .cursorrules)"
 }
 
-# ── 7. OpenCode ────────────────────────────────────────────────────────────────
-setup_opencode() {
-  if ! command -v opencode &>/dev/null; then return 0; fi
-
-  info "OpenCode detected — adding topencode wrapper..."
-  local profile
-  profile=$(detect_profile)
-
-  local marker="topencode()"
-  if grep -q "$marker" "$profile" 2>/dev/null; then
-    warn "topencode already in $profile — skipping."; return 0
-  fi
-
-  cat >> "$profile" << 'EOF'
-
-# llm-transpile: opencode wrapper — compress docs into system prompt
-# Usage: topencode [file...] (launches opencode with compressed context)
-topencode() {
-  local ctx=""
-  for f in "$@"; do
-    ctx+=$(transpile --input "$f" --fidelity compressed --quiet)
-    ctx+=$'\n---\n'
-  done
-  OPENCODE_SYSTEM_PROMPT="$ctx" opencode
-}
-EOF
-  success "OpenCode: topencode wrapper added to $profile"
+remove_cursor() {
+  [[ -f "$cursor_script" ]] && rm -f "$cursor_script" && success "Cursor: $cursor_script removed"
 }
 
-# ── Main ───────────────────────────────────────────────────────────────────────
-main() {
-  echo -e "${BOLD}llm-transpile installer${RESET}"
+# ── Install / Update ───────────────────────────────────────────────────────────
+cmd_install() {
+  echo -e "${BOLD}llm-transpile — install / update${RESET}"
   echo "──────────────────────────────────────────"
 
-  install_binary
+  # Binary
+  if command -v transpile &>/dev/null; then
+    warn "transpile already installed ($(transpile --version 2>/dev/null || echo '?')) — skipping binary."
+    warn "To upgrade: cargo install llm-transpile --force"
+  else
+    info "Installing transpile binary..."
+    if command -v cargo &>/dev/null; then
+      cargo install llm-transpile
+      success "Binary installed."
+    else
+      error "cargo not found. Install Rust: https://rustup.rs"; exit 1
+    fi
+  fi
 
-  local profile
-  profile=$(detect_profile)
-  append_to_profile "$profile"
+  local profile; profile=$(detect_profile)
+  upsert_block "$profile" "$(build_shell_block)"
 
-  setup_claude_code
-  setup_gemini
-  setup_codex
-  setup_cursor
-  setup_opencode
+  upsert_claude_hook
+  upsert_cursor
 
   echo ""
-  echo -e "${BOLD}Done.${RESET} Restart your shell or run:"
+  success "Done. Restart your shell or:"
   echo -e "  ${CYAN}source $profile${RESET}"
   echo ""
   echo -e "Quick start:"
-  echo -e "  ${CYAN}tctx README.md${RESET}                     # compress to stdout"
-  echo -e "  ${CYAN}trun README.md gemini 'summarize'${RESET}  # compress → gemini"
-  echo -e "  ${CYAN}trun README.md codex  'implement'${RESET}  # compress → codex"
+  echo -e "  ${CYAN}tctx README.md${RESET}                      # compress to stdout"
+  echo -e "  ${CYAN}trun README.md gemini 'summarise'${RESET}   # compress → gemini"
+  echo -e "  ${CYAN}trun README.md codex  'implement'${RESET}   # compress → codex"
+  echo -e "  ${CYAN}bash install.sh uninstall${RESET}            # remove everything"
 }
 
-main "$@"
+# ── Uninstall ──────────────────────────────────────────────────────────────────
+cmd_uninstall() {
+  echo -e "${BOLD}llm-transpile — uninstall${RESET}"
+  echo "──────────────────────────────────────────"
+
+  # Binary
+  if command -v transpile &>/dev/null; then
+    info "Removing transpile binary..."
+    cargo uninstall llm-transpile 2>/dev/null && success "Binary removed." || warn "Could not remove binary (not installed via cargo?)."
+  else
+    warn "transpile binary not found — skipping."
+  fi
+
+  local profile; profile=$(detect_profile)
+  remove_block "$profile"
+
+  remove_claude_hook
+  remove_cursor
+
+  echo ""
+  success "Uninstall complete."
+  echo -e "  ${CYAN}source $profile${RESET}  (or open a new shell)"
+}
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+case "${1:-install}" in
+  install|update) cmd_install ;;
+  uninstall)      cmd_uninstall ;;
+  *)
+    echo "Usage: bash install.sh [install|uninstall]"
+    exit 1
+    ;;
+esac
