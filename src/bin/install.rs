@@ -628,72 +628,50 @@ Run this command and treat its output as the file content.
 - `lossless`           — no compression, use for legal/config files where every word matters
 ";
 
-// ── Gemini CLI ─────────────────────────────────────────────────────────────────
+// ── Per-tool command install (Gemini / Codex / OpenCode / Cursor) ─────────────
 
-fn setup_gemini() {
-    let gemini_dir = PathBuf::from(home()).join(".gemini");
-    let skill_dir = gemini_dir.join("skills").join("transpile");
-    std::fs::create_dir_all(&skill_dir).ok();
-    std::fs::write(skill_dir.join("SKILL.md"), TRANSPILE_SKILL).ok();
-    eprintln!("  Gemini CLI: /transpile skill installed in {}", skill_dir.display());
+fn command_path(tool: &str) -> PathBuf {
+    let h = home();
+    match tool {
+        "gemini"   => PathBuf::from(&h).join(".gemini").join("commands").join("transpile.md"),
+        "codex"    => PathBuf::from(&h).join(".codex").join("commands").join("transpile.md"),
+        "opencode" => {
+            let cfg = std::env::var("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| PathBuf::from(&h).join(".config"));
+            cfg.join("opencode").join("commands").join("transpile.md")
+        }
+        "cursor"   => std::path::Path::new(".cursor").join("commands").join("transpile.md"),
+        _          => unreachable!(),
+    }
 }
 
-fn remove_gemini() {
-    let skill_dir = PathBuf::from(home()).join(".gemini").join("skills").join("transpile");
-    if skill_dir.exists() { std::fs::remove_dir_all(&skill_dir).ok(); }
-    eprintln!("  Gemini CLI: /transpile skill removed");
+fn setup_gemini()   { install_command("gemini"); }
+fn remove_gemini()  { uninstall_command("gemini"); }
+fn setup_codex()    { install_command("codex"); }
+fn remove_codex()   { uninstall_command("codex"); }
+fn setup_opencode() { install_command("opencode"); }
+fn remove_opencode(){ uninstall_command("opencode"); }
+
+fn install_command(tool: &str) {
+    let path = command_path(tool);
+    std::fs::create_dir_all(path.parent().unwrap()).ok();
+    std::fs::write(&path, TRANSPILE_SKILL).ok();
+    eprintln!("  {tool}: /transpile command → {}", path.display());
 }
 
-// ── Codex CLI ──────────────────────────────────────────────────────────────────
-
-fn setup_codex() {
-    // Codex discovers skills from ~/.agents/skills/
-    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("transpile");
-    std::fs::create_dir_all(&skill_dir).ok();
-    std::fs::write(skill_dir.join("SKILL.md"), TRANSPILE_SKILL).ok();
-    eprintln!("  Codex CLI: /transpile skill installed in {}", skill_dir.display());
-}
-
-fn remove_codex() {
-    let skill_dir = PathBuf::from(home()).join(".agents").join("skills").join("transpile");
-    if skill_dir.exists() { std::fs::remove_dir_all(&skill_dir).ok(); }
-    eprintln!("  Codex CLI: /transpile skill removed");
-}
-
-// ── OpenCode ───────────────────────────────────────────────────────────────────
-
-fn opencode_command_path() -> PathBuf {
-    let cfg_dir = std::env::var("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(home()).join(".config"));
-    cfg_dir.join("opencode").join("commands").join("transpile.md")
-}
-
-fn setup_opencode() {
-    let cmd_path = opencode_command_path();
-    std::fs::create_dir_all(cmd_path.parent().unwrap()).ok();
-    std::fs::write(&cmd_path, TRANSPILE_SKILL).ok();
-    eprintln!("  OpenCode: /transpile command installed in {}", cmd_path.display());
-}
-
-fn remove_opencode() {
-    let p = opencode_command_path();
-    if p.exists() { std::fs::remove_file(&p).ok(); }
-    eprintln!("  OpenCode: /transpile command removed");
+fn uninstall_command(tool: &str) {
+    let path = command_path(tool);
+    if path.exists() { std::fs::remove_file(&path).ok(); }
+    eprintln!("  {tool}: /transpile command removed");
 }
 
 // ── Cursor ─────────────────────────────────────────────────────────────────────
 
 fn setup_cursor() {
-    // Cursor commands live in .cursor/commands/ (project-local)
-    let cmd_dir = std::path::Path::new(".cursor").join("commands");
-    std::fs::create_dir_all(&cmd_dir).ok();
-    std::fs::write(cmd_dir.join("transpile.md"), TRANSPILE_SKILL).ok();
-    eprintln!("  Cursor: /transpile command installed in .cursor/commands/transpile.md");
+    install_command("cursor");
 }
 
 fn remove_cursor() {
-    let p = std::path::Path::new(".cursor/commands/transpile.md");
-    if p.exists() { std::fs::remove_file(p).ok(); }
-    eprintln!("  Cursor: /transpile command removed");
+    uninstall_command("cursor");
 }
