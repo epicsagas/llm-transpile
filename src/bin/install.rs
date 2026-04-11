@@ -87,26 +87,181 @@ pub fn run_install(tools: Vec<String>, all: bool) -> i32 {
 }
 
 pub fn run_uninstall(tools: Vec<String>) -> i32 {
-    let ids: Vec<&str> = if tools.is_empty() {
-        TOOLS.iter().map(|t| t.id).collect()
+    let selected: Vec<&str> = if !tools.is_empty() {
+        // Validate each name
+        let mut out = Vec::new();
+        for name in &tools {
+            if TOOLS.iter().any(|t| t.id == name.as_str()) {
+                out.push(name.as_str());
+            } else {
+                eprintln!("error: unknown tool '{name}'. Valid: {}", tool_names());
+                return 1;
+            }
+        }
+        out
     } else {
-        tools.iter().map(|s| s.as_str()).collect()
+        wizard_uninstall_select()
     };
 
-    let profile = detect_profile();
-    remove_shell_block(&profile);
-    eprintln!("  removed shell wrappers from {profile}");
+    if selected.is_empty() {
+        eprintln!("No tools selected.");
+        return 0;
+    }
 
-    for id in &ids {
+    // Determine which tools remain installed after removal
+    let profile = detect_profile();
+    let currently_installed = installed_tools_from_profile(&profile);
+    let remaining: Vec<&str> = currently_installed
+        .iter()
+        .filter(|id| !selected.contains(id))
+        .copied()
+        .collect();
+
+    // Update or remove the shell block
+    if remaining.is_empty() {
+        remove_shell_block(&profile);
+        eprintln!("  removed shell wrappers from {profile}");
+    } else {
+        upsert_shell_block(&profile, &remaining);
+    }
+
+    // Remove per-tool config for each selected tool
+    for id in &selected {
         match *id {
             "claude" => remove_claude(),
             "cursor" => remove_cursor(),
             _ => {}
         }
+        eprintln!("  {id}: removed");
     }
 
+    eprintln!();
     eprintln!("Done.");
     0
+}
+
+/// Returns tools currently present in the shell profile block.
+fn installed_tools_from_profile(profile: &str) -> Vec<&'static str> {
+    let content = std::fs::read_to_string(profile).unwrap_or_default();
+    if !content.contains(MARKER_BEGIN) {
+        return vec![];
+    }
+    // Extract block content
+    let start = content.find(MARKER_BEGIN).unwrap_or(0);
+    let end = content[start..].find(MARKER_END).map(|i| start + i).unwrap_or(content.len());
+    let block = &content[start..end];
+
+    // Detect which tools are referenced by their section comments
+    let mut found = vec!["claude"]; // tctx/talias/trun always imply base install
+    if block.contains("# Gemini CLI")  { found.push("gemini"); }
+    if block.contains("# Codex CLI")   { found.push("codex"); }
+    if block.contains("# OpenCode")    { found.push("opencode"); }
+    // cursor doesn't add shell block entries, detect via file
+    if std::path::Path::new(".cursor/transpile-ctx.sh").exists() {
+        found.push("cursor");
+    }
+    found
+}
+
+/// Uninstall wizard: same TTY/pipe UI but labeled "remove".
+fn wizard_uninstall_select() -> Vec<&'static str> {
+    let tty = io::stdin().is_terminal() && io::stderr().is_terminal();
+    if tty {
+        wizard_uninstall_tty()
+    } else {
+        wizard_uninstall_pipe()
+    }
+}
+
+fn wizard_uninstall_tty() -> Vec<&'static str> {
+    let profile = detect_profile();
+    let installed = installed_tools_from_profile(&profile);
+    // Pre-check everything that's installed
+    let mut checked: Vec<bool> = TOOLS.iter().map(|t| installed.contains(&t.id)).collect();
+    let mut cursor = 0usize;
+
+    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+
+    loop {
+        eprint!("\x1b[2J\x1b[H");
+        eprintln!("transpile uninstall — select integrations to remove\r");
+        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
+        eprintln!("\r");
+
+        for (i, tool) in TOOLS.iter().enumerate() {
+            let is_installed = installed.contains(&tool.id);
+            let check  = if checked[i]   { "◉" } else { "○" };
+            let arrow  = if i == cursor  { "▶" } else { " " };
+            let status = if is_installed { " (installed)" } else { " (not installed)" };
+            eprintln!("  {} {} {}  {}{}\r", arrow, check, tool.id, tool.label, status);
+        }
+
+        let _ = io::stderr().flush();
+
+        let key = read_key();
+        match key {
+            b' ' => { checked[cursor] = !checked[cursor]; }
+            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
+            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
+            b'Q' | b'q' => {
+                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+                return vec![];
+            }
+            b'\r' | b'\n' => break,
+            27 => {
+                let b2 = read_key();
+                if b2 == b'[' {
+                    match read_key() {
+                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'B' => { if cursor < TOOLS.len() - 1 { cursor += 1; } }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    eprint!("\x1b[2J\x1b[H");
+
+    TOOLS.iter().enumerate()
+        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
+        .collect()
+}
+
+fn wizard_uninstall_pipe() -> Vec<&'static str> {
+    let profile = detect_profile();
+    let installed = installed_tools_from_profile(&profile);
+
+    eprintln!("transpile uninstall — select integrations to remove");
+    eprintln!("────────────────────────────────────────────────────");
+    for (i, t) in TOOLS.iter().enumerate() {
+        let status = if installed.contains(&t.id) { " [installed]" } else { "" };
+        eprintln!("  [{}] {:<10} {}{}", i + 1, t.id, t.label, status);
+    }
+    eprintln!("  [a] All of the above");
+    eprintln!();
+    eprint!("Selection (e.g. 1,3 or a): ");
+    let _ = io::stderr().flush();
+
+    let mut line = String::new();
+    let _ = io::stdin().read_line(&mut line);
+    let line = line.trim().to_lowercase();
+
+    if line == "a" || line == "all" {
+        return TOOLS.iter().map(|t| t.id).collect();
+    }
+
+    let mut out = Vec::new();
+    for token in line.split(',') {
+        if let Ok(n) = token.trim().parse::<usize>() {
+            if n >= 1 && n <= TOOLS.len() {
+                out.push(TOOLS[n - 1].id);
+            }
+        }
+    }
+    out
 }
 
 // ── Interactive wizard ─────────────────────────────────────────────────────────
