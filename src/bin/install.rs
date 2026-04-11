@@ -592,11 +592,10 @@ fn remove_claude() {
 }
 
 
-// ── /transpile skill content (shared across all tools) ────────────────────────────
+// ── Command/skill content per tool ────────────────────────────────────────────
 
-/// The /transpile skill instructs the LLM to run `transpile` when it wants to read
-/// a large file, instead of reading the raw content directly.
-const TRANSPILE_SKILL: &str = "\
+/// Markdown command — Claude Code, Cursor, OpenCode
+const TRANSPILE_CMD_MD: &str = "\
 ---
 name: transpile
 description: Read a file in token-compressed form. Use for any file larger than ~8KB to save context.
@@ -604,8 +603,8 @@ description: Read a file in token-compressed form. Use for any file larger than 
 
 # /transpile — Token-Compressed File Read
 
-When you need to read a large file, use this skill instead of reading it directly.
-It produces a semantically equivalent but ~30% smaller version.
+When you need to read a large file, use this instead of reading it directly.
+Produces a semantically equivalent but ~30% smaller version.
 
 ## Usage
 
@@ -618,60 +617,122 @@ Run this command and treat its output as the file content.
 ## When to trigger
 
 - File is larger than ~8KB
-- You are about to read documentation, specs, or long source files
-- Context window is getting full and you need to be efficient
+- About to read documentation, specs, or long source files
+- Context window is getting full
 
 ## Fidelity options
 
-- `semantic` (default) — stopword removal + low-importance pruning, ~30% reduction
-- `compressed`         — aggressive, ~40% reduction, use when near context limit
-- `lossless`           — no compression, use for legal/config files where every word matters
+- `semantic` (default) — ~30% reduction
+- `compressed`         — ~40% reduction, use when near context limit
+- `lossless`           — no compression, for legal/config files
 ";
 
-// ── Per-tool command install (Gemini / Codex / OpenCode / Cursor) ─────────────
+/// TOML command — Gemini CLI (`~/.gemini/commands/*.toml`)
+const TRANSPILE_CMD_TOML: &str = "\
+description = \"Read a file in token-compressed form. Use for files larger than ~8KB.\"
+prompt = \"\"\"
+Run the following command and treat its output as the file content:
 
-fn command_path(tool: &str) -> PathBuf {
-    let h = home();
-    match tool {
-        "gemini"   => PathBuf::from(&h).join(".gemini").join("commands").join("transpile.md"),
-        "codex"    => PathBuf::from(&h).join(".codex").join("commands").join("transpile.md"),
-        "opencode" => {
-            let cfg = std::env::var("XDG_CONFIG_HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from(&h).join(".config"));
-            cfg.join("opencode").join("commands").join("transpile.md")
-        }
-        "cursor"   => std::path::Path::new(".cursor").join("commands").join("transpile.md"),
-        _          => unreachable!(),
-    }
-}
+  transpile --input $ARGUMENTS --fidelity semantic --quiet
 
-fn setup_gemini()   { install_command("gemini"); }
-fn remove_gemini()  { uninstall_command("gemini"); }
-fn setup_codex()    { install_command("codex"); }
-fn remove_codex()   { uninstall_command("codex"); }
-fn setup_opencode() { install_command("opencode"); }
-fn remove_opencode(){ uninstall_command("opencode"); }
+Use `--fidelity compressed` when near context limit, `--fidelity lossless` for config/legal files.
+\"\"\"
+";
 
-fn install_command(tool: &str) {
-    let path = command_path(tool);
+/// SKILL.md — Codex CLI (`~/.agents/skills/transpile/SKILL.md`)
+const TRANSPILE_SKILL_MD: &str = "\
+---
+name: transpile
+description: Read a file in token-compressed form. Use for any file larger than ~8KB to save context.
+---
+
+# /transpile — Token-Compressed File Read
+
+When you need to read a large file, use this skill instead of reading it directly.
+
+## Usage
+
+```bash
+transpile --input $ARGUMENTS --fidelity semantic --quiet
+```
+
+Run this command and treat its output as the file content.
+
+## When to trigger
+
+- File is larger than ~8KB
+- About to read documentation, specs, or long source files
+- Context window is getting full
+
+## Fidelity options
+
+- `semantic` (default) — ~30% reduction
+- `compressed`         — ~40% reduction, use when near context limit
+- `lossless`           — no compression, for legal/config files
+";
+
+// ── Per-tool install ───────────────────────────────────────────────────────────
+
+fn setup_gemini() {
+    // Gemini CLI: ~/.gemini/commands/*.toml
+    let path = PathBuf::from(home()).join(".gemini").join("commands").join("transpile.toml");
     std::fs::create_dir_all(path.parent().unwrap()).ok();
-    std::fs::write(&path, TRANSPILE_SKILL).ok();
-    eprintln!("  {tool}: /transpile command → {}", path.display());
+    std::fs::write(&path, TRANSPILE_CMD_TOML).ok();
+    eprintln!("  gemini: /transpile command → {}", path.display());
 }
 
-fn uninstall_command(tool: &str) {
-    let path = command_path(tool);
+fn remove_gemini() {
+    let path = PathBuf::from(home()).join(".gemini").join("commands").join("transpile.toml");
     if path.exists() { std::fs::remove_file(&path).ok(); }
-    eprintln!("  {tool}: /transpile command removed");
+    eprintln!("  gemini: /transpile command removed");
+}
+
+fn setup_codex() {
+    // Codex CLI: ~/.agents/skills/transpile/SKILL.md
+    let path = PathBuf::from(home()).join(".agents").join("skills").join("transpile").join("SKILL.md");
+    std::fs::create_dir_all(path.parent().unwrap()).ok();
+    std::fs::write(&path, TRANSPILE_SKILL_MD).ok();
+    eprintln!("  codex: /transpile skill → {}", path.display());
+}
+
+fn remove_codex() {
+    let dir = PathBuf::from(home()).join(".agents").join("skills").join("transpile");
+    if dir.exists() { std::fs::remove_dir_all(&dir).ok(); }
+    eprintln!("  codex: /transpile skill removed");
+}
+
+fn setup_opencode() {
+    // OpenCode: ~/.config/opencode/commands/transpile.md
+    let cfg = std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(home()).join(".config"));
+    let path = cfg.join("opencode").join("commands").join("transpile.md");
+    std::fs::create_dir_all(path.parent().unwrap()).ok();
+    std::fs::write(&path, TRANSPILE_CMD_MD).ok();
+    eprintln!("  opencode: /transpile command → {}", path.display());
+}
+
+fn remove_opencode() {
+    let cfg = std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(home()).join(".config"));
+    let path = cfg.join("opencode").join("commands").join("transpile.md");
+    if path.exists() { std::fs::remove_file(&path).ok(); }
+    eprintln!("  opencode: /transpile command removed");
 }
 
 // ── Cursor ─────────────────────────────────────────────────────────────────────
 
 fn setup_cursor() {
-    install_command("cursor");
+    // Cursor: .cursor/commands/transpile.md (project-local)
+    let path = std::path::Path::new(".cursor").join("commands").join("transpile.md");
+    std::fs::create_dir_all(path.parent().unwrap()).ok();
+    std::fs::write(&path, TRANSPILE_CMD_MD).ok();
+    eprintln!("  cursor: /transpile command → {}", path.display());
 }
 
 fn remove_cursor() {
-    uninstall_command("cursor");
+    let path = std::path::Path::new(".cursor").join("commands").join("transpile.md");
+    if path.exists() { std::fs::remove_file(&path).ok(); }
+    eprintln!("  cursor: /transpile command removed");
 }
