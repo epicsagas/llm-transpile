@@ -1,0 +1,17 @@
+{
+  "name": "epicsagas",
+  "owner": {
+    "name": "epicsagas",
+    "url": "https://github.com/epicsagas"
+  },
+  "metadata": {
+    "description": "Token-optimized document transpiler for LLM context compression."
+  },
+  "plugins": [
+    {
+      "name": "transpile",
+      "source": "./",
+      "description": "Auto-compress .md, .html, .txt files read by Claude Code via PostToolUse hook."
+    }
+  ]
+}

@@ -74,21 +74,37 @@ enum Command {
     ///   transpile install claude       # install only Claude Code
     ///   transpile install gemini codex # install specific tools
     ///   transpile install --all        # install every detected tool
+    ///   transpile install --list       # show available integrations + status
+    ///   transpile install --dry-run    # preview without writing files
     Install {
-        /// Tools to install (omit for interactive menu)
+        /// Integrations to install (omit for interactive menu)
         tools: Vec<String>,
-        /// Install into all supported tools without prompting
+        /// Install all supported integrations without prompting
         #[arg(long)]
         all: bool,
+        /// List available integrations and their current status
+        #[arg(long)]
+        list: bool,
+        /// Preview changes without writing any files
+        #[arg(long)]
+        dry_run: bool,
     },
-    /// Remove all integrations installed by `transpile install`
+    /// Remove integrations installed by `transpile install`
     ///
     /// Examples:
-    ///   transpile uninstall            # remove everything
+    ///   transpile uninstall            # interactive — pick what to remove
     ///   transpile uninstall claude     # remove only Claude Code
+    ///   transpile uninstall --all      # remove all installed integrations
+    ///   transpile uninstall --dry-run  # preview without removing files
     Uninstall {
-        /// Tools to remove (omit to remove all)
+        /// Integrations to remove (omit for interactive menu)
         tools: Vec<String>,
+        /// Remove all installed integrations without prompting
+        #[arg(long)]
+        all: bool,
+        /// Preview changes without removing any files
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -141,11 +157,11 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Command::Install { tools, all }) => {
-            process::exit(install::run_install(tools, all));
+        Some(Command::Install { tools, all, list, dry_run }) => {
+            process::exit(install::run_install(tools, all, dry_run, list));
         }
-        Some(Command::Uninstall { tools }) => {
-            process::exit(install::run_uninstall(tools));
+        Some(Command::Uninstall { tools, all, dry_run }) => {
+            process::exit(install::run_uninstall(tools, all, dry_run));
         }
         None => run_transpile(cli),
     }

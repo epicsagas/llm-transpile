@@ -1,63 +1,215 @@
 //! install.rs — `transpile install` / `transpile uninstall` subcommands
 //!
-//! Configures shell wrappers and per-tool integrations.
-//! All state written to the shell profile is bracketed by:
-//!   # >>> llm-transpile
-//!   ...
-//!   # <<< llm-transpile
-//! so it can be cleanly updated or removed on re-run.
+//! Marketplace-style plugin installer. Each integration is declared in the
+//! static `INTEGRATIONS` registry with its own install/uninstall logic.
+//! All writes are idempotent — re-running install is always safe.
+//!
+//! Features:
+//!   transpile install              # interactive wizard
+//!   transpile install claude       # specific integration(s)
+//!   transpile install --all        # everything
+//!   transpile install --list       # show available integrations + status
+//!   transpile install --dry-run    # preview without writing
+//!   transpile uninstall [tool]     # remove integration(s)
+//!   transpile uninstall --all      # remove everything
+//!   transpile uninstall --dry-run  # preview without removing
 
 use std::io::{self, IsTerminal, Write as IoWrite};
 use std::path::PathBuf;
 
-// ── Tool registry ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sync result — returned by every install/uninstall fn for uniform output
+// ═══════════════════════════════════════════════════════════════════════════════
 
-struct Tool {
-    id: &'static str,
-    label: &'static str,
-    /// Returns true when the tool appears to be installed on this machine.
-    detect: fn() -> bool,
+enum SyncResult {
+    Added(PathBuf),
+    Updated(PathBuf),
+    Unchanged(PathBuf),
+    Removed(PathBuf),
+    Skipped(PathBuf),       // would remove but file absent
+    Configured(String),     // non-file change (e.g. settings.json merge)
+    Deconfigured(String),   // non-file removal
+    DryRun(String),         // what would happen
 }
 
-const TOOLS: &[Tool] = &[
-    Tool { id: "claude",   label: "Claude Code",  detect: || cmd_exists("claude") || dir_exists("~/.claude") },
-    Tool { id: "gemini",   label: "Gemini CLI",   detect: || cmd_exists("gemini") },
-    Tool { id: "codex",    label: "Codex CLI",    detect: || cmd_exists("codex") },
-    Tool { id: "cursor",   label: "Cursor",       detect: || cmd_exists("cursor") || dir_exists("~/.cursor") },
-    Tool { id: "opencode", label: "OpenCode",     detect: || cmd_exists("opencode") },
+impl SyncResult {
+    fn symbol(&self) -> &'static str {
+        match self {
+            Self::Added(_) | Self::Configured(_)         => "✓",
+            Self::Updated(_)                              => "~",
+            Self::Unchanged(_) | Self::Skipped(_)        => "·",
+            Self::Removed(_) | Self::Deconfigured(_)     => "✗",
+            Self::DryRun(_)                               => "?",
+        }
+    }
+    fn tag(&self) -> &'static str {
+        match self {
+            Self::Added(_)        => "added     ",
+            Self::Updated(_)      => "updated   ",
+            Self::Unchanged(_)    => "unchanged ",
+            Self::Removed(_)      => "removed   ",
+            Self::Skipped(_)      => "skipped   ",
+            Self::Configured(_)   => "configured",
+            Self::Deconfigured(_) => "removed   ",
+            Self::DryRun(_)       => "dry-run   ",
+        }
+    }
+    fn detail(&self) -> String {
+        match self {
+            Self::Added(p) | Self::Updated(p) | Self::Unchanged(p)
+            | Self::Removed(p) | Self::Skipped(p) => shorten_path(p),
+            Self::Configured(s) | Self::Deconfigured(s) | Self::DryRun(s) => s.clone(),
+        }
+    }
+}
+
+fn print_results(id: &str, results: &[SyncResult]) {
+    for r in results {
+        eprintln!("  {id:<10} {} {}  {}", r.symbol(), r.tag(), r.detail());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Integration registry
+// ═══════════════════════════════════════════════════════════════════════════════
+
+struct Integration {
+    id:        &'static str,
+    label:     &'static str,
+    detect:    fn() -> bool,
+    /// Primary artifact — used for installed-status detection and --list display.
+    artifact:  fn() -> PathBuf,
+    install:   fn(dry_run: bool) -> Vec<SyncResult>,
+    uninstall: fn(dry_run: bool) -> Vec<SyncResult>,
+}
+
+static INTEGRATIONS: &[Integration] = &[
+    Integration {
+        id: "claude", label: "Claude Code",
+        detect: detect_claude, artifact: claude_artifact,
+        install: install_claude, uninstall: uninstall_claude,
+    },
+    Integration {
+        id: "gemini", label: "Gemini CLI",
+        detect: detect_gemini, artifact: gemini_artifact,
+        install: install_gemini, uninstall: uninstall_gemini,
+    },
+    Integration {
+        id: "codex", label: "Codex CLI",
+        detect: detect_codex, artifact: codex_artifact,
+        install: install_codex, uninstall: uninstall_codex,
+    },
+    Integration {
+        id: "opencode", label: "OpenCode",
+        detect: detect_opencode, artifact: opencode_artifact,
+        install: install_opencode, uninstall: uninstall_opencode,
+    },
+    Integration {
+        id: "cursor", label: "Cursor",
+        detect: detect_cursor, artifact: cursor_artifact,
+        install: install_cursor, uninstall: uninstall_cursor,
+    },
 ];
 
-fn cmd_exists(name: &str) -> bool {
-    std::process::Command::new("which")
-        .arg(name)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+fn integration_names() -> String {
+    INTEGRATIONS.iter().map(|i| i.id).collect::<Vec<_>>().join(", ")
 }
 
-fn dir_exists(path: &str) -> bool {
-    let expanded = path.replacen("~", &home(), 1);
-    std::path::Path::new(&expanded).exists()
+fn find_integration(id: &str) -> Option<&'static Integration> {
+    INTEGRATIONS.iter().find(|i| i.id == id)
 }
 
-fn home() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())
+// ── Detectors ──────────────────────────────────────────────────────────────────
+fn detect_claude()   -> bool { cmd_exists("claude")   || dir_exists("~/.claude") }
+fn detect_gemini()   -> bool { cmd_exists("gemini") }
+fn detect_codex()    -> bool { cmd_exists("codex") }
+fn detect_opencode() -> bool { cmd_exists("opencode") }
+fn detect_cursor()   -> bool { cmd_exists("cursor")   || dir_exists("~/.cursor") }
+
+// ── Artifact paths (canonical installed-status marker) ─────────────────────────
+fn claude_artifact()   -> PathBuf { PathBuf::from(home()).join(".claude").join("transpile-hook.sh") }
+fn gemini_artifact()   -> PathBuf { skill_path("gemini") }
+fn codex_artifact()    -> PathBuf { skill_path("codex") }
+fn opencode_artifact() -> PathBuf { skill_path("opencode") }
+fn cursor_artifact()   -> PathBuf { skill_path("cursor") }
+
+// ── Per-integration install fns ────────────────────────────────────────────────
+fn install_claude(dry_run: bool) -> Vec<SyncResult> {
+    let mut out = Vec::new();
+
+    // 1) Hook script
+    let hook = claude_artifact();
+    out.push(sync_file(&hook, CLAUDE_HOOK_SCRIPT, true, dry_run));
+
+    // 2) settings.json PostToolUse entry
+    let settings = PathBuf::from(home()).join(".claude").join("settings.json");
+    if dry_run {
+        out.push(SyncResult::DryRun(format!(
+            "merge PostToolUse hook → {}",
+            shorten_path(&settings)
+        )));
+    } else {
+        out.push(merge_claude_hook(&hook, &settings));
+    }
+
+    out
 }
 
-// ── Public entry points ────────────────────────────────────────────────────────
+fn uninstall_claude(dry_run: bool) -> Vec<SyncResult> {
+    let mut out = Vec::new();
 
-pub fn run_install(tools: Vec<String>, all: bool) -> i32 {
-    let selected = if all {
-        TOOLS.iter().map(|t| t.id).collect::<Vec<_>>()
+    // 1) Hook script
+    let hook = claude_artifact();
+    out.push(remove_file(&hook, dry_run));
+
+    // 2) settings.json entry
+    let settings = PathBuf::from(home()).join(".claude").join("settings.json");
+    if dry_run {
+        out.push(SyncResult::DryRun(format!(
+            "remove PostToolUse hook from {}",
+            shorten_path(&settings)
+        )));
+    } else {
+        out.push(strip_claude_hook(&settings));
+    }
+
+    // 3) Legacy command file (silent)
+    if !dry_run {
+        let legacy = PathBuf::from(home()).join(".claude").join("commands").join("transpile.md");
+        if legacy.exists() { std::fs::remove_file(legacy).ok(); }
+    }
+
+    out
+}
+
+fn install_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&gemini_artifact(),   TRANSPILE_SKILL, false, dry_run)] }
+fn install_codex(dry_run: bool)    -> Vec<SyncResult> { vec![sync_file(&codex_artifact(),    TRANSPILE_SKILL, false, dry_run)] }
+fn install_opencode(dry_run: bool) -> Vec<SyncResult> { vec![sync_file(&opencode_artifact(), TRANSPILE_SKILL, false, dry_run)] }
+fn install_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&cursor_artifact(),   TRANSPILE_SKILL, false, dry_run)] }
+
+fn uninstall_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![remove_file(&gemini_artifact(),   dry_run)] }
+fn uninstall_codex(dry_run: bool)    -> Vec<SyncResult> { vec![remove_file(&codex_artifact(),    dry_run)] }
+fn uninstall_opencode(dry_run: bool) -> Vec<SyncResult> { vec![remove_file(&opencode_artifact(), dry_run)] }
+fn uninstall_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![remove_file(&cursor_artifact(),   dry_run)] }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Public entry points
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub fn run_install(tools: Vec<String>, all: bool, dry_run: bool, list: bool) -> i32 {
+    if list { return run_list(); }
+
+    let selected: Vec<&str> = if all {
+        INTEGRATIONS.iter().map(|i| i.id).collect()
     } else if !tools.is_empty() {
-        // Validate names
         let mut out = Vec::new();
         for name in &tools {
-            if TOOLS.iter().any(|t| t.id == name.as_str()) {
-                out.push(name.as_str());
-            } else {
-                eprintln!("error: unknown tool '{name}'. Valid: {}", tool_names());
-                return 1;
+            match find_integration(name) {
+                Some(ig) => out.push(ig.id),
+                None => {
+                    eprintln!("error: unknown integration '{name}'. Available: {}", integration_names());
+                    return 1;
+                }
             }
         }
         out
@@ -66,39 +218,43 @@ pub fn run_install(tools: Vec<String>, all: bool) -> i32 {
     };
 
     if selected.is_empty() {
-        eprintln!("No tools selected.");
+        eprintln!("No integrations selected.");
         return 0;
     }
 
-    let profile = detect_profile();
-    upsert_shell_block(&profile, &selected);
+    if dry_run { eprintln!("Dry run — no files will be written.\n"); }
 
-    for id in &selected {
-        match *id {
-            "claude"   => setup_claude(),
-            "gemini"   => setup_gemini(),
-            "codex"    => setup_codex(),
-            "opencode" => setup_opencode(),
-            "cursor"   => setup_cursor(),
-            _ => {}
-        }
+    let profile = detect_profile();
+    if !dry_run {
+        ensure_shell_block(&profile);
+        eprintln!();
     }
 
-    eprintln!();
-    eprintln!("Done. Restart your shell or:  source {profile}");
+    for id in &selected {
+        let ig = find_integration(id).unwrap();
+        let results = (ig.install)(dry_run);
+        print_results(id, &results);
+    }
+
+    if !dry_run {
+        eprintln!();
+        eprintln!("Done. Restart your shell or:  source {profile}");
+    }
     0
 }
 
-pub fn run_uninstall(tools: Vec<String>) -> i32 {
-    let selected: Vec<&str> = if !tools.is_empty() {
-        // Validate each name
+pub fn run_uninstall(tools: Vec<String>, all: bool, dry_run: bool) -> i32 {
+    let selected: Vec<&str> = if all {
+        INTEGRATIONS.iter().map(|i| i.id).collect()
+    } else if !tools.is_empty() {
         let mut out = Vec::new();
         for name in &tools {
-            if TOOLS.iter().any(|t| t.id == name.as_str()) {
-                out.push(name.as_str());
-            } else {
-                eprintln!("error: unknown tool '{name}'. Valid: {}", tool_names());
-                return 1;
+            match find_integration(name) {
+                Some(ig) => out.push(ig.id),
+                None => {
+                    eprintln!("error: unknown integration '{name}'. Available: {}", integration_names());
+                    return 1;
+                }
             }
         }
         out
@@ -107,360 +263,100 @@ pub fn run_uninstall(tools: Vec<String>) -> i32 {
     };
 
     if selected.is_empty() {
-        eprintln!("No tools selected.");
+        eprintln!("No integrations selected.");
         return 0;
     }
 
-    // Determine which tools remain installed after removal
-    let profile = detect_profile();
-    let currently_installed = installed_tools_from_profile(&profile);
-    let remaining: Vec<&str> = currently_installed
-        .iter()
-        .filter(|id| !selected.contains(id))
-        .copied()
-        .collect();
+    if dry_run { eprintln!("Dry run — no files will be removed.\n"); }
 
-    // Update or remove the shell block
-    if remaining.is_empty() {
-        remove_shell_block(&profile);
-        eprintln!("  removed shell wrappers from {profile}");
-    } else {
-        upsert_shell_block(&profile, &remaining);
-    }
-
-    // Remove per-tool config for each selected tool
     for id in &selected {
-        match *id {
-            "claude"   => remove_claude(),
-            "gemini"   => remove_gemini(),
-            "codex"    => remove_codex(),
-            "opencode" => remove_opencode(),
-            "cursor"   => remove_cursor(),
-            _ => {}
-        }
-        eprintln!("  {id}: removed");
+        let ig = find_integration(id).unwrap();
+        let results = (ig.uninstall)(dry_run);
+        print_results(id, &results);
     }
 
-    eprintln!();
-    eprintln!("Done.");
+    // Remove shell block if nothing is installed anymore
+    if !dry_run {
+        let profile = detect_profile();
+        let any_remain = INTEGRATIONS.iter().any(|ig| (ig.artifact)().exists());
+        if !any_remain {
+            remove_shell_block(&profile);
+            eprintln!("  shell block removed from {profile}");
+        }
+        eprintln!("\nDone.");
+    }
     0
 }
 
-/// Returns tools currently present in the shell profile block.
-fn installed_tools_from_profile(profile: &str) -> Vec<&'static str> {
-    let content = std::fs::read_to_string(profile).unwrap_or_default();
-    if !content.contains(MARKER_BEGIN) {
-        return vec![];
+// ── --list ─────────────────────────────────────────────────────────────────────
+
+pub fn run_list() -> i32 {
+    eprintln!("Available integrations:\n");
+    eprintln!("  {:<10} {:<14} {:<12} {:<14} ARTIFACT", "ID", "LABEL", "DETECTED", "STATUS");
+    eprintln!("  {}", "─".repeat(72));
+    for ig in INTEGRATIONS {
+        let artifact = (ig.artifact)();
+        let detected = if (ig.detect)() { "✓ detected  " } else { "            " };
+        let status   = if artifact.exists() { "✓ installed " } else { "  not installed" };
+        eprintln!("  {:<10} {:<14} {:<12} {:<15} {}", ig.id, ig.label, detected, status, shorten_path(&artifact));
     }
-    // Extract block content
-    let start = content.find(MARKER_BEGIN).unwrap_or(0);
-    let end = content[start..].find(MARKER_END).map(|i| start + i).unwrap_or(content.len());
-    let block = &content[start..end];
-
-    // Detect which tools are referenced by their section comments
-    let mut found = vec!["claude"]; // tctx/talias/trun always imply base install
-    if block.contains("# Gemini CLI")  { found.push("gemini"); }
-    if block.contains("# Codex CLI")   { found.push("codex"); }
-    if block.contains("# OpenCode")    { found.push("opencode"); }
-    // cursor doesn't add shell block entries, detect via file
-    if std::path::Path::new(".cursor/transpile-ctx.sh").exists() {
-        found.push("cursor");
-    }
-    found
-}
-
-/// Uninstall wizard: same TTY/pipe UI but labeled "remove".
-fn wizard_uninstall_select() -> Vec<&'static str> {
-    let tty = io::stdin().is_terminal() && io::stderr().is_terminal();
-    if tty {
-        wizard_uninstall_tty()
-    } else {
-        wizard_uninstall_pipe()
-    }
-}
-
-fn wizard_uninstall_tty() -> Vec<&'static str> {
-    let profile = detect_profile();
-    let installed = installed_tools_from_profile(&profile);
-    // Pre-check everything that's installed
-    let mut checked: Vec<bool> = TOOLS.iter().map(|t| installed.contains(&t.id)).collect();
-    let mut cursor = 0usize;
-
-    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
-
-    loop {
-        eprint!("\x1b[2J\x1b[H");
-        eprintln!("transpile uninstall — select integrations to remove\r");
-        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
-        eprintln!("\r");
-
-        for (i, tool) in TOOLS.iter().enumerate() {
-            let is_installed = installed.contains(&tool.id);
-            let check  = if checked[i]   { "◉" } else { "○" };
-            let arrow  = if i == cursor  { "▶" } else { " " };
-            let status = if is_installed { " (installed)" } else { " (not installed)" };
-            eprintln!("  {} {} {}  {}{}\r", arrow, check, tool.id, tool.label, status);
-        }
-
-        let _ = io::stderr().flush();
-
-        let key = read_key();
-        match key {
-            b' ' => { checked[cursor] = !checked[cursor]; }
-            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
-            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
-            b'Q' | b'q' => {
-                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
-                return vec![];
-            }
-            b'\r' | b'\n' => break,
-            27 => {
-                let b2 = read_key();
-                if b2 == b'[' {
-                    match read_key() {
-                        b'A' => { if cursor > 0 { cursor -= 1; } }
-                        b'B' => { if cursor < TOOLS.len() - 1 { cursor += 1; } }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
-    eprint!("\x1b[2J\x1b[H");
-
-    TOOLS.iter().enumerate()
-        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
-        .collect()
-}
-
-fn wizard_uninstall_pipe() -> Vec<&'static str> {
-    let profile = detect_profile();
-    let installed = installed_tools_from_profile(&profile);
-
-    eprintln!("transpile uninstall — select integrations to remove");
-    eprintln!("────────────────────────────────────────────────────");
-    for (i, t) in TOOLS.iter().enumerate() {
-        let status = if installed.contains(&t.id) { " [installed]" } else { "" };
-        eprintln!("  [{}] {:<10} {}{}", i + 1, t.id, t.label, status);
-    }
-    eprintln!("  [a] All of the above");
     eprintln!();
-    eprint!("Selection (e.g. 1,3 or a): ");
-    let _ = io::stderr().flush();
-
-    let mut line = String::new();
-    let _ = io::stdin().read_line(&mut line);
-    let line = line.trim().to_lowercase();
-
-    if line == "a" || line == "all" {
-        return TOOLS.iter().map(|t| t.id).collect();
-    }
-
-    let mut out = Vec::new();
-    for token in line.split(',') {
-        if let Ok(n) = token.trim().parse::<usize>() {
-            if n >= 1 && n <= TOOLS.len() {
-                out.push(TOOLS[n - 1].id);
-            }
-        }
-    }
-    out
+    0
 }
 
-// ── Interactive wizard ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// File sync helpers
+// ═══════════════════════════════════════════════════════════════════════════════
 
-fn wizard_select() -> Vec<&'static str> {
-    let tty = io::stdin().is_terminal() && io::stderr().is_terminal();
-
-    if tty {
-        wizard_tty()
-    } else {
-        wizard_pipe()
+/// Write `content` to `path`. Returns Added / Updated / Unchanged.
+/// Creates parent dirs as needed. Optionally makes file executable.
+fn sync_file(path: &PathBuf, content: &str, executable: bool, dry_run: bool) -> SyncResult {
+    if dry_run {
+        let action = if path.exists() { "update" } else { "create" };
+        return SyncResult::DryRun(format!("{action} {}", shorten_path(path)));
     }
-}
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let exists = path.exists();
+    let same   = exists
+        && std::fs::read_to_string(path).map(|s| s == content).unwrap_or(false);
 
-/// TTY: space-toggle checkbox list, Enter to confirm.
-fn wizard_tty() -> Vec<&'static str> {
-    let detected: Vec<bool> = TOOLS.iter().map(|t| (t.detect)()).collect();
-    // Pre-select detected tools
-    let mut checked: Vec<bool> = detected.clone();
-    let mut cursor = 0usize;
+    if same { return SyncResult::Unchanged(path.clone()); }
 
-    // Switch terminal to raw mode via stty
-    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+    std::fs::write(path, content).ok();
 
-    loop {
-        // Render
-        eprint!("\x1b[2J\x1b[H"); // clear screen
-        eprintln!("transpile install — select integrations\r");
-        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
-        eprintln!("\r");
-
-        for (i, tool) in TOOLS.iter().enumerate() {
-            let check = if checked[i] { "◉" } else { "○" };
-            let arrow = if i == cursor { "▶" } else { " " };
-            let det   = if detected[i] { " (detected)" } else { "" };
-            eprintln!("  {} {} {}  {}{}\r", arrow, check, tool.id, tool.label, det);
-        }
-
-        let _ = io::stderr().flush();
-
-        // Read one keypress
-        let key = read_key();
-        match key {
-            b' ' => { checked[cursor] = !checked[cursor]; }
-            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
-            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
-            b'Q' | b'q' => {
-                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
-                return vec![];
-            }
-            b'\r' | b'\n' => break,
-            27 => { // ESC sequences: [A = up, [B = down
-                let b2 = read_key();
-                if b2 == b'[' {
-                    match read_key() {
-                        b'A' => { if cursor > 0 { cursor -= 1; } }
-                        b'B' => { if cursor < TOOLS.len() - 1 { cursor += 1; } }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
+    #[cfg(unix)]
+    if executable {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(m) = std::fs::metadata(path) {
+            let mut p = m.permissions();
+            p.set_mode(0o755);
+            std::fs::set_permissions(path, p).ok();
         }
     }
 
-    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
-    eprint!("\x1b[2J\x1b[H"); // clear screen
-
-    TOOLS.iter().enumerate()
-        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
-        .collect()
+    if exists { SyncResult::Updated(path.clone()) } else { SyncResult::Added(path.clone()) }
 }
 
-fn read_key() -> u8 {
-    use std::io::Read;
-    let mut buf = [0u8; 1];
-    io::stdin().read_exact(&mut buf).ok();
-    buf[0]
-}
-
-/// Non-TTY fallback: numbered list, comma-separated input.
-fn wizard_pipe() -> Vec<&'static str> {
-    eprintln!("transpile install — select integrations");
-    eprintln!("────────────────────────────────────────");
-    for (i, t) in TOOLS.iter().enumerate() {
-        let det = if (t.detect)() { " *" } else { "" };
-        eprintln!("  [{}] {:<10} {}{}", i + 1, t.id, t.label, det);
+/// Remove `path`. Returns Removed / Skipped.
+/// Also prunes the parent directory if it becomes empty.
+fn remove_file(path: &PathBuf, dry_run: bool) -> SyncResult {
+    if !path.exists() { return SyncResult::Skipped(path.clone()); }
+    if dry_run {
+        return SyncResult::DryRun(format!("remove {}", shorten_path(path)));
     }
-    eprintln!("  [a] All of the above");
-    eprintln!();
-    eprint!("Selection (e.g. 1,3 or a): ");
-    let _ = io::stderr().flush();
-
-    let mut line = String::new();
-    let _ = io::stdin().read_line(&mut line);
-    let line = line.trim().to_lowercase();
-
-    if line == "a" || line == "all" {
-        return TOOLS.iter().map(|t| t.id).collect();
+    std::fs::remove_file(path).ok();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::remove_dir(parent); // no-op if non-empty
     }
-
-    let mut out = Vec::new();
-    for token in line.split(',') {
-        if let Ok(n) = token.trim().parse::<usize>() {
-            if n >= 1 && n <= TOOLS.len() {
-                out.push(TOOLS[n - 1].id);
-            }
-        }
-    }
-    out
+    SyncResult::Removed(path.clone())
 }
 
-fn tool_names() -> String {
-    TOOLS.iter().map(|t| t.id).collect::<Vec<_>>().join(", ")
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// Claude Code — hook script + settings.json merge
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Shell profile block ────────────────────────────────────────────────────────
-
-const MARKER_BEGIN: &str = "# >>> llm-transpile";
-const MARKER_END:   &str = "# <<< llm-transpile";
-
-fn detect_profile() -> String {
-    let home = home();
-    for name in &[".zshrc", ".bashrc", ".profile"] {
-        let p = format!("{home}/{name}");
-        if std::path::Path::new(&p).exists() {
-            return p;
-        }
-    }
-    format!("{home}/.profile")
-}
-
-fn build_shell_block(_tools: &[&str]) -> String {
-    // Single unified helper — all tools use `transpile` directly.
-    // Per-tool wrappers are replaced by /transpile skills installed in each tool.
-    vec![
-        r#"tctx() { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }"#.to_string(),
-    ].join("\n")
-}
-
-fn upsert_shell_block(profile: &str, tools: &[&str]) {
-    let block_body = build_shell_block(tools);
-    let full_block = format!("\n{MARKER_BEGIN}\n{block_body}\n{MARKER_END}\n");
-
-    let existing = std::fs::read_to_string(profile).unwrap_or_default();
-
-    let new_content = if existing.contains(MARKER_BEGIN) {
-        // Replace existing block
-        // Manual replace (no regex dep): find begin..end and splice
-        splice_block(&existing, MARKER_BEGIN, MARKER_END, &full_block.trim())
-    } else {
-        format!("{existing}{full_block}")
-    };
-
-    std::fs::write(profile, new_content).ok();
-    eprintln!("  {} shell wrappers in {profile}", if existing.contains(MARKER_BEGIN) { "updated" } else { "added" });
-}
-
-fn splice_block(text: &str, begin: &str, end: &str, replacement: &str) -> String {
-    let start = match text.find(begin) {
-        Some(i) => i,
-        None => return format!("{text}\n{replacement}\n"),
-    };
-    let after_end = match text[start..].find(end) {
-        Some(i) => start + i + end.len(),
-        None => text.len(),
-    };
-    // Trim any leading newline before the marker
-    let prefix_end = if start > 0 && text.as_bytes()[start - 1] == b'\n' { start - 1 } else { start };
-    format!("{}\n{}\n{}", &text[..prefix_end], replacement, &text[after_end..])
-}
-
-fn remove_shell_block(profile: &str) {
-    let existing = std::fs::read_to_string(profile).unwrap_or_default();
-    if !existing.contains(MARKER_BEGIN) { return; }
-    let cleaned = splice_block(&existing, MARKER_BEGIN, MARKER_END, "");
-    // Remove double-blank lines left behind
-    let cleaned = cleaned.trim_end().to_string() + "\n";
-    std::fs::write(profile, cleaned).ok();
-}
-
-// ── Claude Code ────────────────────────────────────────────────────────────────
-
-fn claude_settings_path() -> PathBuf {
-    PathBuf::from(home()).join(".claude").join("settings.json")
-}
-
-/// The PostToolUse hook script written to ~/.claude/transpile-hook.sh.
-///
-/// Reads the hook JSON payload from stdin, extracts the file path, and if the
-/// file exceeds the byte threshold, runs `transpile` and returns a JSON object
-/// with `additionalContext` so Claude receives the compressed version alongside
-/// the raw read result — no manual intervention required.
 const CLAUDE_HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
 # Auto-generated by `transpile install`. Re-run to update.
 # PostToolUse hook: auto-compress large files read by Claude Code.
@@ -501,93 +397,64 @@ print(json.dumps({'additionalContext': msg}))
 " "$COMPRESSED" "$FNAME" "$BYTES"
 "#;
 
-fn setup_claude() {
-    let claude_dir = PathBuf::from(home()).join(".claude");
-    std::fs::create_dir_all(&claude_dir).ok();
-
-    // Write the hook script
-    let hook_script = claude_dir.join("transpile-hook.sh");
-    std::fs::write(&hook_script, CLAUDE_HOOK_SCRIPT).ok();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(m) = std::fs::metadata(&hook_script) {
-            let mut p = m.permissions();
-            p.set_mode(0o755);
-            std::fs::set_permissions(&hook_script, p).ok();
-        }
-    }
-    eprintln!("  Claude Code: hook script written to {}", hook_script.display());
-
-    // Upsert settings.json with the PostToolUse hook
-    let settings_path = claude_dir.join("settings.json");
+fn merge_claude_hook(hook_script: &PathBuf, settings_path: &PathBuf) -> SyncResult {
     if !settings_path.exists() {
-        std::fs::write(&settings_path, "{}").ok();
+        std::fs::write(settings_path, "{}").ok();
     }
-    let raw = std::fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
+    let mut cfg: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
 
-    let hook_cmd = format!(
-        "bash \"{}\"",
-        hook_script.display()
-    );
     let hook = serde_json::json!({
         "_id": "llm-transpile",
         "matcher": "Read",
-        "hooks": [{ "type": "command", "command": hook_cmd }]
+        "hooks": [{ "type": "command", "command": format!("bash \"{}\"", hook_script.display()) }]
     });
 
-    let arr = cfg["hooks"]["PostToolUse"]
-        .as_array_mut();
-    if let Some(arr) = arr {
+    let already = cfg["hooks"]["PostToolUse"]
+        .as_array()
+        .map(|a| a.iter().any(|h| h.get("_id").and_then(|v| v.as_str()) == Some("llm-transpile")))
+        .unwrap_or(false);
+
+    if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
         arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
         arr.push(hook);
     } else {
         cfg["hooks"]["PostToolUse"] = serde_json::json!([hook]);
     }
 
-    std::fs::write(&settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
-    eprintln!("  Claude Code: PostToolUse hook registered in {}", settings_path.display());
+    std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
 
+    let label = format!("PostToolUse hook → {}", shorten_path(settings_path));
+    if already { SyncResult::Configured(label) } else { SyncResult::Configured(label) }
 }
 
-fn remove_claude() {
-    let path = claude_settings_path();
-    if !path.exists() { return; }
-
-    let raw = std::fs::read_to_string(&path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+fn strip_claude_hook(settings_path: &PathBuf) -> SyncResult {
+    if !settings_path.exists() {
+        return SyncResult::Skipped(settings_path.clone());
+    }
+    let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
+    let mut cfg: serde_json::Value =
+        serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
 
     if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
         arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
     }
-    // Clean up empty containers
+    // Prune empty containers
     if cfg["hooks"]["PostToolUse"].as_array().map(|a| a.is_empty()).unwrap_or(false) {
         cfg["hooks"].as_object_mut().map(|o| o.remove("PostToolUse"));
     }
     if cfg["hooks"].as_object().map(|o| o.is_empty()).unwrap_or(false) {
         cfg.as_object_mut().map(|o| o.remove("hooks"));
     }
-
-    std::fs::write(&path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
-    eprintln!("  Claude Code: hook removed from settings.json");
-
-    let claude_dir = PathBuf::from(home()).join(".claude");
-
-    let hook_script = claude_dir.join("transpile-hook.sh");
-    if hook_script.exists() { std::fs::remove_file(&hook_script).ok(); }
-    eprintln!("  Claude Code: hook script removed");
-
-    // Remove command file (legacy path)
-    let cmd = claude_dir.join("commands").join("transpile.md");
-    if cmd.exists() { std::fs::remove_file(cmd).ok(); }
-    eprintln!("  Claude Code: hook + command removed");
+    std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
+    SyncResult::Deconfigured(format!("PostToolUse hook removed from {}", shorten_path(settings_path)))
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared skill content + per-tool paths
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ── Shared skill content ───────────────────────────────────────────────────────
-
-/// Used by all tools: always-on rule triggered by file extension, not size.
 const TRANSPILE_SKILL: &str = "\
 ---
 name: transpile
@@ -619,8 +486,6 @@ transpile --input <file> --fidelity semantic --quiet
 - `lossless`           — no compression, for files where every word matters
 ";
 
-// ── Per-tool install ───────────────────────────────────────────────────────────
-
 fn skill_path(tool: &str) -> PathBuf {
     let h = home();
     match tool {
@@ -632,36 +497,277 @@ fn skill_path(tool: &str) -> PathBuf {
                 .unwrap_or_else(|_| PathBuf::from(&h).join(".config"));
             cfg.join("opencode").join("skills").join("transpile").join("SKILL.md")
         }
-        "cursor"   => std::path::Path::new(".cursor").join("rules").join("transpile.mdc"),
-        _          => unreachable!(),
+        "cursor" => std::path::Path::new(".cursor").join("rules").join("transpile.mdc"),
+        _        => unreachable!(),
     }
 }
 
-fn install_skill(tool: &str) {
-    let path = skill_path(tool);
-    std::fs::create_dir_all(path.parent().unwrap()).ok();
-    std::fs::write(&path, TRANSPILE_SKILL).ok();
-    eprintln!("  {tool}: transpile skill → {}", path.display());
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shell profile block  (tctx helper — optional convenience alias)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-fn uninstall_skill(tool: &str) {
-    let path = skill_path(tool);
-    // Remove the file; also remove parent dir if it's the skill dir
-    if path.exists() { std::fs::remove_file(&path).ok(); }
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::remove_dir(parent); // only removes if empty
+const MARKER_BEGIN: &str = "# >>> llm-transpile";
+const MARKER_END:   &str = "# <<< llm-transpile";
+
+const SHELL_BLOCK: &str =
+    r#"tctx() { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }"#;
+
+fn detect_profile() -> String {
+    let home = home();
+    for name in &[".zshrc", ".bashrc", ".profile"] {
+        let p = format!("{home}/{name}");
+        if std::path::Path::new(&p).exists() { return p; }
     }
-    eprintln!("  {tool}: transpile skill removed");
+    format!("{home}/.profile")
 }
 
-fn setup_gemini()    { install_skill("gemini"); }
-fn remove_gemini()   { uninstall_skill("gemini"); }
-fn setup_codex()     { install_skill("codex"); }
-fn remove_codex()    { uninstall_skill("codex"); }
-fn setup_opencode()  { install_skill("opencode"); }
-fn remove_opencode() { uninstall_skill("opencode"); }
+fn ensure_shell_block(profile: &str) {
+    let existing = std::fs::read_to_string(profile).unwrap_or_default();
+    if existing.contains(MARKER_BEGIN) { return; }
+    let block = format!("\n{MARKER_BEGIN}\n{SHELL_BLOCK}\n{MARKER_END}\n");
+    let new    = format!("{existing}{block}");
+    std::fs::write(profile, new).ok();
+    eprintln!("  shell    ✓ added      tctx() helper → {profile}");
+}
 
-// ── Cursor ─────────────────────────────────────────────────────────────────────
+fn remove_shell_block(profile: &str) {
+    let existing = std::fs::read_to_string(profile).unwrap_or_default();
+    if !existing.contains(MARKER_BEGIN) { return; }
+    let cleaned = splice_block(&existing, MARKER_BEGIN, MARKER_END, "");
+    let cleaned = cleaned.trim_end().to_string() + "\n";
+    std::fs::write(profile, cleaned).ok();
+}
 
-fn setup_cursor()  { install_skill("cursor"); }
-fn remove_cursor() { uninstall_skill("cursor"); }
+fn splice_block(text: &str, begin: &str, end: &str, replacement: &str) -> String {
+    let start = match text.find(begin) {
+        Some(i) => i,
+        None    => return format!("{text}\n{replacement}\n"),
+    };
+    let after_end = match text[start..].find(end) {
+        Some(i) => start + i + end.len(),
+        None    => text.len(),
+    };
+    let prefix_end = if start > 0 && text.as_bytes()[start - 1] == b'\n' { start - 1 } else { start };
+    if replacement.is_empty() {
+        format!("{}{}", &text[..prefix_end], &text[after_end..])
+    } else {
+        format!("{}\n{}\n{}", &text[..prefix_end], replacement, &text[after_end..])
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Interactive wizard — install
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn wizard_select() -> Vec<&'static str> {
+    if io::stdin().is_terminal() && io::stderr().is_terminal() {
+        wizard_tty()
+    } else {
+        wizard_pipe()
+    }
+}
+
+fn wizard_tty() -> Vec<&'static str> {
+    let detected: Vec<bool> = INTEGRATIONS.iter().map(|i| (i.detect)()).collect();
+    let mut checked: Vec<bool> = detected.clone();
+    let mut cursor = 0usize;
+
+    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+
+    loop {
+        eprint!("\x1b[2J\x1b[H");
+        eprintln!("transpile install — select integrations\r");
+        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
+        eprintln!("\r");
+        for (i, ig) in INTEGRATIONS.iter().enumerate() {
+            let artifact = (ig.artifact)();
+            let status = if artifact.exists() {
+                " [installed]"
+            } else if detected[i] {
+                " [detected] "
+            } else {
+                "            "
+            };
+            let check = if checked[i]  { "◉" } else { "○" };
+            let arrow = if i == cursor { "▶" } else { " " };
+            eprintln!("  {} {} {:<10}  {}{}\r", arrow, check, ig.id, ig.label, status);
+        }
+        let _ = io::stderr().flush();
+
+        match read_key() {
+            b' '       => { checked[cursor] = !checked[cursor]; }
+            b'A'|b'a'  => { checked.iter_mut().for_each(|c| *c = true); }
+            b'N'|b'n'  => { checked.iter_mut().for_each(|c| *c = false); }
+            b'Q'|b'q'  => {
+                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+                return vec![];
+            }
+            b'\r'|b'\n' => break,
+            27 => {
+                if read_key() == b'[' {
+                    match read_key() {
+                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    eprint!("\x1b[2J\x1b[H");
+    INTEGRATIONS.iter().enumerate()
+        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
+        .collect()
+}
+
+fn wizard_pipe() -> Vec<&'static str> {
+    eprintln!("transpile install — select integrations");
+    eprintln!("────────────────────────────────────────");
+    for (i, ig) in INTEGRATIONS.iter().enumerate() {
+        let flag = if (ig.detect)() { " *" } else { "" };
+        eprintln!("  [{}] {:<10} {}{}", i + 1, ig.id, ig.label, flag);
+    }
+    eprintln!("  [a] All of the above");
+    eprintln!();
+    eprint!("Selection (e.g. 1,3 or a): ");
+    let _ = io::stderr().flush();
+    read_selection()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Interactive wizard — uninstall
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn wizard_uninstall_select() -> Vec<&'static str> {
+    if io::stdin().is_terminal() && io::stderr().is_terminal() {
+        wizard_uninstall_tty()
+    } else {
+        wizard_uninstall_pipe()
+    }
+}
+
+fn wizard_uninstall_tty() -> Vec<&'static str> {
+    let installed: Vec<bool> = INTEGRATIONS.iter().map(|ig| (ig.artifact)().exists()).collect();
+    let mut checked: Vec<bool> = installed.clone();
+    let mut cursor = 0usize;
+
+    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+
+    loop {
+        eprint!("\x1b[2J\x1b[H");
+        eprintln!("transpile uninstall — select integrations to remove\r");
+        eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
+        eprintln!("\r");
+        for (i, ig) in INTEGRATIONS.iter().enumerate() {
+            let status = if installed[i] { " [installed]    " } else { " [not installed]" };
+            let check  = if checked[i]   { "◉" } else { "○" };
+            let arrow  = if i == cursor  { "▶" } else { " " };
+            eprintln!("  {} {} {:<10}  {}{}\r", arrow, check, ig.id, ig.label, status);
+        }
+        let _ = io::stderr().flush();
+
+        match read_key() {
+            b' '        => { checked[cursor] = !checked[cursor]; }
+            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
+            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
+            b'Q' | b'q' => {
+                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+                return vec![];
+            }
+            b'\r' | b'\n' => break,
+            27 => {
+                if read_key() == b'[' {
+                    match read_key() {
+                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    eprint!("\x1b[2J\x1b[H");
+    INTEGRATIONS.iter().enumerate()
+        .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
+        .collect()
+}
+
+fn wizard_uninstall_pipe() -> Vec<&'static str> {
+    eprintln!("transpile uninstall — select integrations to remove");
+    eprintln!("─────────────────────────────────────────────────────");
+    for (i, ig) in INTEGRATIONS.iter().enumerate() {
+        let status = if (ig.artifact)().exists() { " [installed]" } else { "" };
+        eprintln!("  [{}] {:<10} {}{}", i + 1, ig.id, ig.label, status);
+    }
+    eprintln!("  [a] All of the above");
+    eprintln!();
+    eprint!("Selection (e.g. 1,3 or a): ");
+    let _ = io::stderr().flush();
+    read_selection()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared I/O helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn read_key() -> u8 {
+    use std::io::Read;
+    let mut buf = [0u8; 1];
+    io::stdin().read_exact(&mut buf).ok();
+    buf[0]
+}
+
+fn read_selection() -> Vec<&'static str> {
+    let mut line = String::new();
+    let _ = io::stdin().read_line(&mut line);
+    let line = line.trim().to_lowercase();
+    if line == "a" || line == "all" {
+        return INTEGRATIONS.iter().map(|i| i.id).collect();
+    }
+    let mut out = Vec::new();
+    for token in line.split(',') {
+        if let Ok(n) = token.trim().parse::<usize>() {
+            if n >= 1 && n <= INTEGRATIONS.len() {
+                out.push(INTEGRATIONS[n - 1].id);
+            }
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// System helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn home() -> String {
+    std::env::var("HOME").unwrap_or_else(|_| "/tmp".into())
+}
+
+fn cmd_exists(name: &str) -> bool {
+    std::process::Command::new("which")
+        .arg(name)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn dir_exists(path: &str) -> bool {
+    let expanded = path.replacen("~", &home(), 1);
+    std::path::Path::new(&expanded).exists()
+}
+
+fn shorten_path(p: &PathBuf) -> String {
+    let h = home();
+    let s = p.to_string_lossy();
+    if s.starts_with(&h) {
+        format!("~{}", &s[h.len()..])
+    } else {
+        s.into_owned()
+    }
+}

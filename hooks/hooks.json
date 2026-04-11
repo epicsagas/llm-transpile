@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "_id": "llm-transpile",
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.claude/transpile-hook.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

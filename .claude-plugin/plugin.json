@@ -1,0 +1,19 @@
+{
+  "name": "transpile",
+  "version": "0.1.0",
+  "description": "Auto-compress .md, .html, .txt files read by Claude Code via PostToolUse hook.",
+  "author": {
+    "name": "epicsagas",
+    "url": "https://github.com/epicsagas"
+  },
+  "homepage": "https://github.com/epicsagas/llm-transpile",
+  "repository": "https://github.com/epicsagas/llm-transpile",
+  "license": "Apache-2.0",
+  "keywords": [
+    "transpile",
+    "compression",
+    "llm",
+    "context",
+    "token"
+  ]
+}
