@@ -107,7 +107,7 @@ transpile uninstall --all          # 移除全部
 transpile uninstall --dry-run      # 预览移除
 ```
 
-**Claude Code 插件**（替代方案 — 需要 Claude Code 插件支持）
+**Claude Code 插件**
 
 ```
 /plugin marketplace add epicsagas/claude-plugins

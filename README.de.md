@@ -107,7 +107,7 @@ transpile uninstall --all          # alles entfernen
 transpile uninstall --dry-run      # Vorschau der Entfernungen
 ```
 
-**Claude Code-Plugin** (Alternative — erfordert Claude Code mit Plugin-Unterstützung)
+**Claude Code-Plugin**
 
 ```
 /plugin marketplace add epicsagas/claude-plugins

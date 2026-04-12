@@ -107,7 +107,7 @@ transpile uninstall --all          # すべて削除
 transpile uninstall --dry-run      # 削除のプレビュー
 ```
 
-**Claude Codeプラグイン**（代替手段 — Claude Codeのプラグインサポートが必要）
+**Claude Codeプラグイン**
 
 ```
 /plugin marketplace add epicsagas/claude-plugins

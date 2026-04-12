@@ -107,7 +107,7 @@ transpile uninstall --all          # सब हटाएं
 transpile uninstall --dry-run      # हटाने का पूर्वावलोकन
 ```
 
-**Claude Code प्लगइन** (विकल्प — प्लगइन सपोर्ट वाला Claude Code आवश्यक)
+**Claude Code प्लगइन**
 
 ```
 /plugin marketplace add epicsagas/claude-plugins

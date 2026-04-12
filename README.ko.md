@@ -107,7 +107,7 @@ transpile uninstall --all          # 전체 제거
 transpile uninstall --dry-run      # 제거 미리보기
 ```
 
-**Claude Code 플러그인** (대안 — Claude Code 플러그인 지원 필요)
+**Claude Code 플러그인**
 
 ```
 /plugin marketplace add epicsagas/claude-plugins
