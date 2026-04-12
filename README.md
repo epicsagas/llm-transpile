@@ -2,7 +2,6 @@
 
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![CI](https://github.com/epicsagas/llm-transpile/actions/workflows/ci.yml/badge.svg)](https://github.com/epicsagas/llm-transpile/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
@@ -299,16 +298,16 @@ match transpile(input, format, fidelity, budget) {
 
 ## Performance
 
-Measured on release build (`cargo build --release`), Apple M-series, 37 documents across Markdown / HTML / PlainText:
+Measured on release build (`cargo build --release`), Apple M-series, 48 documents across Markdown / HTML / PlainText:
 
 | Metric | Measured | Notes |
 |--------|----------|-------|
-| Throughput | **2,258 tok/ms** | ≈75× faster than Python parsing baseline |
-| Semantic reduction | **29.8%** (Markdown EN) | 15–30% target met |
-| Compressed reduction | **42.0%** (Markdown EN) | Budget-adaptive, guaranteed ≥ PruneLowImportance |
-| Lossless word coverage | **98.4% avg** | Across all formats and languages |
-| HTML reduction | **97.7%** | Reflects markup overhead removal (nav/scripts/styles) |
-| Multilingual support | FR/DE/JA/ZH tested | 97.3% avg word coverage |
+| Throughput | **10,975 tok/ms** | ≈75× faster than Python parsing baseline |
+| Semantic reduction | **33.9%** (Markdown) | 15–30% target met |
+| Compressed reduction | **39.7%** (Markdown) | Budget-adaptive, guaranteed ≥ PruneLowImportance |
+| Lossless word coverage | **98.8% avg** | Across all formats and languages |
+| HTML reduction | **97.6%** | Reflects markup overhead removal (nav/scripts/styles) |
+| Multilingual support | 15 languages tested | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.4% avg word coverage |
 
 Run the evaluation suite yourself:
 
