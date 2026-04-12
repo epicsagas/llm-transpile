@@ -88,7 +88,15 @@ pub enum TranspileError {
 
     #[error("compression attempted in Lossless mode")]
     LosslessModeViolation,
+
+    #[error("input exceeds maximum allowed size of {0} bytes")]
+    InputTooLarge(usize),
 }
+
+/// Maximum input size accepted by [`transpile`] and [`transpile_stream`].
+/// Inputs larger than this limit are rejected with [`TranspileError::InputTooLarge`]
+/// to prevent resource exhaustion on unbounded documents.
+pub const MAX_INPUT_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
 
 // ────────────────────────────────────────────────
 // Internal helpers
@@ -135,6 +143,9 @@ pub fn transpile(
     fidelity: FidelityLevel,
     budget: Option<usize>,
 ) -> Result<String, TranspileError> {
+    if input.len() > MAX_INPUT_BYTES {
+        return Err(TranspileError::InputTooLarge(input.len()));
+    }
     let input = strip_pua(input);
     let input = input.as_ref();
 
@@ -182,6 +193,14 @@ pub async fn transpile_stream(
     fidelity: FidelityLevel,
     budget: usize,
 ) -> std::pin::Pin<Box<dyn futures::Stream<Item = Result<TranspileChunk, StreamError>> + Send>> {
+    if input.len() > MAX_INPUT_BYTES {
+        return Box::pin(futures::stream::once(futures::future::ready(Err(
+            StreamError::Parse(format!(
+                "input exceeds maximum allowed size of {} bytes",
+                MAX_INPUT_BYTES
+            )),
+        ))));
+    }
     let sanitized = strip_pua(input);
     let input_ref = sanitized.as_ref();
 
@@ -317,5 +336,38 @@ mod tests {
             "valid input must yield an Ok chunk: {:?}",
             first.err()
         );
+    }
+
+    #[test]
+    fn transpile_rejects_oversized_input() {
+        let huge = "a".repeat(MAX_INPUT_BYTES + 1);
+        let result = transpile(&huge, InputFormat::PlainText, FidelityLevel::Lossless, None);
+        assert!(
+            matches!(result, Err(TranspileError::InputTooLarge(_))),
+            "expected InputTooLarge, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn stream_rejects_oversized_input() {
+        use futures::StreamExt;
+        let huge = "a".repeat(MAX_INPUT_BYTES + 1);
+        let mut stream =
+            transpile_stream(&huge, InputFormat::PlainText, FidelityLevel::Lossless, 0).await;
+        let first = stream.next().await.expect("must yield an error item");
+        assert!(first.is_err(), "oversized stream input must yield Err");
+    }
+
+    #[test]
+    fn html_pua_entity_stripped_after_tag_removal() {
+        // &#xE000; decoded by ammonia becomes a PUA char — must be stripped
+        let html = "<p>hello &#xE000; world</p>";
+        let output = transpile(html, InputFormat::Html, FidelityLevel::Lossless, None).unwrap();
+        assert!(
+            !output.contains('\u{E000}'),
+            "PUA from HTML entity decoding must be stripped"
+        );
+        assert!(output.contains("hello"), "surrounding text must be preserved");
     }
 }

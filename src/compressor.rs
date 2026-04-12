@@ -366,7 +366,11 @@ fn deduplicate_paras(nodes: Vec<DocNode>) -> Vec<DocNode> {
         .into_iter()
         .filter(|n| {
             if let DocNode::Para { text, .. } = n {
-                let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+                let mut normalized = String::with_capacity(text.len());
+                for token in text.split_whitespace() {
+                    if !normalized.is_empty() { normalized.push(' '); }
+                    normalized.push_str(token);
+                }
                 seen.insert(normalized)
             } else {
                 true

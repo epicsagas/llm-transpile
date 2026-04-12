@@ -35,8 +35,12 @@ pub fn parse(
         InputFormat::Markdown => parse_markdown(input, &mut doc),
         InputFormat::PlainText => parse_plaintext(input, &mut doc),
         InputFormat::Html => {
-            // Strip HTML → delegate to PlainText paragraph parser
+            // Strip HTML → delegate to PlainText paragraph parser.
+            // Re-apply PUA stripping after ammonia tag removal: ammonia decodes HTML
+            // entities (e.g. &#xE000;) into actual PUA codepoints which would otherwise
+            // collide with the internal symbol substitution scheme.
             let plain = strip_html_tags(input);
+            let plain = crate::strip_pua(&plain);
             parse_plaintext(&plain, &mut doc);
         }
     }

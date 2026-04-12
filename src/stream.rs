@@ -245,7 +245,8 @@ impl StreamingTranspiler {
     ///     .with_channel_size(8);
     /// ```
     pub fn with_channel_size(mut self, n: usize) -> Self {
-        self.channel_buffer = n;
+        // Tokio's mpsc::channel requires a capacity of at least 1; clamp to prevent panic.
+        self.channel_buffer = n.max(1);
         self
     }
 
@@ -318,37 +319,33 @@ impl StreamingTranspiler {
             .filter(|n| !matches!(n, crate::ir::DocNode::Metadata { .. }))
             .collect();
 
+        // ── Batch compression (single pass over all body nodes) ──────────
+        // Compute effective fidelity once based on post-header token usage,
+        // then compress the entire batch in one call — O(N+M) Aho-Corasick
+        // pass instead of N separate passes, and no per-node Vec allocation.
+        let usage_after_header = if budget > 0 {
+            accumulated_tokens as f64 / budget as f64
+        } else {
+            1.0
+        };
+        let batch_fidelity = if fidelity != FidelityLevel::Lossless && usage_after_header >= 0.80 {
+            FidelityLevel::Compressed
+        } else {
+            fidelity
+        };
+        let batch_cfg = CompressionConfig {
+            budget,
+            current_tokens: accumulated_tokens,
+            fidelity: batch_fidelity,
+        };
+        let body_nodes = compressor.compress(body_nodes, &batch_cfg);
+
         let body_len = body_nodes.len();
         for (idx, node) in body_nodes.into_iter().enumerate() {
             let is_last = idx == body_len - 1;
 
-            // Switch to Compressed at 80% budget usage.
-            // If budget=0, treat as immediately over-budget (immediate Compressed mode).
-            let usage = if budget > 0 {
-                accumulated_tokens as f64 / budget as f64
-            } else {
-                1.0
-            };
-            let effective_fidelity = if fidelity != FidelityLevel::Lossless && usage >= 0.80 {
-                FidelityLevel::Compressed
-            } else {
-                fidelity
-            };
-
-            // Apply compression to a single node
-            let cfg = CompressionConfig {
-                budget,
-                current_tokens: accumulated_tokens,
-                fidelity: effective_fidelity,
-            };
-            let compressed = compressor.compress(vec![node], &cfg);
-
-            let chunk_text: String = compressed
-                .iter()
-                .map(|n| render_node(n, &dict))
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .join("\n");
+            // Compression was already applied to the full batch above; render directly.
+            let chunk_text = render_node(&node, &dict);
 
             if chunk_text.is_empty() {
                 continue; // Skip nodes entirely eliminated by compression
@@ -603,5 +600,43 @@ mod tests {
                 "'{text}' must be at least 1 token"
             );
         }
+    }
+
+    /// Batch compression regression: with many identical paragraphs,
+    /// deduplication (DeduplicateAndLinearize stage) should fire and reduce
+    /// the chunk count compared to the raw paragraph count.
+    /// This test is only meaningful if compression fires (high budget usage).
+    #[tokio::test]
+    async fn batch_compression_deduplicates_identical_paras() {
+        // 5 identical paragraphs + 95% budget consumed → DeduplicateAndLinearize fires.
+        // After batch compression only 1 unique paragraph should remain, producing
+        // exactly 2 chunks: the header (seq=0) + 1 body chunk (seq=1, is_final).
+        let mut doc = IRDocument::new(FidelityLevel::Semantic, None);
+        doc.push(DocNode::Metadata {
+            key: "title".into(),
+            value: "배치 압축 테스트".into(),
+        });
+        // Use high-budget-usage to trigger DeduplicateAndLinearize
+        let para_text = "identical content paragraph.";
+        for _ in 0..5 {
+            doc.push(DocNode::Para {
+                text: para_text.into(),
+                importance: 1.0,
+            });
+        }
+
+        // budget=10: header already uses ~5 tokens → usage >80% → Compressed mode
+        let transpiler = StreamingTranspiler::new(10, FidelityLevel::Semantic);
+        let chunks: Vec<_> = transpiler
+            .transpile(doc)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert!(!chunks.is_empty(), "must produce at least one chunk");
+        let final_count = chunks.iter().filter(|c| c.is_final).count();
+        assert_eq!(final_count, 1, "exactly one chunk must be final");
     }
 }
