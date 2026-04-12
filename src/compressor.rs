@@ -11,13 +11,17 @@
 //!
 //! ## Stopword matching strategy
 //!
-//! - **ASCII stopwords**: compiled into `\b word \b` regex patterns (case-insensitive).
+//! - **ASCII stopwords**: indexed into a single [`AhoCorasick`] automaton (case-insensitive).
+//!   Word-boundary semantics are enforced by checking the characters immediately before and
+//!   after each match — the same contract as the previous `\b word \b` regex approach, but
+//!   in a single O(N + M) pass instead of O(N × S) repeated regex sweeps.
 //! - **Non-ASCII stopwords** (Korean, Japanese, CJK, Arabic, etc.): matched as exact
 //!   whitespace-delimited tokens. This is necessary because `\b` does not recognise
 //!   Unicode word boundaries for scripts without ASCII-style spacing.
 
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
+
 use crate::ir::{DocNode, FidelityLevel};
-use regex::Regex;
 
 // ────────────────────────────────────────────────
 // 1. Compression configuration
@@ -85,9 +89,9 @@ pub enum CompressionStage {
 
 /// Budget-based adaptive document compressor.
 pub struct AdaptiveCompressor {
-    /// Pre-compiled regex list for ASCII stopwords.
-    /// Uses `\b word \b` word-boundary matching (case-insensitive).
-    ascii_stopword_regexes: Vec<Regex>,
+    /// Single Aho-Corasick automaton built from all ASCII stopwords (case-insensitive).
+    /// Replaces the previous per-stopword regex list — one O(N+M) pass instead of O(N×S).
+    ascii_ac: Option<AhoCorasick>,
     /// Non-ASCII stopword list for exact whitespace-token matching.
     /// Applied with a whitespace-split-filter pass to handle CJK / Korean / Arabic etc.
     nonascii_stopwords: Vec<String>,
@@ -112,35 +116,41 @@ impl AdaptiveCompressor {
     /// Creates a compressor with a fully custom stopword list.
     ///
     /// Stopwords are partitioned at construction time:
-    /// - ASCII words → compiled into `\b…\b` regexes (cached).
+    /// - ASCII words → indexed into a single Aho-Corasick automaton (case-insensitive).
     /// - Non-ASCII words → stored as plain strings for token-level matching.
     pub fn with_stopwords(stopwords: Vec<String>) -> Self {
-        let mut ascii_stopword_regexes = Vec::new();
+        let mut ascii_stopwords: Vec<String> = Vec::new();
         let mut nonascii_stopwords = Vec::new();
 
         for sw in &stopwords {
             if sw.is_ascii() {
-                // ASCII: `\b` word boundaries work correctly.
-                if let Ok(re) = Regex::new(&format!(r"(?i)\b{}\b\s*", regex::escape(sw))) {
-                    ascii_stopword_regexes.push(re);
-                }
+                ascii_stopwords.push(sw.to_ascii_lowercase());
             } else {
                 // Non-ASCII (Korean, CJK, Arabic, Devanagari, …):
-                // `\b` does not recognise Unicode script-word boundaries reliably,
-                // so we store these as plain strings for whitespace-token matching.
+                // stored as plain strings for whitespace-token matching.
                 nonascii_stopwords.push(sw.clone());
             }
         }
 
+        let ascii_ac = if ascii_stopwords.is_empty() {
+            None
+        } else {
+            AhoCorasickBuilder::new()
+                .ascii_case_insensitive(true)
+                .match_kind(MatchKind::LeftmostFirst)
+                .build(&ascii_stopwords)
+                .ok()
+        };
+
         Self {
-            ascii_stopword_regexes,
+            ascii_ac,
             nonascii_stopwords,
         }
     }
 
     /// Returns true when no stopwords are configured (both lists empty).
     pub fn has_stopwords(&self) -> bool {
-        !self.ascii_stopword_regexes.is_empty() || !self.nonascii_stopwords.is_empty()
+        self.ascii_ac.is_some() || !self.nonascii_stopwords.is_empty()
     }
 
     /// Applies compression to the node list and returns the result.
@@ -200,39 +210,100 @@ impl AdaptiveCompressor {
     /// Removes stopwords from a single text string.
     ///
     /// Two passes:
-    /// 1. ASCII regex pass (`\b word \b`) — O(N × |ascii_stopwords|).
+    /// 1. ASCII Aho-Corasick pass — single O(N+M) scan with word-boundary validation.
+    ///    Each match is accepted only when the character immediately before the match
+    ///    start and the character immediately after the match end are both non-word
+    ///    characters (i.e. not `[A-Za-z0-9_]`). Trailing whitespace after an accepted
+    ///    match is also consumed to avoid double-spaces.
     /// 2. Non-ASCII whitespace-token pass — splits on whitespace, filters exact matches,
     ///    then rejoins. O(N) per token.
     ///
-    /// A final `split_whitespace().join(" ")` collapses any consecutive spaces
-    /// introduced by both passes.
+    /// A final `split_whitespace` + rejoin collapses any residual consecutive spaces.
     fn strip_stopwords(&self, text: &str) -> String {
-        let mut result = text.to_string();
+        // ── Pass 1: ASCII Aho-Corasick with word-boundary check ──────────────
+        let result: String = if let Some(ac) = &self.ascii_ac {
+            let bytes = text.as_bytes();
+            let mut out = String::with_capacity(text.len());
+            let mut last = 0usize;
 
-        // Pass 1 — ASCII regex stopwords
-        for re in &self.ascii_stopword_regexes {
-            result = re.replace_all(&result, "").into_owned();
-        }
+            for mat in ac.find_iter(text) {
+                let start = mat.start();
+                let end = mat.end();
 
-        // Pass 2 — Non-ASCII token stopwords (whitespace-delimited exact match)
+                // Word-boundary check: char before must be a non-word char (or start of string).
+                let before_ok = start == 0 || !is_word_byte(bytes[start - 1]);
+                // Word-boundary check: char after must be a non-word char (or end of string).
+                let after_ok = end == bytes.len() || !is_word_byte(bytes[end]);
+
+                if before_ok && after_ok {
+                    // Emit the text before this match.
+                    out.push_str(&text[last..start]);
+                    // Consume any trailing whitespace that immediately follows the stopword.
+                    let skip_end = skip_trailing_space(bytes, end);
+                    last = skip_end;
+                }
+                // If boundary check fails, we do nothing — the match is skipped and
+                // `last` stays where it was so the text is emitted unchanged.
+            }
+
+            out.push_str(&text[last..]);
+            out
+        } else {
+            text.to_string()
+        };
+
+        // ── Pass 2: Non-ASCII token stopwords (whitespace-delimited exact match) ──
+        let mut out2 = String::with_capacity(result.len());
         if !self.nonascii_stopwords.is_empty() {
-            result = result
-                .split_whitespace()
-                .filter(|token| {
-                    !self
-                        .nonascii_stopwords
-                        .iter()
-                        .any(|sw| sw.as_str() == *token)
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
+            for token in result.split_whitespace().filter(|token| {
+                !self
+                    .nonascii_stopwords
+                    .iter()
+                    .any(|sw| sw.as_str() == *token)
+            }) {
+                if !out2.is_empty() {
+                    out2.push(' ');
+                }
+                out2.push_str(token);
+            }
         } else {
             // Collapse consecutive whitespace even when no non-ASCII stopwords exist.
-            result = result.split_whitespace().collect::<Vec<_>>().join(" ");
+            for token in result.split_whitespace() {
+                if !out2.is_empty() {
+                    out2.push(' ');
+                }
+                out2.push_str(token);
+            }
         }
 
-        result
+        out2
     }
+}
+
+// ── Word-boundary helpers ────────────────────────────────────────────────────
+
+/// Returns `true` when `b` is an ASCII word character (`[A-Za-z0-9_]`).
+///
+/// The AC automaton operates on the UTF-8 byte slice.  Because all stopwords
+/// are ASCII, every match start/end lands on an ASCII byte boundary, so a
+/// simple byte-level check is safe and avoids a `char`-decode round-trip.
+#[inline]
+fn is_word_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Returns the index just past any ASCII horizontal whitespace (` `, `\t`)
+/// immediately following position `pos` in `bytes`.
+///
+/// Only a single run of whitespace tokens immediately after the stopword is
+/// consumed; sentence-level whitespace collapse is handled by the
+/// `split_whitespace` pass that follows.
+#[inline]
+fn skip_trailing_space(bytes: &[u8], mut pos: usize) -> usize {
+    while pos < bytes.len() && (bytes[pos] == b' ' || bytes[pos] == b'\t') {
+        pos += 1;
+    }
+    pos
 }
 
 // ────────────────────────────────────────────────
@@ -664,6 +735,67 @@ mod tests {
             3,
             "paragraphs with equal importance must not all be removed"
         );
+    }
+
+    /// Word-boundary regression: stopword "the" must be removed as a whole word but
+    /// must NOT be stripped from inside "theory", "there", or "gather".
+    #[test]
+    fn ascii_stopword_respects_word_boundaries() {
+        let compressor = AdaptiveCompressor::with_stopwords(vec!["the".into()]);
+        let cfg = CompressionConfig {
+            budget: 1000,
+            current_tokens: 100,
+            fidelity: FidelityLevel::Semantic,
+        };
+
+        // "the" at start-of-string followed by space → must be removed
+        let nodes = vec![make_para("the cat sat", 1.0)];
+        let result = compressor.compress(nodes, &cfg);
+        if let DocNode::Para { text, .. } = &result[0] {
+            assert!(
+                !text.to_lowercase().starts_with("the "),
+                "standalone 'the' at start must be removed: got '{}'",
+                text
+            );
+            assert!(
+                text.contains("cat") && text.contains("sat"),
+                "non-stopword tokens must remain: got '{}'",
+                text
+            );
+        }
+
+        // "theory" contains "the" as a prefix → must NOT be altered
+        let nodes2 = vec![make_para("theory is important", 1.0)];
+        let result2 = compressor.compress(nodes2, &cfg);
+        if let DocNode::Para { text, .. } = &result2[0] {
+            assert!(
+                text.contains("theory"),
+                "'theory' must not be modified by stopword 'the': got '{}'",
+                text
+            );
+        }
+
+        // "there" starts with "the" → must NOT be altered
+        let nodes3 = vec![make_para("there are cats", 1.0)];
+        let result3 = compressor.compress(nodes3, &cfg);
+        if let DocNode::Para { text, .. } = &result3[0] {
+            assert!(
+                text.contains("there"),
+                "'there' must not be modified by stopword 'the': got '{}'",
+                text
+            );
+        }
+
+        // "gather" contains "the" inside → must NOT be altered
+        let nodes4 = vec![make_para("we gather here", 1.0)];
+        let result4 = compressor.compress(nodes4, &cfg);
+        if let DocNode::Para { text, .. } = &result4[0] {
+            assert!(
+                text.contains("gather"),
+                "'gather' must not be modified by stopword 'the': got '{}'",
+                text
+            );
+        }
     }
 
     #[test]

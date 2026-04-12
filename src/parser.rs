@@ -280,7 +280,9 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
         if text.is_empty() {
             continue;
         }
-        // Lines starting with '#' are treated as headings
+        // Only H1 and H2 are recognized in plain-text mode. H3+ markers are treated as
+        // paragraph text — plain-text inputs rarely use deep heading hierarchies and this
+        // keeps the parser simple.
         if let Some(stripped) = text.strip_prefix("# ") {
             doc.push(DocNode::Header {
                 level: 1,

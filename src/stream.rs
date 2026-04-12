@@ -149,6 +149,10 @@ fn chars_per_token(c: char) -> u32 {
 // 3. StreamingTranspiler
 // ────────────────────────────────────────────────
 
+/// Default mpsc channel buffer size used when none is specified via
+/// [`StreamingTranspiler::with_channel_size`].
+const DEFAULT_CHANNEL_BUFFER: usize = 32;
+
 /// Tokio channel-based streaming transpiler.
 ///
 /// # Symbol dictionary injection
@@ -174,6 +178,12 @@ pub struct StreamingTranspiler {
     /// Pre-populated symbol dictionary used during streaming.
     /// Empty by default; populate via `with_dict()` for domain-specific compression.
     dict: SymbolDict,
+    /// Tokio mpsc channel buffer size.
+    /// Controls backpressure: the spawned producer task blocks when this many
+    /// chunks are in flight and the consumer has not yet polled them.
+    /// Larger values reduce producer stalls at the cost of higher memory usage;
+    /// smaller values increase backpressure and bound memory.
+    channel_buffer: usize,
 }
 
 impl StreamingTranspiler {
@@ -184,6 +194,7 @@ impl StreamingTranspiler {
             budget,
             fidelity,
             dict: SymbolDict::new(),
+            channel_buffer: DEFAULT_CHANNEL_BUFFER,
         }
     }
 
@@ -209,7 +220,33 @@ impl StreamingTranspiler {
             budget,
             fidelity,
             dict,
+            channel_buffer: DEFAULT_CHANNEL_BUFFER,
         }
+    }
+
+    /// Sets the Tokio mpsc channel buffer size and returns `self` for chaining.
+    ///
+    /// The internal pipeline uses a bounded `mpsc` channel to deliver chunks to
+    /// the caller. The buffer size controls **backpressure**: when `n` chunks are
+    /// already queued and the consumer has not polled them yet, the producer task
+    /// will `.await` before sending the next chunk. This bounds peak memory usage
+    /// to roughly `n` in-flight chunks at a time.
+    ///
+    /// - **Larger `n`**: fewer producer stalls, higher peak memory.
+    /// - **Smaller `n`**: tighter backpressure, lower memory footprint.
+    ///
+    /// Defaults to `32` when not set.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use llm_transpile::{FidelityLevel, StreamingTranspiler};
+    ///
+    /// let transpiler = StreamingTranspiler::new(4096, FidelityLevel::Semantic)
+    ///     .with_channel_size(8);
+    /// ```
+    pub fn with_channel_size(mut self, n: usize) -> Self {
+        self.channel_buffer = n;
+        self
     }
 
     /// Converts an `IRDocument` into a chunk stream.
@@ -220,7 +257,8 @@ impl StreamingTranspiler {
         self,
         doc: IRDocument,
     ) -> Pin<Box<dyn Stream<Item = Result<TranspileChunk, StreamError>> + Send>> {
-        let (tx, rx) = mpsc::channel::<Result<TranspileChunk, StreamError>>(32);
+        let (tx, rx) =
+            mpsc::channel::<Result<TranspileChunk, StreamError>>(self.channel_buffer);
         let stream = ReceiverStream::new(rx);
 
         tokio::spawn(async move {
@@ -482,6 +520,36 @@ mod tests {
             first.content.contains("대규모언어모델"),
             "dictionary block must list the interned term"
         );
+    }
+
+    #[tokio::test]
+    async fn custom_channel_size_streaming_works() {
+        // Verify that a non-default channel buffer size (4) does not break
+        // streaming correctness: all chunks arrive, the last is marked final,
+        // and the closing </B> tag is present.
+        let doc = make_doc(
+            FidelityLevel::Semantic,
+            &["단락 one", "단락 two", "단락 three"],
+        );
+        let transpiler = StreamingTranspiler::new(10_000, FidelityLevel::Semantic)
+            .with_channel_size(4);
+
+        let chunks: Vec<_> = transpiler
+            .transpile(doc)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert!(!chunks.is_empty(), "must produce at least one chunk");
+
+        let final_count = chunks.iter().filter(|c| c.is_final).count();
+        assert_eq!(final_count, 1, "exactly one chunk must be final");
+
+        let last = chunks.last().unwrap();
+        assert!(last.is_final);
+        assert!(last.content.contains("</B>"), "last chunk must close <B>");
     }
 
     #[test]

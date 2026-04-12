@@ -101,6 +101,11 @@ impl SymbolDict {
     /// Restores PUA symbols in the input string back to their original terms.
     ///
     /// Unknown PUA characters are passed through unchanged.
+    ///
+    /// # Why test-only?
+    /// Decoding PUA back to original terms is only needed in tests for round-trip
+    /// verification. Production output is consumed by LLMs which treat PUA symbols
+    /// as opaque tokens, so no decoding path is needed at runtime.
     #[cfg(test)]
     pub(crate) fn decode_str(&self, input: &str) -> String {
         input

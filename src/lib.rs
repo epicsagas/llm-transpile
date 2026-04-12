@@ -146,6 +146,9 @@ pub fn transpile(
         let compressor = AdaptiveCompressor::new();
         let cfg = CompressionConfig {
             budget: b,
+            // Note: token count is estimated from raw input before compression and symbol
+            // substitution. The actual output token count will typically be lower. This
+            // estimate drives compression stage selection and may cause slight over-compression.
             current_tokens: stream::estimate_tokens(input),
             fidelity,
         };

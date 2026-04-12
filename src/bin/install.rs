@@ -397,7 +397,7 @@ print(json.dumps({'additionalContext': msg}))
 " "$COMPRESSED" "$FNAME" "$BYTES"
 "#;
 
-fn merge_claude_hook(hook_script: &PathBuf, settings_path: &PathBuf) -> SyncResult {
+fn merge_claude_hook(hook_script: &std::path::Path, settings_path: &std::path::Path) -> SyncResult {
     if !settings_path.exists() {
         std::fs::write(settings_path, "{}").ok();
     }
@@ -411,11 +411,6 @@ fn merge_claude_hook(hook_script: &PathBuf, settings_path: &PathBuf) -> SyncResu
         "hooks": [{ "type": "command", "command": format!("bash \"{}\"", hook_script.display()) }]
     });
 
-    let already = cfg["hooks"]["PostToolUse"]
-        .as_array()
-        .map(|a| a.iter().any(|h| h.get("_id").and_then(|v| v.as_str()) == Some("llm-transpile")))
-        .unwrap_or(false);
-
     if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
         arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
         arr.push(hook);
@@ -426,12 +421,12 @@ fn merge_claude_hook(hook_script: &PathBuf, settings_path: &PathBuf) -> SyncResu
     std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
 
     let label = format!("PostToolUse hook → {}", shorten_path(settings_path));
-    if already { SyncResult::Configured(label) } else { SyncResult::Configured(label) }
+    SyncResult::Configured(label)
 }
 
-fn strip_claude_hook(settings_path: &PathBuf) -> SyncResult {
+fn strip_claude_hook(settings_path: &std::path::Path) -> SyncResult {
     if !settings_path.exists() {
-        return SyncResult::Skipped(settings_path.clone());
+        return SyncResult::Skipped(settings_path.to_path_buf());
     }
     let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
     let mut cfg: serde_json::Value =
@@ -606,7 +601,7 @@ fn wizard_tty() -> Vec<&'static str> {
             27 => {
                 if read_key() == b'[' {
                     match read_key() {
-                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'A' => { cursor = cursor.saturating_sub(1); }
                         b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
                         _ => {}
                     }
@@ -681,7 +676,7 @@ fn wizard_uninstall_tty() -> Vec<&'static str> {
             27 => {
                 if read_key() == b'[' {
                     match read_key() {
-                        b'A' => { if cursor > 0 { cursor -= 1; } }
+                        b'A' => { cursor = cursor.saturating_sub(1); }
                         b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
                         _ => {}
                     }
@@ -732,10 +727,9 @@ fn read_selection() -> Vec<&'static str> {
     }
     let mut out = Vec::new();
     for token in line.split(',') {
-        if let Ok(n) = token.trim().parse::<usize>() {
-            if n >= 1 && n <= INTEGRATIONS.len() {
+        if let Ok(n) = token.trim().parse::<usize>()
+            && n >= 1 && n <= INTEGRATIONS.len() {
                 out.push(INTEGRATIONS[n - 1].id);
-            }
         }
     }
     out
@@ -762,7 +756,7 @@ fn dir_exists(path: &str) -> bool {
     std::path::Path::new(&expanded).exists()
 }
 
-fn shorten_path(p: &PathBuf) -> String {
+fn shorten_path(p: &std::path::Path) -> String {
     let h = home();
     let s = p.to_string_lossy();
     if s.starts_with(&h) {
