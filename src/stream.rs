@@ -342,7 +342,7 @@ impl StreamingTranspiler {
 
         let body_len = body_nodes.len();
         for (idx, node) in body_nodes.into_iter().enumerate() {
-            let is_last = idx == body_len - 1;
+            let is_last = body_len > 0 && idx == body_len - 1;
 
             // Compression was already applied to the full batch above; render directly.
             let chunk_text = render_node(&node, &dict);
@@ -423,6 +423,9 @@ pub enum StreamError {
 
     #[error("parse failed: {0}")]
     Parse(String),
+
+    #[error("input exceeds maximum allowed size of {0} bytes")]
+    InputTooLarge(usize),
 }
 
 // ────────────────────────────────────────────────

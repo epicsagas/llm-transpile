@@ -195,10 +195,7 @@ pub async fn transpile_stream(
 ) -> std::pin::Pin<Box<dyn futures::Stream<Item = Result<TranspileChunk, StreamError>> + Send>> {
     if input.len() > MAX_INPUT_BYTES {
         return Box::pin(futures::stream::once(futures::future::ready(Err(
-            StreamError::Parse(format!(
-                "input exceeds maximum allowed size of {} bytes",
-                MAX_INPUT_BYTES
-            )),
+            StreamError::InputTooLarge(input.len()),
         ))));
     }
     let sanitized = strip_pua(input);
@@ -356,7 +353,11 @@ mod tests {
         let mut stream =
             transpile_stream(&huge, InputFormat::PlainText, FidelityLevel::Lossless, 0).await;
         let first = stream.next().await.expect("must yield an error item");
-        assert!(first.is_err(), "oversized stream input must yield Err");
+        assert!(
+            matches!(first, Err(stream::StreamError::InputTooLarge(_))),
+            "oversized stream input must yield InputTooLarge, got: {:?}",
+            first
+        );
     }
 
     #[test]
