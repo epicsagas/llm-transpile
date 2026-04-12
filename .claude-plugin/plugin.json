@@ -6,8 +6,8 @@
     "name": "epicsagas",
     "url": "https://github.com/epicsagas"
   },
-  "homepage": "https://github.com/epicsagas/llm-transpile",
-  "repository": "https://github.com/epicsagas/llm-transpile",
+  "homepage": "https://github.com/epicsagas/llm-transpiler",
+  "repository": "https://github.com/epicsagas/llm-transpiler",
   "license": "Apache-2.0",
   "keywords": [
     "transpile",
