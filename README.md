@@ -69,7 +69,19 @@ Requires **Rust 1.75+**.
 ### CLI binary + tool integration
 
 ```bash
+# Homebrew (macOS)
+brew install epicsagas/tap/llm-transpile
+
+# Pre-built binary (faster, no compile)
+cargo binstall llm-transpile
+
+# From crates.io
 cargo install llm-transpile
+```
+
+Then configure tool integrations:
+
+```bash
 transpile install
 ```
 
