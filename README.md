@@ -101,7 +101,7 @@ transpile uninstall --dry-run      # preview removals
 **Claude Code plugin** (alternative — requires Claude Code with plugin support)
 
 ```
-/plugin marketplace add epicsagas/llm-transpile
+/plugin marketplace add epicsagas/claude-plugins
 /plugin install transpile@epicsagas
 ```
 
