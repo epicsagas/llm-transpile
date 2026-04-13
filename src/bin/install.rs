@@ -182,10 +182,10 @@ fn uninstall_claude(dry_run: bool) -> Vec<SyncResult> {
     out
 }
 
-fn install_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&gemini_artifact(),   TRANSPILE_SKILL, false, dry_run)] }
-fn install_codex(dry_run: bool)    -> Vec<SyncResult> { vec![sync_file(&codex_artifact(),    TRANSPILE_SKILL, false, dry_run)] }
-fn install_opencode(dry_run: bool) -> Vec<SyncResult> { vec![sync_file(&opencode_artifact(), TRANSPILE_SKILL, false, dry_run)] }
-fn install_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&cursor_artifact(),   TRANSPILE_SKILL, false, dry_run)] }
+fn install_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&gemini_artifact(),   &transpile_skill("gemini"),   false, dry_run)] }
+fn install_codex(dry_run: bool)    -> Vec<SyncResult> { vec![sync_file(&codex_artifact(),    &transpile_skill("codex"),    false, dry_run)] }
+fn install_opencode(dry_run: bool) -> Vec<SyncResult> { vec![sync_file(&opencode_artifact(), &transpile_skill("opencode"), false, dry_run)] }
+fn install_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&cursor_artifact(),   &transpile_skill("cursor"),   false, dry_run)] }
 
 fn uninstall_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![remove_file(&gemini_artifact(),   dry_run)] }
 fn uninstall_codex(dry_run: bool)    -> Vec<SyncResult> { vec![remove_file(&codex_artifact(),    dry_run)] }
@@ -450,7 +450,8 @@ fn strip_claude_hook(settings_path: &std::path::Path) -> SyncResult {
 // Shared skill content + per-tool paths
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const TRANSPILE_SKILL: &str = "\
+fn transpile_skill(agent: &str) -> String {
+    format!("\
 ---
 name: transpile
 description: >
@@ -471,7 +472,7 @@ The file extension alone triggers this. No size check needed.
 ## Usage
 
 ```bash
-transpile --input <file> --fidelity semantic --quiet
+TRANSPILE_AGENT={agent} transpile --input <file> --fidelity semantic --quiet
 ```
 
 ## Fidelity options
@@ -479,7 +480,8 @@ transpile --input <file> --fidelity semantic --quiet
 - `semantic` (default) — ~30% reduction, preserves all meaning
 - `compressed`         — ~40% reduction, use when near context limit
 - `lossless`           — no compression, for files where every word matters
-";
+")
+}
 
 fn skill_path(tool: &str) -> PathBuf {
     let h = home();
@@ -763,5 +765,56 @@ fn shorten_path(p: &std::path::Path) -> String {
         format!("~{}", &s[h.len()..])
     } else {
         s.into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transpile_skill;
+
+    #[test]
+    fn skill_gemini_contains_agent_env() {
+        let content = transpile_skill("gemini");
+        assert!(
+            content.contains("TRANSPILE_AGENT=gemini transpile"),
+            "gemini skill must include TRANSPILE_AGENT=gemini in usage command"
+        );
+    }
+
+    #[test]
+    fn skill_codex_contains_agent_env() {
+        let content = transpile_skill("codex");
+        assert!(
+            content.contains("TRANSPILE_AGENT=codex transpile"),
+            "codex skill must include TRANSPILE_AGENT=codex in usage command"
+        );
+    }
+
+    #[test]
+    fn skill_opencode_contains_agent_env() {
+        let content = transpile_skill("opencode");
+        assert!(
+            content.contains("TRANSPILE_AGENT=opencode transpile"),
+            "opencode skill must include TRANSPILE_AGENT=opencode in usage command"
+        );
+    }
+
+    #[test]
+    fn skill_cursor_contains_agent_env() {
+        let content = transpile_skill("cursor");
+        assert!(
+            content.contains("TRANSPILE_AGENT=cursor transpile"),
+            "cursor skill must include TRANSPILE_AGENT=cursor in usage command"
+        );
+    }
+
+    #[test]
+    fn skill_preserves_rest_of_content() {
+        for agent in &["gemini", "codex", "opencode", "cursor"] {
+            let content = transpile_skill(agent);
+            assert!(content.contains("name: transpile"), "agent={agent}: missing frontmatter");
+            assert!(content.contains("--fidelity semantic --quiet"), "agent={agent}: missing fidelity flag");
+            assert!(content.contains("alwaysApply: true"), "agent={agent}: missing alwaysApply");
+        }
     }
 }

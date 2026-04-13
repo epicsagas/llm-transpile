@@ -97,7 +97,7 @@ transpile install
 | **Cursor** | `.mdc` rule (`alwaysApply`) | Triggers `transpile` before reading document files |
 | **OpenCode** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
 
-All non-Claude tools use a skill file that teaches the LLM to run `transpile --input <file>` automatically — no size check needed, extension alone triggers it.
+All non-Claude tools use a skill file that teaches the LLM to run `TRANSPILE_AGENT=<agent> transpile --input <file>` automatically — no size check needed, extension alone triggers it.
 
 **Selective install / uninstall**
 
@@ -220,7 +220,7 @@ transpile stats — last 7 days
 
 **`TRANSPILE_AGENT` environment variable**
 
-The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. Each integration sets this automatically (`claude`, `gemini`, `codex`, `opencode`). You can also set it manually:
+The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. Each integration sets this automatically (`claude`, `gemini`, `codex`, `opencode`, `cursor`). You can also set it manually:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

@@ -63,6 +63,10 @@ struct Cli {
     /// Print stats to stdout after content (single-stream capture)
     #[arg(long)]
     stats: bool,
+
+    /// Print the PostToolUse hook script to stdout and exit
+    #[arg(long)]
+    print_hook_script: bool,
 }
 
 #[derive(Subcommand)]
@@ -167,8 +171,51 @@ fn detect_format(path: &Path, flag: &FormatArg) -> InputFormat {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
+const HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
+set -euo pipefail
+THRESHOLD=${TRANSPILE_THRESHOLD:-8192}
+INPUT=$(cat)
+FILE=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(d.get('tool_input', {}).get('file_path', ''))
+" 2>/dev/null) || exit 0
+[ -z "$FILE" ] && exit 0
+[ -f "$FILE" ] || exit 0
+BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
+[ "$BYTES" -lt "$THRESHOLD" ] && exit 0
+export TRANSPILE_AGENT=claude
+JSON_OUT=$(transpile --input "$FILE" --fidelity semantic --json 2>/dev/null) || exit 0
+[ -z "$JSON_OUT" ] && exit 0
+FNAME=$(basename "$FILE")
+python3 -c "
+import json, sys
+
+data  = json.loads(sys.argv[1])
+fname = sys.argv[2]
+size  = sys.argv[3]
+
+content = data.get('content', '')
+inp     = data.get('input_tok', 0)
+out     = data.get('output_tok', 0)
+pct     = data.get('reduction_pct', '0')
+saved   = inp - out
+
+msg = (
+    f'[llm-transpile] {fname} ({size}B) \u2192 {inp} tok \u2192 {out} tok '
+    f'({pct}% reduction, {saved} tokens saved)\n\n{content}'
+)
+print(json.dumps({'additionalContext': msg}))
+" "$JSON_OUT" "$FNAME" "$BYTES" 2>/dev/null || exit 0
+"#;
+
 fn main() {
     let cli = Cli::parse();
+
+    if cli.print_hook_script {
+        print!("{HOOK_SCRIPT}");
+        process::exit(0);
+    }
 
     match cli.command {
         Some(Command::Stats { days, agent }) => {
