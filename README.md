@@ -32,6 +32,7 @@ This agreement is made between Licensor and Licensee.
 - [Why](#why)
 - [Installation](#installation)
 - [CLI Usage](#cli-usage)
+- [Usage Statistics](#usage-statistics)
 - [Library Usage](#library-usage)
 - [Output Format](#output-format)
 - [Fidelity Levels](#fidelity-levels)
@@ -177,6 +178,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > Stats (`[273 → 150 tok  45.1% reduction]`) are written to **stderr** by default, so stdout stays clean for piping. Use `--quiet` to suppress, or `--stats` to redirect to stdout.
+
+---
+
+## Usage Statistics
+
+Every `transpile` invocation automatically appends a record to `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. The `transpile stats` subcommand reads those files and prints a summary table.
+
+```
+transpile stats                # today
+transpile stats --days 7       # last N days
+transpile stats --agent claude # filter by agent
+```
+
+Example output:
+
+```
+transpile stats — last 7 days
+
+  Date        Agent       Calls   Input tok   Output tok   Saved    Reduction
+  ──────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude          5      14 965       10 872   4 093      27.3%
+  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  ──────────────────────────────────────────────────────────────────────────
+  Total                       7      19 765       14 372   5 393      27.3%
+```
+
+**JSONL record fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ts` | ISO 8601 | Timestamp of the invocation |
+| `agent` | string | Tool that triggered the call (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | string | Input file path (empty when reading from stdin) |
+| `format` | string | `markdown`, `html`, or `plaintext` |
+| `fidelity` | string | `lossless`, `semantic`, or `compressed` |
+| `input_tok` | integer | Token count before transpilation |
+| `output_tok` | integer | Token count after transpilation |
+| `reduction_pct` | float | Percentage of tokens saved |
+| `saved` | integer | Absolute tokens saved (`input_tok − output_tok`) |
+
+**`TRANSPILE_AGENT` environment variable**
+
+The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. Each integration sets this automatically (`claude`, `gemini`, `codex`, `opencode`). You can also set it manually:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 

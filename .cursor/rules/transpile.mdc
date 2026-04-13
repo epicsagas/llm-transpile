@@ -1,0 +1,28 @@
+---
+name: transpile
+description: >
+  ALWAYS run this instead of directly reading .md, .html, or .txt files.
+  Trigger on file extension alone — no size check needed.
+alwaysApply: true
+---
+
+# transpile — Read document files in token-compressed form
+
+## Activation rule
+
+**Whenever you are about to read a `.md`, `.html`, or `.txt` file, run this
+instead. Use transpile's output as the file content — do not read the raw file.**
+
+The file extension alone triggers this. No size check needed.
+
+## Usage
+
+```bash
+transpile --input <file> --fidelity semantic --quiet
+```
+
+## Fidelity options
+
+- `semantic` (default) — ~30% reduction, preserves all meaning
+- `compressed`         — ~40% reduction, use when near context limit
+- `lossless`           — no compression, for files where every word matters

@@ -65,7 +65,7 @@ msg = (
     f'"'"'({pct}% reduction, {saved} tokens saved)\n\n{content}'"'"'
 )
 print(json.dumps({'"'"'additionalContext'"'"': msg}))
-" "$JSON_OUT" "$FNAME" "$BYTES"
+" "$JSON_OUT" "$FNAME" "$BYTES" 2>/dev/null || exit 0
 '
 fi
 

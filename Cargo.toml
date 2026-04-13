@@ -1,6 +1,6 @@
 [package]
 name         = "llm-transpile"
-version      = "0.1.3"
+version      = "0.1.4"
 edition      = "2024"
 description  = "High-performance LLM context bridge — token-optimized document transpiler"
 rust-version = "1.92"

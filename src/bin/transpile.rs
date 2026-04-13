@@ -67,6 +67,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Show transpile usage statistics
+    ///
+    /// Examples:
+    ///   transpile stats                # last 1 day
+    ///   transpile stats --days 7       # last 7 days
+    ///   transpile stats --agent claude # filter by agent
+    Stats {
+        /// Number of days to look back (default: 1)
+        #[arg(long, default_value = "1")]
+        days: u32,
+        /// Filter by agent name (claude, gemini, codex, opencode)
+        #[arg(long)]
+        agent: Option<String>,
+    },
     /// Configure integrations with AI coding tools (interactive wizard)
     ///
     /// Examples:
@@ -157,6 +171,9 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Some(Command::Stats { days, agent }) => {
+            process::exit(run_stats(days, agent));
+        }
         Some(Command::Install { tools, all, list, dry_run }) => {
             process::exit(install::run_install(tools, all, dry_run, list));
         }
@@ -237,6 +254,184 @@ fn run_transpile(cli: Cli) {
     }
 }
 
+// ── Stats subcommand ───────────────────────────────────────────────────────────
+
+/// One row in the output table, keyed by (date, agent).
+#[derive(Debug, PartialEq)]
+struct StatsRow {
+    date: String,
+    agent: String,
+    calls: u64,
+    input_tok: u64,
+    output_tok: u64,
+    saved: u64,
+}
+
+impl StatsRow {
+    fn reduction_pct(&self) -> f64 {
+        if self.input_tok == 0 {
+            0.0
+        } else {
+            self.saved as f64 / self.input_tok as f64 * 100.0
+        }
+    }
+}
+
+/// Parse JSONL lines and aggregate into rows, filtered by agent (if given).
+fn aggregate_lines(lines: &[&str], agent_filter: Option<&str>) -> Vec<StatsRow> {
+    use std::collections::BTreeMap;
+
+    // key: (date, agent)
+    let mut map: BTreeMap<(String, String), StatsRow> = BTreeMap::new();
+
+    for line in lines {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+
+        let ts = v["ts"].as_str().unwrap_or("");
+        let date = ts.get(..10).unwrap_or("").to_string();
+        let agent = v["agent"].as_str().unwrap_or("").to_string();
+
+        if let Some(filter) = agent_filter
+            && agent != filter
+        {
+            continue;
+        }
+
+        let input_tok = v["input_tok"].as_u64().unwrap_or(0);
+        let output_tok = v["output_tok"].as_u64().unwrap_or(0);
+        let saved = v["saved"].as_u64().unwrap_or(0);
+
+        let entry = map.entry((date.clone(), agent.clone())).or_insert(StatsRow {
+            date,
+            agent,
+            calls: 0,
+            input_tok: 0,
+            output_tok: 0,
+            saved: 0,
+        });
+        entry.calls += 1;
+        entry.input_tok += input_tok;
+        entry.output_tok += output_tok;
+        entry.saved += saved;
+    }
+
+    map.into_values().collect()
+}
+
+fn run_stats(days: u32, agent: Option<String>) -> i32 {
+    let home = match std::env::var("HOME") {
+        Ok(h) => h,
+        Err(_) => {
+            eprintln!("error: HOME environment variable not set");
+            return 1;
+        }
+    };
+    let stats_dir = PathBuf::from(&home).join(".agents/transpile/stats");
+
+    // Collect date strings for the range [today-days+1 .. today]
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let today_days = now_secs / 86400;
+
+    let mut all_lines: Vec<String> = Vec::new();
+
+    for offset in 0..days as u64 {
+        let day = today_days.saturating_sub(offset);
+        let (y, m, d) = epoch_days_to_ymd(day);
+        let date_str = format!("{y:04}-{m:02}-{d:02}");
+        let path = stats_dir.join(format!("{date_str}.jsonl"));
+        if let Ok(contents) = std::fs::read_to_string(&path) {
+            for line in contents.lines() {
+                all_lines.push(line.to_string());
+            }
+        }
+    }
+
+    let borrowed: Vec<&str> = all_lines.iter().map(|s| s.as_str()).collect();
+    let rows = aggregate_lines(&borrowed, agent.as_deref());
+
+    if rows.is_empty() {
+        println!("No stats found. Run transpile on some files first.");
+        return 0;
+    }
+
+    let label = if days == 1 {
+        "last 1 day".to_string()
+    } else {
+        format!("last {days} days")
+    };
+    println!("transpile stats — {label}");
+    println!();
+
+    let sep = "  ──────────────────────────────────────────────────────────────────────────";
+    println!("  {:<12}  {:<12}  {:>5}  {:>10}  {:>10}  {:>7}  {:>9}", "Date", "Agent", "Calls", "Input tok", "Output tok", "Saved", "Reduction");
+    println!("{sep}");
+
+    let mut total_calls: u64 = 0;
+    let mut total_input: u64 = 0;
+    let mut total_output: u64 = 0;
+    let mut total_saved: u64 = 0;
+
+    for row in &rows {
+        total_calls += row.calls;
+        total_input += row.input_tok;
+        total_output += row.output_tok;
+        total_saved += row.saved;
+
+        println!(
+            "  {:<12}  {:<12}  {:>5}  {:>10}  {:>10}  {:>7}  {:>8.1}%",
+            row.date,
+            row.agent,
+            row.calls,
+            format_num(row.input_tok),
+            format_num(row.output_tok),
+            format_num(row.saved),
+            row.reduction_pct(),
+        );
+    }
+
+    println!("{sep}");
+
+    let total_reduction = if total_input > 0 {
+        total_saved as f64 / total_input as f64 * 100.0
+    } else {
+        0.0
+    };
+    println!(
+        "  {:<12}  {:<12}  {:>5}  {:>10}  {:>10}  {:>7}  {:>8.1}%",
+        "Total",
+        "",
+        total_calls,
+        format_num(total_input),
+        format_num(total_output),
+        format_num(total_saved),
+        total_reduction,
+    );
+
+    0
+}
+
+/// Format a number with thousands separators (space-separated groups of 3).
+fn format_num(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, ch) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(' ');
+        }
+        result.push(ch);
+    }
+    result.chars().rev().collect()
+}
+
 fn log_stats(
     input_path: Option<&Path>,
     format: &InputFormat,
@@ -257,7 +452,7 @@ fn try_log_stats(
     output_tok: usize,
     reduction: f64,
 ) -> io::Result<()> {
-    let home = std::env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let home = std::env::var("HOME").map_err(io::Error::other)?;
     let stats_dir = PathBuf::from(&home).join(".agents/transpile/stats");
     std::fs::create_dir_all(&stats_dir)?;
 
@@ -300,11 +495,13 @@ fn try_log_stats(
         "fidelity": fid_str,
         "input_tok": input_tok,
         "output_tok": output_tok,
-        "reduction_pct": format!("{reduction:.1}"),
+        "reduction_pct": (reduction * 10.0).round() / 10.0,
         "saved": input_tok.saturating_sub(output_tok),
     });
 
     let log_path = stats_dir.join(format!("{date_str}.jsonl"));
+    // POSIX guarantees atomic append for writes under PIPE_BUF (4096 bytes).
+    // A single JSONL stats line is well under this limit.
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -327,4 +524,153 @@ fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     (y, m, d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{aggregate_lines, epoch_days_to_ymd, format_num, StatsRow};
+
+    #[test]
+    fn day_0_unix_epoch() {
+        assert_eq!(epoch_days_to_ymd(0), (1970, 1, 1));
+    }
+
+    #[test]
+    fn day_1() {
+        assert_eq!(epoch_days_to_ymd(1), (1970, 1, 2));
+    }
+
+    #[test]
+    fn leap_year_boundary_2000_03_01() {
+        assert_eq!(epoch_days_to_ymd(11017), (2000, 3, 1));
+    }
+
+    #[test]
+    fn leap_day_2024_02_29() {
+        assert_eq!(epoch_days_to_ymd(19782), (2024, 2, 29));
+    }
+
+    #[test]
+    fn today_2026_04_13() {
+        assert_eq!(epoch_days_to_ymd(20556), (2026, 4, 13));
+    }
+
+    #[test]
+    fn non_leap_century_2100_01_01() {
+        assert_eq!(epoch_days_to_ymd(47482), (2100, 1, 1));
+    }
+
+    // ── Stats aggregation tests ──────────────────────────────────────────────
+
+    #[test]
+    fn aggregate_empty_input() {
+        let rows = aggregate_lines(&[], None);
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn aggregate_single_line() {
+        let line = r#"{"ts":"2026-04-13T07:12:31Z","agent":"claude","file":"lib.rs","format":"markdown","fidelity":"semantic","input_tok":2993,"output_tok":2749,"reduction_pct":8.2,"saved":244}"#;
+        let rows = aggregate_lines(&[line], None);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].date, "2026-04-13");
+        assert_eq!(rows[0].agent, "claude");
+        assert_eq!(rows[0].calls, 1);
+        assert_eq!(rows[0].input_tok, 2993);
+        assert_eq!(rows[0].output_tok, 2749);
+        assert_eq!(rows[0].saved, 244);
+    }
+
+    #[test]
+    fn aggregate_groups_by_date_and_agent() {
+        let lines = [
+            r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
+            r#"{"ts":"2026-04-13T08:00:00Z","agent":"claude","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
+            r#"{"ts":"2026-04-13T09:00:00Z","agent":"gemini","file":"c.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1500,"reduction_pct":25.0,"saved":500}"#,
+        ];
+        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let rows = aggregate_lines(&borrowed, None);
+        assert_eq!(rows.len(), 2);
+
+        let claude = rows.iter().find(|r| r.agent == "claude").unwrap();
+        assert_eq!(claude.calls, 2);
+        assert_eq!(claude.input_tok, 1500);
+        assert_eq!(claude.output_tok, 1200);
+        assert_eq!(claude.saved, 300);
+
+        let gemini = rows.iter().find(|r| r.agent == "gemini").unwrap();
+        assert_eq!(gemini.calls, 1);
+        assert_eq!(gemini.input_tok, 2000);
+    }
+
+    #[test]
+    fn aggregate_agent_filter() {
+        let lines = [
+            r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
+            r#"{"ts":"2026-04-13T08:00:00Z","agent":"gemini","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
+        ];
+        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let rows = aggregate_lines(&borrowed, Some("claude"));
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].agent, "claude");
+    }
+
+    #[test]
+    fn aggregate_skips_malformed_lines() {
+        let lines = [
+            "not json at all",
+            r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
+            r#"{"broken":"#,
+        ];
+        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let rows = aggregate_lines(&borrowed, None);
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn aggregate_groups_across_two_dates() {
+        let lines = [
+            r#"{"ts":"2026-04-12T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
+            r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1600,"reduction_pct":20.0,"saved":400}"#,
+        ];
+        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let rows = aggregate_lines(&borrowed, None);
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn reduction_pct_calculation() {
+        let row = StatsRow {
+            date: "2026-04-13".to_string(),
+            agent: "claude".to_string(),
+            calls: 1,
+            input_tok: 1000,
+            output_tok: 730,
+            saved: 270,
+        };
+        let pct = row.reduction_pct();
+        assert!((pct - 27.0).abs() < 0.01, "expected 27.0%, got {pct}");
+    }
+
+    #[test]
+    fn reduction_pct_zero_input() {
+        let row = StatsRow {
+            date: "2026-04-13".to_string(),
+            agent: "claude".to_string(),
+            calls: 0,
+            input_tok: 0,
+            output_tok: 0,
+            saved: 0,
+        };
+        assert_eq!(row.reduction_pct(), 0.0);
+    }
+
+    #[test]
+    fn format_num_thousands() {
+        assert_eq!(format_num(0), "0");
+        assert_eq!(format_num(999), "999");
+        assert_eq!(format_num(1000), "1 000");
+        assert_eq!(format_num(14965), "14 965");
+        assert_eq!(format_num(1_000_000), "1 000 000");
+    }
 }
