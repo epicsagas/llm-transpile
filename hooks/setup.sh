@@ -43,17 +43,29 @@ print(d.get('"'"'tool_input'"'"', {}).get('"'"'file_path'"'"', '"'"''"'"'))
 [ -f "$FILE" ] || exit 0
 BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
 [ "$BYTES" -lt "$THRESHOLD" ] && exit 0
-COMPRESSED=$(transpile --input "$FILE" --fidelity semantic --quiet 2>/dev/null) || exit 0
-[ -z "$COMPRESSED" ] && exit 0
+export TRANSPILE_AGENT=claude
+JSON_OUT=$(transpile --input "$FILE" --fidelity semantic --json 2>/dev/null) || exit 0
+[ -z "$JSON_OUT" ] && exit 0
 FNAME=$(basename "$FILE")
 python3 -c "
 import json, sys
+
+data  = json.loads(sys.argv[1])
+fname = sys.argv[2]
+size  = sys.argv[3]
+
+content = data.get('"'"'content'"'"', '"'"''"'"')
+inp     = data.get('"'"'input_tok'"'"', 0)
+out     = data.get('"'"'output_tok'"'"', 0)
+pct     = data.get('"'"'reduction_pct'"'"', '"'"'0'"'"')
+saved   = inp - out
+
 msg = (
-    f'"'"'[llm-transpile] {sys.argv[2]} is {sys.argv[3]}B — token-compressed version below '"'"'
-    f'"'"'(prefer this over the raw content above):\n\n{sys.argv[1]}'"'"'
+    f'"'"'[llm-transpile] {fname} ({size}B) \u2192 {inp} tok \u2192 {out} tok '"'"'
+    f'"'"'({pct}% reduction, {saved} tokens saved)\n\n{content}'"'"'
 )
 print(json.dumps({'"'"'additionalContext'"'"': msg}))
-" "$COMPRESSED" "$FNAME" "$BYTES"
+" "$JSON_OUT" "$FNAME" "$BYTES"
 '
 fi
 

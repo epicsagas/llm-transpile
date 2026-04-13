@@ -15,7 +15,7 @@ mod install;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use llm_transpile::{FidelityLevel, InputFormat, token_count, transpile};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -209,6 +209,16 @@ fn run_transpile(cli: Cli) {
 
     let stats_line = format!("[{input_tok} → {output_tok} tok  {reduction:.1}% reduction]");
 
+    // Log stats to ~/.agents/transpile/stats/YYYY-MM-DD.jsonl
+    log_stats(
+        cli.input.as_deref(),
+        &format,
+        &fidelity,
+        input_tok,
+        output_tok,
+        reduction,
+    );
+
     if cli.json {
         let obj = serde_json::json!({
             "input_tok": input_tok,
@@ -225,4 +235,96 @@ fn run_transpile(cli: Cli) {
             eprintln!("\n{stats_line}");
         }
     }
+}
+
+fn log_stats(
+    input_path: Option<&Path>,
+    format: &InputFormat,
+    fidelity: &FidelityLevel,
+    input_tok: usize,
+    output_tok: usize,
+    reduction: f64,
+) {
+    // Best-effort — never fail the main pipeline
+    let _ = try_log_stats(input_path, format, fidelity, input_tok, output_tok, reduction);
+}
+
+fn try_log_stats(
+    input_path: Option<&Path>,
+    format: &InputFormat,
+    fidelity: &FidelityLevel,
+    input_tok: usize,
+    output_tok: usize,
+    reduction: f64,
+) -> io::Result<()> {
+    let home = std::env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let stats_dir = PathBuf::from(&home).join(".agents/transpile/stats");
+    std::fs::create_dir_all(&stats_dir)?;
+
+    // Date-partitioned file
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let days = secs / 86400;
+    let (y, m, d) = epoch_days_to_ymd(days);
+    let date_str = format!("{y:04}-{m:02}-{d:02}");
+
+    let h = (secs % 86400) / 3600;
+    let min = (secs % 3600) / 60;
+    let s = secs % 60;
+    let ts = format!("{date_str}T{h:02}:{min:02}:{s:02}Z");
+
+    let agent = std::env::var("TRANSPILE_AGENT").unwrap_or_default();
+    let file_name = input_path
+        .and_then(|p| p.file_name())
+        .and_then(|f| f.to_str())
+        .unwrap_or("stdin");
+
+    let fmt_str = match format {
+        InputFormat::Markdown => "markdown",
+        InputFormat::Html => "html",
+        InputFormat::PlainText => "plaintext",
+    };
+    let fid_str = match fidelity {
+        FidelityLevel::Lossless => "lossless",
+        FidelityLevel::Semantic => "semantic",
+        FidelityLevel::Compressed => "compressed",
+    };
+
+    let entry = serde_json::json!({
+        "ts": ts,
+        "agent": agent,
+        "file": file_name,
+        "format": fmt_str,
+        "fidelity": fid_str,
+        "input_tok": input_tok,
+        "output_tok": output_tok,
+        "reduction_pct": format!("{reduction:.1}"),
+        "saved": input_tok.saturating_sub(output_tok),
+    });
+
+    let log_path = stats_dir.join(format!("{date_str}.jsonl"));
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)?;
+    writeln!(file, "{entry}")?;
+    Ok(())
+}
+
+/// Convert days since Unix epoch to (year, month, day).
+fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
+    // Civil calendar algorithm from Howard Hinnant
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
 }
