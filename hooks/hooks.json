@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/setup.sh\""
+            "command": "bash -c 'script=\"${CLAUDE_PLUGIN_DIR:-$HOME/.claude/plugins/transpile}/hooks/setup.sh\"; [ -f \"$script\" ] && bash \"$script\" || true'"
           }
         ]
       }
