@@ -635,7 +635,7 @@ mod tests {
             r#"{"ts":"2026-04-13T08:00:00Z","agent":"claude","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
             r#"{"ts":"2026-04-13T09:00:00Z","agent":"gemini","file":"c.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1500,"reduction_pct":25.0,"saved":500}"#,
         ];
-        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, None);
         assert_eq!(rows.len(), 2);
 
@@ -656,7 +656,7 @@ mod tests {
             r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
             r#"{"ts":"2026-04-13T08:00:00Z","agent":"gemini","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
         ];
-        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, Some("claude"));
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].agent, "claude");
@@ -669,7 +669,7 @@ mod tests {
             r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
             r#"{"broken":"#,
         ];
-        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, None);
         assert_eq!(rows.len(), 1);
     }
@@ -680,7 +680,7 @@ mod tests {
             r#"{"ts":"2026-04-12T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
             r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1600,"reduction_pct":20.0,"saved":400}"#,
         ];
-        let borrowed: Vec<&str> = lines.iter().copied().collect();
+        let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, None);
         assert_eq!(rows.len(), 2);
     }

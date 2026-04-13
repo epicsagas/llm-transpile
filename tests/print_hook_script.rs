@@ -3,8 +3,8 @@ use std::process::Command;
 
 fn transpile_bin() -> Command {
     // Use `cargo run --bin transpile` so the test works before installation.
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_transpile"));
-    cmd
+    
+    Command::new(env!("CARGO_BIN_EXE_transpile"))
 }
 
 #[test]
