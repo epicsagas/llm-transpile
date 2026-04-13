@@ -114,7 +114,6 @@ jobs:
     name: Publish to crates.io
     needs: release
     runs-on: ubuntu-latest
-    if: secrets.CARGO_REGISTRY_TOKEN != ''
     steps:
       - uses: actions/checkout@v4
 
@@ -128,7 +127,7 @@ jobs:
     name: Update Homebrew Tap
     needs: release
     runs-on: ubuntu-latest
-    if: "!contains(github.ref_name, '-') && secrets.HOMEBREW_TAP_TOKEN != ''"
+    if: "!contains(github.ref_name, '-')"
     steps:
       - name: Compute SHA256 for macOS tarballs
         id: sha
