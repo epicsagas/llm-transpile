@@ -110,7 +110,7 @@ transpile uninstall --dry-run      # 预览移除
 **Claude Code 插件**
 
 ```
-/plugin marketplace add epicsagas/claude-plugins
+/plugin marketplace add epicsagas/plugins
 /plugin install transpile@epicsagas
 ```
 

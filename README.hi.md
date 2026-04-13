@@ -110,7 +110,7 @@ transpile uninstall --dry-run      # हटाने का पूर्वा�
 **Claude Code प्लगइन**
 
 ```
-/plugin marketplace add epicsagas/claude-plugins
+/plugin marketplace add epicsagas/plugins
 /plugin install transpile@epicsagas
 ```
 

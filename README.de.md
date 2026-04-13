@@ -110,7 +110,7 @@ transpile uninstall --dry-run      # Vorschau der Entfernungen
 **Claude Code-Plugin**
 
 ```
-/plugin marketplace add epicsagas/claude-plugins
+/plugin marketplace add epicsagas/plugins
 /plugin install transpile@epicsagas
 ```
 

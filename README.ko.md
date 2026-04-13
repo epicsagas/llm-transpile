@@ -110,7 +110,7 @@ transpile uninstall --dry-run      # 제거 미리보기
 **Claude Code 플러그인**
 
 ```
-/plugin marketplace add epicsagas/claude-plugins
+/plugin marketplace add epicsagas/plugins
 /plugin install transpile@epicsagas
 ```
 

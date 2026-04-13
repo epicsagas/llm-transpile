@@ -115,7 +115,7 @@ transpile uninstall --dry-run      # preview removals
 **Claude Code plugin**
 
 ```
-/plugin marketplace add epicsagas/claude-plugins
+/plugin marketplace add epicsagas/plugins
 /plugin install transpile@epicsagas
 ```
 
