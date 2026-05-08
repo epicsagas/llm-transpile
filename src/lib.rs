@@ -369,6 +369,9 @@ mod tests {
             !output.contains('\u{E000}'),
             "PUA from HTML entity decoding must be stripped"
         );
-        assert!(output.contains("hello"), "surrounding text must be preserved");
+        assert!(
+            output.contains("hello"),
+            "surrounding text must be preserved"
+        );
     }
 }

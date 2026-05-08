@@ -26,38 +26,41 @@ enum SyncResult {
     Updated(PathBuf),
     Unchanged(PathBuf),
     Removed(PathBuf),
-    Skipped(PathBuf),       // would remove but file absent
-    Configured(String),     // non-file change (e.g. settings.json merge)
-    Deconfigured(String),   // non-file removal
-    DryRun(String),         // what would happen
+    Skipped(PathBuf),     // would remove but file absent
+    Configured(String),   // non-file change (e.g. settings.json merge)
+    Deconfigured(String), // non-file removal
+    DryRun(String),       // what would happen
 }
 
 impl SyncResult {
     fn symbol(&self) -> &'static str {
         match self {
-            Self::Added(_) | Self::Configured(_)         => "✓",
-            Self::Updated(_)                              => "~",
-            Self::Unchanged(_) | Self::Skipped(_)        => "·",
-            Self::Removed(_) | Self::Deconfigured(_)     => "✗",
-            Self::DryRun(_)                               => "?",
+            Self::Added(_) | Self::Configured(_) => "✓",
+            Self::Updated(_) => "~",
+            Self::Unchanged(_) | Self::Skipped(_) => "·",
+            Self::Removed(_) | Self::Deconfigured(_) => "✗",
+            Self::DryRun(_) => "?",
         }
     }
     fn tag(&self) -> &'static str {
         match self {
-            Self::Added(_)        => "added     ",
-            Self::Updated(_)      => "updated   ",
-            Self::Unchanged(_)    => "unchanged ",
-            Self::Removed(_)      => "removed   ",
-            Self::Skipped(_)      => "skipped   ",
-            Self::Configured(_)   => "configured",
+            Self::Added(_) => "added     ",
+            Self::Updated(_) => "updated   ",
+            Self::Unchanged(_) => "unchanged ",
+            Self::Removed(_) => "removed   ",
+            Self::Skipped(_) => "skipped   ",
+            Self::Configured(_) => "configured",
             Self::Deconfigured(_) => "removed   ",
-            Self::DryRun(_)       => "dry-run   ",
+            Self::DryRun(_) => "dry-run   ",
         }
     }
     fn detail(&self) -> String {
         match self {
-            Self::Added(p) | Self::Updated(p) | Self::Unchanged(p)
-            | Self::Removed(p) | Self::Skipped(p) => shorten_path(p),
+            Self::Added(p)
+            | Self::Updated(p)
+            | Self::Unchanged(p)
+            | Self::Removed(p)
+            | Self::Skipped(p) => shorten_path(p),
             Self::Configured(s) | Self::Deconfigured(s) | Self::DryRun(s) => s.clone(),
         }
     }
@@ -74,45 +77,64 @@ fn print_results(id: &str, results: &[SyncResult]) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 struct Integration {
-    id:        &'static str,
-    label:     &'static str,
-    detect:    fn() -> bool,
+    id: &'static str,
+    label: &'static str,
+    detect: fn() -> bool,
     /// Primary artifact — used for installed-status detection and --list display.
-    artifact:  fn() -> PathBuf,
-    install:   fn(dry_run: bool) -> Vec<SyncResult>,
+    artifact: fn() -> PathBuf,
+    install: fn(dry_run: bool) -> Vec<SyncResult>,
     uninstall: fn(dry_run: bool) -> Vec<SyncResult>,
 }
 
 static INTEGRATIONS: &[Integration] = &[
     Integration {
-        id: "claude", label: "Claude Code",
-        detect: detect_claude, artifact: claude_artifact,
-        install: install_claude, uninstall: uninstall_claude,
+        id: "claude",
+        label: "Claude Code",
+        detect: detect_claude,
+        artifact: claude_artifact,
+        install: install_claude,
+        uninstall: uninstall_claude,
     },
     Integration {
-        id: "gemini", label: "Gemini CLI",
-        detect: detect_gemini, artifact: gemini_artifact,
-        install: install_gemini, uninstall: uninstall_gemini,
+        id: "gemini",
+        label: "Gemini CLI",
+        detect: detect_gemini,
+        artifact: gemini_artifact,
+        install: install_gemini,
+        uninstall: uninstall_gemini,
     },
     Integration {
-        id: "codex", label: "Codex CLI",
-        detect: detect_codex, artifact: codex_artifact,
-        install: install_codex, uninstall: uninstall_codex,
+        id: "codex",
+        label: "Codex CLI",
+        detect: detect_codex,
+        artifact: codex_artifact,
+        install: install_codex,
+        uninstall: uninstall_codex,
     },
     Integration {
-        id: "opencode", label: "OpenCode",
-        detect: detect_opencode, artifact: opencode_artifact,
-        install: install_opencode, uninstall: uninstall_opencode,
+        id: "opencode",
+        label: "OpenCode",
+        detect: detect_opencode,
+        artifact: opencode_artifact,
+        install: install_opencode,
+        uninstall: uninstall_opencode,
     },
     Integration {
-        id: "cursor", label: "Cursor",
-        detect: detect_cursor, artifact: cursor_artifact,
-        install: install_cursor, uninstall: uninstall_cursor,
+        id: "cursor",
+        label: "Cursor",
+        detect: detect_cursor,
+        artifact: cursor_artifact,
+        install: install_cursor,
+        uninstall: uninstall_cursor,
     },
 ];
 
 fn integration_names() -> String {
-    INTEGRATIONS.iter().map(|i| i.id).collect::<Vec<_>>().join(", ")
+    INTEGRATIONS
+        .iter()
+        .map(|i| i.id)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn find_integration(id: &str) -> Option<&'static Integration> {
@@ -120,18 +142,40 @@ fn find_integration(id: &str) -> Option<&'static Integration> {
 }
 
 // ── Detectors ──────────────────────────────────────────────────────────────────
-fn detect_claude()   -> bool { cmd_exists("claude")   || dir_exists("~/.claude") }
-fn detect_gemini()   -> bool { cmd_exists("gemini") }
-fn detect_codex()    -> bool { cmd_exists("codex") }
-fn detect_opencode() -> bool { cmd_exists("opencode") }
-fn detect_cursor()   -> bool { cmd_exists("cursor")   || dir_exists("~/.cursor") }
+fn detect_claude() -> bool {
+    cmd_exists("claude") || dir_exists("~/.claude")
+}
+fn detect_gemini() -> bool {
+    cmd_exists("gemini")
+}
+fn detect_codex() -> bool {
+    cmd_exists("codex")
+}
+fn detect_opencode() -> bool {
+    cmd_exists("opencode")
+}
+fn detect_cursor() -> bool {
+    cmd_exists("cursor") || dir_exists("~/.cursor")
+}
 
 // ── Artifact paths (canonical installed-status marker) ─────────────────────────
-fn claude_artifact()   -> PathBuf { PathBuf::from(home()).join(".claude").join("transpile-hook.sh") }
-fn gemini_artifact()   -> PathBuf { skill_path("gemini") }
-fn codex_artifact()    -> PathBuf { skill_path("codex") }
-fn opencode_artifact() -> PathBuf { skill_path("opencode") }
-fn cursor_artifact()   -> PathBuf { skill_path("cursor") }
+fn claude_artifact() -> PathBuf {
+    PathBuf::from(home())
+        .join(".claude")
+        .join("transpile-hook.sh")
+}
+fn gemini_artifact() -> PathBuf {
+    skill_path("gemini")
+}
+fn codex_artifact() -> PathBuf {
+    skill_path("codex")
+}
+fn opencode_artifact() -> PathBuf {
+    skill_path("opencode")
+}
+fn cursor_artifact() -> PathBuf {
+    skill_path("cursor")
+}
 
 // ── Per-integration install fns ────────────────────────────────────────────────
 fn install_claude(dry_run: bool) -> Vec<SyncResult> {
@@ -175,29 +219,72 @@ fn uninstall_claude(dry_run: bool) -> Vec<SyncResult> {
 
     // 3) Legacy command file (silent)
     if !dry_run {
-        let legacy = PathBuf::from(home()).join(".claude").join("commands").join("transpile.md");
-        if legacy.exists() { std::fs::remove_file(legacy).ok(); }
+        let legacy = PathBuf::from(home())
+            .join(".claude")
+            .join("commands")
+            .join("transpile.md");
+        if legacy.exists() {
+            std::fs::remove_file(legacy).ok();
+        }
     }
 
     out
 }
 
-fn install_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&gemini_artifact(),   &transpile_skill("gemini"),   false, dry_run)] }
-fn install_codex(dry_run: bool)    -> Vec<SyncResult> { vec![sync_file(&codex_artifact(),    &transpile_skill("codex"),    false, dry_run)] }
-fn install_opencode(dry_run: bool) -> Vec<SyncResult> { vec![sync_file(&opencode_artifact(), &transpile_skill("opencode"), false, dry_run)] }
-fn install_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![sync_file(&cursor_artifact(),   &transpile_skill("cursor"),   false, dry_run)] }
+fn install_gemini(dry_run: bool) -> Vec<SyncResult> {
+    vec![sync_file(
+        &gemini_artifact(),
+        &transpile_skill("gemini"),
+        false,
+        dry_run,
+    )]
+}
+fn install_codex(dry_run: bool) -> Vec<SyncResult> {
+    vec![sync_file(
+        &codex_artifact(),
+        &transpile_skill("codex"),
+        false,
+        dry_run,
+    )]
+}
+fn install_opencode(dry_run: bool) -> Vec<SyncResult> {
+    vec![sync_file(
+        &opencode_artifact(),
+        &transpile_skill("opencode"),
+        false,
+        dry_run,
+    )]
+}
+fn install_cursor(dry_run: bool) -> Vec<SyncResult> {
+    vec![sync_file(
+        &cursor_artifact(),
+        &transpile_skill("cursor"),
+        false,
+        dry_run,
+    )]
+}
 
-fn uninstall_gemini(dry_run: bool)   -> Vec<SyncResult> { vec![remove_file(&gemini_artifact(),   dry_run)] }
-fn uninstall_codex(dry_run: bool)    -> Vec<SyncResult> { vec![remove_file(&codex_artifact(),    dry_run)] }
-fn uninstall_opencode(dry_run: bool) -> Vec<SyncResult> { vec![remove_file(&opencode_artifact(), dry_run)] }
-fn uninstall_cursor(dry_run: bool)   -> Vec<SyncResult> { vec![remove_file(&cursor_artifact(),   dry_run)] }
+fn uninstall_gemini(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&gemini_artifact(), dry_run)]
+}
+fn uninstall_codex(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&codex_artifact(), dry_run)]
+}
+fn uninstall_opencode(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&opencode_artifact(), dry_run)]
+}
+fn uninstall_cursor(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&cursor_artifact(), dry_run)]
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public entry points
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub fn run_install(tools: Vec<String>, all: bool, dry_run: bool, list: bool) -> i32 {
-    if list { return run_list(); }
+    if list {
+        return run_list();
+    }
 
     let selected: Vec<&str> = if all {
         INTEGRATIONS.iter().map(|i| i.id).collect()
@@ -207,7 +294,10 @@ pub fn run_install(tools: Vec<String>, all: bool, dry_run: bool, list: bool) -> 
             match find_integration(name) {
                 Some(ig) => out.push(ig.id),
                 None => {
-                    eprintln!("error: unknown integration '{name}'. Available: {}", integration_names());
+                    eprintln!(
+                        "error: unknown integration '{name}'. Available: {}",
+                        integration_names()
+                    );
                     return 1;
                 }
             }
@@ -222,7 +312,9 @@ pub fn run_install(tools: Vec<String>, all: bool, dry_run: bool, list: bool) -> 
         return 0;
     }
 
-    if dry_run { eprintln!("Dry run — no files will be written.\n"); }
+    if dry_run {
+        eprintln!("Dry run — no files will be written.\n");
+    }
 
     let profile = detect_profile();
     if !dry_run {
@@ -252,7 +344,10 @@ pub fn run_uninstall(tools: Vec<String>, all: bool, dry_run: bool) -> i32 {
             match find_integration(name) {
                 Some(ig) => out.push(ig.id),
                 None => {
-                    eprintln!("error: unknown integration '{name}'. Available: {}", integration_names());
+                    eprintln!(
+                        "error: unknown integration '{name}'. Available: {}",
+                        integration_names()
+                    );
                     return 1;
                 }
             }
@@ -267,7 +362,9 @@ pub fn run_uninstall(tools: Vec<String>, all: bool, dry_run: bool) -> i32 {
         return 0;
     }
 
-    if dry_run { eprintln!("Dry run — no files will be removed.\n"); }
+    if dry_run {
+        eprintln!("Dry run — no files will be removed.\n");
+    }
 
     for id in &selected {
         let ig = find_integration(id).unwrap();
@@ -292,13 +389,31 @@ pub fn run_uninstall(tools: Vec<String>, all: bool, dry_run: bool) -> i32 {
 
 pub fn run_list() -> i32 {
     eprintln!("Available integrations:\n");
-    eprintln!("  {:<10} {:<14} {:<12} {:<14} ARTIFACT", "ID", "LABEL", "DETECTED", "STATUS");
+    eprintln!(
+        "  {:<10} {:<14} {:<12} {:<14} ARTIFACT",
+        "ID", "LABEL", "DETECTED", "STATUS"
+    );
     eprintln!("  {}", "─".repeat(72));
     for ig in INTEGRATIONS {
         let artifact = (ig.artifact)();
-        let detected = if (ig.detect)() { "✓ detected  " } else { "            " };
-        let status   = if artifact.exists() { "✓ installed " } else { "  not installed" };
-        eprintln!("  {:<10} {:<14} {:<12} {:<15} {}", ig.id, ig.label, detected, status, shorten_path(&artifact));
+        let detected = if (ig.detect)() {
+            "✓ detected  "
+        } else {
+            "            "
+        };
+        let status = if artifact.exists() {
+            "✓ installed "
+        } else {
+            "  not installed"
+        };
+        eprintln!(
+            "  {:<10} {:<14} {:<12} {:<15} {}",
+            ig.id,
+            ig.label,
+            detected,
+            status,
+            shorten_path(&artifact)
+        );
     }
     eprintln!();
     0
@@ -319,10 +434,14 @@ fn sync_file(path: &PathBuf, content: &str, executable: bool, dry_run: bool) -> 
         std::fs::create_dir_all(parent).ok();
     }
     let exists = path.exists();
-    let same   = exists
-        && std::fs::read_to_string(path).map(|s| s == content).unwrap_or(false);
+    let same = exists
+        && std::fs::read_to_string(path)
+            .map(|s| s == content)
+            .unwrap_or(false);
 
-    if same { return SyncResult::Unchanged(path.clone()); }
+    if same {
+        return SyncResult::Unchanged(path.clone());
+    }
 
     std::fs::write(path, content).ok();
 
@@ -336,13 +455,19 @@ fn sync_file(path: &PathBuf, content: &str, executable: bool, dry_run: bool) -> 
         }
     }
 
-    if exists { SyncResult::Updated(path.clone()) } else { SyncResult::Added(path.clone()) }
+    if exists {
+        SyncResult::Updated(path.clone())
+    } else {
+        SyncResult::Added(path.clone())
+    }
 }
 
 /// Remove `path`. Returns Removed / Skipped.
 /// Also prunes the parent directory if it becomes empty.
 fn remove_file(path: &PathBuf, dry_run: bool) -> SyncResult {
-    if !path.exists() { return SyncResult::Skipped(path.clone()); }
+    if !path.exists() {
+        return SyncResult::Skipped(path.clone());
+    }
     if dry_run {
         return SyncResult::DryRun(format!("remove {}", shorten_path(path)));
     }
@@ -402,8 +527,7 @@ fn merge_claude_hook(hook_script: &std::path::Path, settings_path: &std::path::P
         std::fs::write(settings_path, "{}").ok();
     }
     let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
 
     let hook = serde_json::json!({
         "_id": "llm-transpile",
@@ -429,21 +553,33 @@ fn strip_claude_hook(settings_path: &std::path::Path) -> SyncResult {
         return SyncResult::Skipped(settings_path.to_path_buf());
     }
     let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value =
-        serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
+    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
 
     if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
         arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
     }
     // Prune empty containers
-    if cfg["hooks"]["PostToolUse"].as_array().map(|a| a.is_empty()).unwrap_or(false) {
-        cfg["hooks"].as_object_mut().map(|o| o.remove("PostToolUse"));
+    if cfg["hooks"]["PostToolUse"]
+        .as_array()
+        .map(|a| a.is_empty())
+        .unwrap_or(false)
+    {
+        cfg["hooks"]
+            .as_object_mut()
+            .map(|o| o.remove("PostToolUse"));
     }
-    if cfg["hooks"].as_object().map(|o| o.is_empty()).unwrap_or(false) {
+    if cfg["hooks"]
+        .as_object()
+        .map(|o| o.is_empty())
+        .unwrap_or(false)
+    {
         cfg.as_object_mut().map(|o| o.remove("hooks"));
     }
     std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
-    SyncResult::Deconfigured(format!("PostToolUse hook removed from {}", shorten_path(settings_path)))
+    SyncResult::Deconfigured(format!(
+        "PostToolUse hook removed from {}",
+        shorten_path(settings_path)
+    ))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -451,7 +587,8 @@ fn strip_claude_hook(settings_path: &std::path::Path) -> SyncResult {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn transpile_skill(agent: &str) -> String {
-    format!("\
+    format!(
+        "\
 ---
 name: transpile
 description: >
@@ -480,22 +617,36 @@ TRANSPILE_AGENT={agent} transpile --input <file> --fidelity semantic --quiet
 - `semantic` (default) — ~30% reduction, preserves all meaning
 - `compressed`         — ~40% reduction, use when near context limit
 - `lossless`           — no compression, for files where every word matters
-")
+"
+    )
 }
 
 fn skill_path(tool: &str) -> PathBuf {
     let h = home();
     match tool {
-        "gemini"   => PathBuf::from(&h).join(".gemini").join("skills").join("transpile").join("SKILL.md"),
-        "codex"    => PathBuf::from(&h).join(".agents").join("skills").join("transpile").join("SKILL.md"),
+        "gemini" => PathBuf::from(&h)
+            .join(".gemini")
+            .join("skills")
+            .join("transpile")
+            .join("SKILL.md"),
+        "codex" => PathBuf::from(&h)
+            .join(".agents")
+            .join("skills")
+            .join("transpile")
+            .join("SKILL.md"),
         "opencode" => {
             let cfg = std::env::var("XDG_CONFIG_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| PathBuf::from(&h).join(".config"));
-            cfg.join("opencode").join("skills").join("transpile").join("SKILL.md")
+            cfg.join("opencode")
+                .join("skills")
+                .join("transpile")
+                .join("SKILL.md")
         }
-        "cursor" => std::path::Path::new(".cursor").join("rules").join("transpile.mdc"),
-        _        => unreachable!(),
+        "cursor" => std::path::Path::new(".cursor")
+            .join("rules")
+            .join("transpile.mdc"),
+        _ => unreachable!(),
     }
 }
 
@@ -504,7 +655,7 @@ fn skill_path(tool: &str) -> PathBuf {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const MARKER_BEGIN: &str = "# >>> llm-transpile";
-const MARKER_END:   &str = "# <<< llm-transpile";
+const MARKER_END: &str = "# <<< llm-transpile";
 
 const SHELL_BLOCK: &str =
     r#"tctx() { transpile --input "$1" --fidelity "${2:-semantic}" --quiet; }"#;
@@ -513,23 +664,29 @@ fn detect_profile() -> String {
     let home = home();
     for name in &[".zshrc", ".bashrc", ".profile"] {
         let p = format!("{home}/{name}");
-        if std::path::Path::new(&p).exists() { return p; }
+        if std::path::Path::new(&p).exists() {
+            return p;
+        }
     }
     format!("{home}/.profile")
 }
 
 fn ensure_shell_block(profile: &str) {
     let existing = std::fs::read_to_string(profile).unwrap_or_default();
-    if existing.contains(MARKER_BEGIN) { return; }
+    if existing.contains(MARKER_BEGIN) {
+        return;
+    }
     let block = format!("\n{MARKER_BEGIN}\n{SHELL_BLOCK}\n{MARKER_END}\n");
-    let new    = format!("{existing}{block}");
+    let new = format!("{existing}{block}");
     std::fs::write(profile, new).ok();
     eprintln!("  shell    ✓ added      tctx() helper → {profile}");
 }
 
 fn remove_shell_block(profile: &str) {
     let existing = std::fs::read_to_string(profile).unwrap_or_default();
-    if !existing.contains(MARKER_BEGIN) { return; }
+    if !existing.contains(MARKER_BEGIN) {
+        return;
+    }
     let cleaned = splice_block(&existing, MARKER_BEGIN, MARKER_END, "");
     let cleaned = cleaned.trim_end().to_string() + "\n";
     std::fs::write(profile, cleaned).ok();
@@ -538,17 +695,26 @@ fn remove_shell_block(profile: &str) {
 fn splice_block(text: &str, begin: &str, end: &str, replacement: &str) -> String {
     let start = match text.find(begin) {
         Some(i) => i,
-        None    => return format!("{text}\n{replacement}\n"),
+        None => return format!("{text}\n{replacement}\n"),
     };
     let after_end = match text[start..].find(end) {
         Some(i) => start + i + end.len(),
-        None    => text.len(),
+        None => text.len(),
     };
-    let prefix_end = if start > 0 && text.as_bytes()[start - 1] == b'\n' { start - 1 } else { start };
+    let prefix_end = if start > 0 && text.as_bytes()[start - 1] == b'\n' {
+        start - 1
+    } else {
+        start
+    };
     if replacement.is_empty() {
         format!("{}{}", &text[..prefix_end], &text[after_end..])
     } else {
-        format!("{}\n{}\n{}", &text[..prefix_end], replacement, &text[after_end..])
+        format!(
+            "{}\n{}\n{}",
+            &text[..prefix_end],
+            replacement,
+            &text[after_end..]
+        )
     }
 }
 
@@ -569,7 +735,9 @@ fn wizard_tty() -> Vec<&'static str> {
     let mut checked: Vec<bool> = detected.clone();
     let mut cursor = 0usize;
 
-    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+    let _ = std::process::Command::new("stty")
+        .args(["-echo", "raw"])
+        .status();
 
     loop {
         eprint!("\x1b[2J\x1b[H");
@@ -585,37 +753,52 @@ fn wizard_tty() -> Vec<&'static str> {
             } else {
                 "            "
             };
-            let check = if checked[i]  { "◉" } else { "○" };
+            let check = if checked[i] { "◉" } else { "○" };
             let arrow = if i == cursor { "▶" } else { " " };
-            eprintln!("  {} {} {:<10}  {}{}\r", arrow, check, ig.id, ig.label, status);
+            eprintln!(
+                "  {} {} {:<10}  {}{}\r",
+                arrow, check, ig.id, ig.label, status
+            );
         }
         let _ = io::stderr().flush();
 
         match read_key() {
-            b' '       => { checked[cursor] = !checked[cursor]; }
-            b'A'|b'a'  => { checked.iter_mut().for_each(|c| *c = true); }
-            b'N'|b'n'  => { checked.iter_mut().for_each(|c| *c = false); }
-            b'Q'|b'q'  => {
-                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+            b' ' => {
+                checked[cursor] = !checked[cursor];
+            }
+            b'A' | b'a' => {
+                checked.iter_mut().for_each(|c| *c = true);
+            }
+            b'N' | b'n' => {
+                checked.iter_mut().for_each(|c| *c = false);
+            }
+            b'Q' | b'q' => {
+                let _ = std::process::Command::new("stty")
+                    .args(["echo", "-raw"])
+                    .status();
                 return vec![];
             }
-            b'\r'|b'\n' => break,
-            27 => {
-                if read_key() == b'[' {
-                    match read_key() {
-                        b'A' => { cursor = cursor.saturating_sub(1); }
-                        b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
-                        _ => {}
-                    }
+            b'\r' | b'\n' => break,
+            27 if read_key() == b'[' => match read_key() {
+                b'A' => {
+                    cursor = cursor.saturating_sub(1);
                 }
-            }
+                b'B' if cursor < INTEGRATIONS.len() - 1 => {
+                    cursor += 1;
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
 
-    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    let _ = std::process::Command::new("stty")
+        .args(["echo", "-raw"])
+        .status();
     eprint!("\x1b[2J\x1b[H");
-    INTEGRATIONS.iter().enumerate()
+    INTEGRATIONS
+        .iter()
+        .enumerate()
         .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
         .collect()
 }
@@ -647,11 +830,16 @@ fn wizard_uninstall_select() -> Vec<&'static str> {
 }
 
 fn wizard_uninstall_tty() -> Vec<&'static str> {
-    let installed: Vec<bool> = INTEGRATIONS.iter().map(|ig| (ig.artifact)().exists()).collect();
+    let installed: Vec<bool> = INTEGRATIONS
+        .iter()
+        .map(|ig| (ig.artifact)().exists())
+        .collect();
     let mut checked: Vec<bool> = installed.clone();
     let mut cursor = 0usize;
 
-    let _ = std::process::Command::new("stty").args(["-echo", "raw"]).status();
+    let _ = std::process::Command::new("stty")
+        .args(["-echo", "raw"])
+        .status();
 
     loop {
         eprint!("\x1b[2J\x1b[H");
@@ -659,38 +847,57 @@ fn wizard_uninstall_tty() -> Vec<&'static str> {
         eprintln!("  Space: toggle  ·  A: all  ·  N: none  ·  Enter: confirm  ·  Q: quit\r");
         eprintln!("\r");
         for (i, ig) in INTEGRATIONS.iter().enumerate() {
-            let status = if installed[i] { " [installed]    " } else { " [not installed]" };
-            let check  = if checked[i]   { "◉" } else { "○" };
-            let arrow  = if i == cursor  { "▶" } else { " " };
-            eprintln!("  {} {} {:<10}  {}{}\r", arrow, check, ig.id, ig.label, status);
+            let status = if installed[i] {
+                " [installed]    "
+            } else {
+                " [not installed]"
+            };
+            let check = if checked[i] { "◉" } else { "○" };
+            let arrow = if i == cursor { "▶" } else { " " };
+            eprintln!(
+                "  {} {} {:<10}  {}{}\r",
+                arrow, check, ig.id, ig.label, status
+            );
         }
         let _ = io::stderr().flush();
 
         match read_key() {
-            b' '        => { checked[cursor] = !checked[cursor]; }
-            b'A' | b'a' => { checked.iter_mut().for_each(|c| *c = true); }
-            b'N' | b'n' => { checked.iter_mut().for_each(|c| *c = false); }
+            b' ' => {
+                checked[cursor] = !checked[cursor];
+            }
+            b'A' | b'a' => {
+                checked.iter_mut().for_each(|c| *c = true);
+            }
+            b'N' | b'n' => {
+                checked.iter_mut().for_each(|c| *c = false);
+            }
             b'Q' | b'q' => {
-                let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+                let _ = std::process::Command::new("stty")
+                    .args(["echo", "-raw"])
+                    .status();
                 return vec![];
             }
             b'\r' | b'\n' => break,
-            27 => {
-                if read_key() == b'[' {
-                    match read_key() {
-                        b'A' => { cursor = cursor.saturating_sub(1); }
-                        b'B' => { if cursor < INTEGRATIONS.len() - 1 { cursor += 1; } }
-                        _ => {}
-                    }
+            27 if read_key() == b'[' => match read_key() {
+                b'A' => {
+                    cursor = cursor.saturating_sub(1);
                 }
-            }
+                b'B' if cursor < INTEGRATIONS.len() - 1 => {
+                    cursor += 1;
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
 
-    let _ = std::process::Command::new("stty").args(["echo", "-raw"]).status();
+    let _ = std::process::Command::new("stty")
+        .args(["echo", "-raw"])
+        .status();
     eprint!("\x1b[2J\x1b[H");
-    INTEGRATIONS.iter().enumerate()
+    INTEGRATIONS
+        .iter()
+        .enumerate()
         .filter_map(|(i, t)| if checked[i] { Some(t.id) } else { None })
         .collect()
 }
@@ -699,7 +906,11 @@ fn wizard_uninstall_pipe() -> Vec<&'static str> {
     eprintln!("transpile uninstall — select integrations to remove");
     eprintln!("─────────────────────────────────────────────────────");
     for (i, ig) in INTEGRATIONS.iter().enumerate() {
-        let status = if (ig.artifact)().exists() { " [installed]" } else { "" };
+        let status = if (ig.artifact)().exists() {
+            " [installed]"
+        } else {
+            ""
+        };
         eprintln!("  [{}] {:<10} {}{}", i + 1, ig.id, ig.label, status);
     }
     eprintln!("  [a] All of the above");
@@ -730,8 +941,10 @@ fn read_selection() -> Vec<&'static str> {
     let mut out = Vec::new();
     for token in line.split(',') {
         if let Ok(n) = token.trim().parse::<usize>()
-            && n >= 1 && n <= INTEGRATIONS.len() {
-                out.push(INTEGRATIONS[n - 1].id);
+            && n >= 1
+            && n <= INTEGRATIONS.len()
+        {
+            out.push(INTEGRATIONS[n - 1].id);
         }
     }
     out
@@ -812,9 +1025,18 @@ mod tests {
     fn skill_preserves_rest_of_content() {
         for agent in &["gemini", "codex", "opencode", "cursor"] {
             let content = transpile_skill(agent);
-            assert!(content.contains("name: transpile"), "agent={agent}: missing frontmatter");
-            assert!(content.contains("--fidelity semantic --quiet"), "agent={agent}: missing fidelity flag");
-            assert!(content.contains("alwaysApply: true"), "agent={agent}: missing alwaysApply");
+            assert!(
+                content.contains("name: transpile"),
+                "agent={agent}: missing frontmatter"
+            );
+            assert!(
+                content.contains("--fidelity semantic --quiet"),
+                "agent={agent}: missing fidelity flag"
+            );
+            assert!(
+                content.contains("alwaysApply: true"),
+                "agent={agent}: missing alwaysApply"
+            );
         }
     }
 }

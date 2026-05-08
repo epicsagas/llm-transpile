@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **Token-optimized document transpiler for LLM pipelines**
@@ -49,11 +49,13 @@ This agreement is made between Licensor and Licensee.
 
 LLMs perform better when context is clean and dense. This library handles the mechanical work:
 
-- **Structural parsing** — Markdown/HTML/plain text → typed IR nodes (headings, paragraphs, tables, lists, code blocks)
-- **Adaptive compression** — automatically escalates through 4 stages as token budget fills up
-- **Symbol substitution** — repeated domain terms → Unicode PUA characters, decoded by `<D>` dictionary header
-- **Table linearization** — Markdown tables → compact `Key:Val` sequences (≤5 rows) or pipe-separated rows (`h1|h2\nv1|v2`) for larger tables
-- **Streaming output** — Tokio stream delivers the first chunk immediately, minimizing TTFT
+| | Feature | Why it matters |
+|--|---------|----------------|
+| 🏗️ | **Structural parsing** | Markdown/HTML/plain text → typed IR nodes (headings, paragraphs, tables, lists, code blocks) |
+| 📉 | **Adaptive compression** | Automatically escalates through 4 stages as token budget fills up |
+| 🔣 | **Symbol substitution** | Repeated domain terms → Unicode PUA characters, decoded by `<D>` dictionary header |
+| 📊 | **Table linearization** | Markdown tables → compact `Key:Val` (≤5 rows) or pipe-separated rows for larger tables |
+| 🌊 | **Streaming output** | Tokio stream delivers the first chunk immediately, minimizing TTFT |
 
 ---
 
@@ -66,7 +68,7 @@ LLMs perform better when context is clean and dense. This library handles the me
 llm-transpile = "0.1"
 ```
 
-Requires **Rust 1.75+**.
+Requires **Rust 1.92+**.
 
 ### CLI binary + tool integration
 
@@ -369,31 +371,7 @@ cargo run --release --example eval
 
 ## Contributing
 
-Contributions are welcome — bug reports, feature requests, and pull requests.
-
-```bash
-# Clone and build
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# Run tests
-cargo test
-
-# Run benchmarks (HTML report → target/criterion/)
-cargo bench
-
-# Lint and format
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**Guidelines**
-
-- Keep MSRV at Rust 1.75 — avoid features introduced after that.
-- New compression behavior must not affect `Lossless` mode.
-- Each PR should include tests for any new logic in the relevant module (`ir`, `compressor`, `symbol`, `renderer`).
-- Run `cargo clippy -- -D warnings` and `cargo fmt` before submitting.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines. PRs welcome — check open issues labeled `good first issue`.
 
 ---
 

@@ -44,7 +44,10 @@ fn eval_file(path: &str, format: InputFormat) -> Option<EvalResult> {
     let input_tok = token_count(&content);
 
     // Helper: run transpile N times and return (output, median_µs)
-    let timed = |fmt: InputFormat, fidelity: FidelityLevel, budget: Option<usize>| -> Option<(String, u128)> {
+    let timed = |fmt: InputFormat,
+                 fidelity: FidelityLevel,
+                 budget: Option<usize>|
+     -> Option<(String, u128)> {
         let mut timings = [0u128; 3];
         let mut out = String::new();
         for t in &mut timings {
@@ -111,8 +114,8 @@ fn strip_non_content(s: &str) -> String {
     while !rest.is_empty() {
         // Find the next tag or comment to strip
         let next_comment = rest.find("<!--");
-        let next_script  = rest.find("<script");
-        let next_style   = rest.find("<style");
+        let next_script = rest.find("<script");
+        let next_style = rest.find("<style");
 
         // Pick the earliest match
         let earliest = [next_comment, next_script, next_style]
@@ -155,13 +158,17 @@ fn strip_non_content(s: &str) -> String {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn pct(a: usize, b: usize) -> f64 {
-    if b == 0 { return 0.0; }
+    if b == 0 {
+        return 0.0;
+    }
     100.0 - (a as f64 / b as f64 * 100.0)
 }
 
 /// Collect all files with a given extension from a directory (sorted).
 fn collect_files(dir: &str, ext: &str) -> Vec<String> {
-    let Ok(entries) = fs::read_dir(dir) else { return vec![] };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return vec![];
+    };
     let mut files: Vec<String> = entries
         .flatten()
         .filter_map(|e| {
@@ -182,21 +189,30 @@ fn collect_files(dir: &str, ext: &str) -> Vec<String> {
 fn print_header() {
     println!(
         "{:<38} {:>4} {:>6} {:>8} {:>8} {:>7} {:>7} {:>10} {:>8} {:>9} {:>7}",
-        "file", "fmt", "in_tok", "Sem%red", "Cmp%red",
-        "Sem_ms", "Cmp_ms", "tok/ms", "Loss%red", "LossCov%", "in_KB"
+        "file",
+        "fmt",
+        "in_tok",
+        "Sem%red",
+        "Cmp%red",
+        "Sem_ms",
+        "Cmp_ms",
+        "tok/ms",
+        "Loss%red",
+        "LossCov%",
+        "in_KB"
     );
     println!("{}", "-".repeat(126));
 }
 
 fn print_row(r: &EvalResult) {
     let fmt_tag = match r.format {
-        InputFormat::Markdown  => "md",
-        InputFormat::Html      => "htm",
+        InputFormat::Markdown => "md",
+        InputFormat::Html => "htm",
         InputFormat::PlainText => "txt",
     };
     // Use µs for precision; display as ms with 1 decimal
-    let sem_ms  = r.semantic_us as f64 / 1000.0;
-    let cmp_ms  = r.compressed_us as f64 / 1000.0;
+    let sem_ms = r.semantic_us as f64 / 1000.0;
+    let cmp_ms = r.compressed_us as f64 / 1000.0;
     // tok/ms: use µs denominator, convert back
     let tokms = if r.semantic_us > 0 {
         r.input_tok as f64 / r.semantic_us as f64 * 1000.0
@@ -206,10 +222,14 @@ fn print_row(r: &EvalResult) {
     };
     println!(
         "{:<38} {:>4} {:>6} {:>8.1} {:>8.1} {:>7.1} {:>7.1} {:>10.0} {:>8.1} {:>8.1}% {:>7.1}",
-        r.file, fmt_tag, r.input_tok,
+        r.file,
+        fmt_tag,
+        r.input_tok,
         pct(r.semantic_tok, r.input_tok),
         pct(r.compressed_tok, r.input_tok),
-        sem_ms, cmp_ms, tokms,
+        sem_ms,
+        cmp_ms,
+        tokms,
         pct(r.lossless_tok, r.input_tok),
         r.lossless_word_coverage,
         r.input_bytes as f64 / 1024.0,
@@ -217,18 +237,23 @@ fn print_row(r: &EvalResult) {
 }
 
 fn print_totals(results: &[EvalResult]) {
-    if results.is_empty() { return; }
+    if results.is_empty() {
+        return;
+    }
 
-    let total_input: usize  = results.iter().map(|r| r.input_tok).sum();
-    let total_sem: usize    = results.iter().map(|r| r.semantic_tok).sum();
-    let total_cmp: usize    = results.iter().map(|r| r.compressed_tok).sum();
-    let total_sem_us: u128  = results.iter().map(|r| r.semantic_us).sum();
-    let total_cmp_us: u128  = results.iter().map(|r| r.compressed_us).sum();
-    let avg_coverage: f64   = results.iter().map(|r| r.lossless_word_coverage).sum::<f64>()
+    let total_input: usize = results.iter().map(|r| r.input_tok).sum();
+    let total_sem: usize = results.iter().map(|r| r.semantic_tok).sum();
+    let total_cmp: usize = results.iter().map(|r| r.compressed_tok).sum();
+    let total_sem_us: u128 = results.iter().map(|r| r.semantic_us).sum();
+    let total_cmp_us: u128 = results.iter().map(|r| r.compressed_us).sum();
+    let avg_coverage: f64 = results
+        .iter()
+        .map(|r| r.lossless_word_coverage)
+        .sum::<f64>()
         / results.len() as f64;
     let n = results.len();
-    let avg_sem_ms  = total_sem_us as f64 / n as f64 / 1000.0;
-    let avg_cmp_ms  = total_cmp_us as f64 / n as f64 / 1000.0;
+    let avg_sem_ms = total_sem_us as f64 / n as f64 / 1000.0;
+    let avg_cmp_ms = total_cmp_us as f64 / n as f64 / 1000.0;
     // Aggregate throughput: total tokens / total time (µs → ms)
     let total_tokms = if total_sem_us > 0 {
         total_input as f64 / total_sem_us as f64 * 1000.0
@@ -240,12 +265,17 @@ fn print_totals(results: &[EvalResult]) {
     println!("{}", "═".repeat(126));
     println!(
         "{:<38} {:>4} {:>6} {:>8.1} {:>8.1} {:>7.1} {:>7.1} {:>10.0} {:>8.1} {:>8.1}% {:>7}",
-        "total/avg", "", total_input,
+        "total/avg",
+        "",
+        total_input,
         pct(total_sem, total_input),
         pct(total_cmp, total_input),
-        avg_sem_ms, avg_cmp_ms, total_tokms,
+        avg_sem_ms,
+        avg_cmp_ms,
+        total_tokms,
         pct(total_lossless, total_input),
-        avg_coverage, "",
+        avg_coverage,
+        "",
     );
 }
 
@@ -307,31 +337,49 @@ fn main() {
     }
 
     // ── Combined summary (reuse already-computed results — no re-evaluation) ────
-    let all_results: Vec<&EvalResult> = md_results.iter()
+    let all_results: Vec<&EvalResult> = md_results
+        .iter()
         .chain(html_results.iter())
         .chain(txt_results.iter())
         .collect();
 
-    let grand_input: usize   = all_results.iter().map(|r| r.input_tok).sum();
-    let grand_sem: usize     = all_results.iter().map(|r| r.semantic_tok).sum();
-    let grand_cmp: usize     = all_results.iter().map(|r| r.compressed_tok).sum();
-    let grand_sem_us: u128   = all_results.iter().map(|r| r.semantic_us).sum();
+    let grand_input: usize = all_results.iter().map(|r| r.input_tok).sum();
+    let grand_sem: usize = all_results.iter().map(|r| r.semantic_tok).sum();
+    let grand_cmp: usize = all_results.iter().map(|r| r.compressed_tok).sum();
+    let grand_sem_us: u128 = all_results.iter().map(|r| r.semantic_us).sum();
     let grand_tokms = if grand_sem_us > 0 {
         grand_input as f64 / grand_sem_us as f64 * 1000.0
     } else {
         grand_input as f64 * 1000.0
     };
-    let grand_coverage: f64 = if all_results.is_empty() { 0.0 } else {
-        all_results.iter().map(|r| r.lossless_word_coverage).sum::<f64>() / all_results.len() as f64
+    let grand_coverage: f64 = if all_results.is_empty() {
+        0.0
+    } else {
+        all_results
+            .iter()
+            .map(|r| r.lossless_word_coverage)
+            .sum::<f64>()
+            / all_results.len() as f64
     };
-    let low_coverage_count = all_results.iter().filter(|r| r.lossless_word_coverage < 90.0).count();
+    let low_coverage_count = all_results
+        .iter()
+        .filter(|r| r.lossless_word_coverage < 90.0)
+        .count();
 
     println!("\n📊 Summary (all formats):");
     println!("  • Documents evaluated:      {}", all_results.len());
     println!("  • Total input tokens:       {grand_input}");
-    println!("  • Semantic   avg reduction: {:.1}%", pct(grand_sem, grand_input));
-    println!("  • Compressed avg reduction: {:.1}%", pct(grand_cmp, grand_input));
-    println!("  • Lossless word coverage:   {grand_coverage:.1}% avg  ({low_coverage_count} files below 90%)");
+    println!(
+        "  • Semantic   avg reduction: {:.1}%",
+        pct(grand_sem, grand_input)
+    );
+    println!(
+        "  • Compressed avg reduction: {:.1}%",
+        pct(grand_cmp, grand_input)
+    );
+    println!(
+        "  • Lossless word coverage:   {grand_coverage:.1}% avg  ({low_coverage_count} files below 90%)"
+    );
     println!("  • Throughput (Semantic):    {grand_tokms:.0} tok/ms  [release build]");
     println!("  • Total output (Semantic):  {grand_sem}");
 }

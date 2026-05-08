@@ -227,10 +227,8 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
             Event::Start(Tag::TableRow) => {
                 current_row.clear();
             }
-            Event::End(TagEnd::TableRow) => {
-                if !in_table_head {
-                    table_rows.push(std::mem::take(&mut current_row));
-                }
+            Event::End(TagEnd::TableRow) if !in_table_head => {
+                table_rows.push(std::mem::take(&mut current_row));
             }
             Event::Start(Tag::TableCell) => {
                 current_cell.clear();
@@ -259,10 +257,8 @@ fn parse_markdown(input: &str, doc: &mut IRDocument) {
                 }
             }
 
-            Event::SoftBreak | Event::HardBreak => {
-                if !in_code_block {
-                    current_text.push(' ');
-                }
+            Event::SoftBreak | Event::HardBreak if !in_code_block => {
+                current_text.push(' ');
             }
 
             _ => {}

@@ -258,8 +258,7 @@ impl StreamingTranspiler {
         self,
         doc: IRDocument,
     ) -> Pin<Box<dyn Stream<Item = Result<TranspileChunk, StreamError>> + Send>> {
-        let (tx, rx) =
-            mpsc::channel::<Result<TranspileChunk, StreamError>>(self.channel_buffer);
+        let (tx, rx) = mpsc::channel::<Result<TranspileChunk, StreamError>>(self.channel_buffer);
         let stream = ReceiverStream::new(rx);
 
         tokio::spawn(async move {
@@ -531,8 +530,8 @@ mod tests {
             FidelityLevel::Semantic,
             &["단락 one", "단락 two", "단락 three"],
         );
-        let transpiler = StreamingTranspiler::new(10_000, FidelityLevel::Semantic)
-            .with_channel_size(4);
+        let transpiler =
+            StreamingTranspiler::new(10_000, FidelityLevel::Semantic).with_channel_size(4);
 
         let chunks: Vec<_> = transpiler
             .transpile(doc)

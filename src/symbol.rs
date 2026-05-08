@@ -146,7 +146,7 @@ impl SymbolDict {
                 .collect();
             // LeftmostLongest selects by length; sort longest-first to assign lower IDs
             // to longer patterns so they are preferred on equal-length conflicts.
-            pairs.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+            pairs.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
             let patterns: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
             let replacements: Vec<String> = pairs.iter().map(|(_, v)| v.clone()).collect();

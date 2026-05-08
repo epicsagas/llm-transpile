@@ -100,7 +100,11 @@ pub fn linearize_table(headers: &[String], rows: &[Vec<String>]) -> String {
         // Compact pipe-separated format — significantly fewer tokens than JSON Lines.
         // Format: header row first, then one data row per line.
         // Example: `Name|Age\nAlice|30\nBob|25`
-        let header_row = headers.iter().map(|h| h.trim()).collect::<Vec<_>>().join("|");
+        let header_row = headers
+            .iter()
+            .map(|h| h.trim())
+            .collect::<Vec<_>>()
+            .join("|");
         let data_rows = rows
             .iter()
             .map(|row| row.iter().map(|v| v.trim()).collect::<Vec<_>>().join("|"))

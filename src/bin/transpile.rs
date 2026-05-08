@@ -221,10 +221,19 @@ fn main() {
         Some(Command::Stats { days, agent }) => {
             process::exit(run_stats(days, agent));
         }
-        Some(Command::Install { tools, all, list, dry_run }) => {
+        Some(Command::Install {
+            tools,
+            all,
+            list,
+            dry_run,
+        }) => {
             process::exit(install::run_install(tools, all, dry_run, list));
         }
-        Some(Command::Uninstall { tools, all, dry_run }) => {
+        Some(Command::Uninstall {
+            tools,
+            all,
+            dry_run,
+        }) => {
             process::exit(install::run_uninstall(tools, all, dry_run));
         }
         None => run_transpile(cli),
@@ -354,14 +363,16 @@ fn aggregate_lines(lines: &[&str], agent_filter: Option<&str>) -> Vec<StatsRow> 
         let output_tok = v["output_tok"].as_u64().unwrap_or(0);
         let saved = v["saved"].as_u64().unwrap_or(0);
 
-        let entry = map.entry((date.clone(), agent.clone())).or_insert(StatsRow {
-            date,
-            agent,
-            calls: 0,
-            input_tok: 0,
-            output_tok: 0,
-            saved: 0,
-        });
+        let entry = map
+            .entry((date.clone(), agent.clone()))
+            .or_insert(StatsRow {
+                date,
+                agent,
+                calls: 0,
+                input_tok: 0,
+                output_tok: 0,
+                saved: 0,
+            });
         entry.calls += 1;
         entry.input_tok += input_tok;
         entry.output_tok += output_tok;
@@ -419,7 +430,10 @@ fn run_stats(days: u32, agent: Option<String>) -> i32 {
     println!();
 
     let sep = "  ──────────────────────────────────────────────────────────────────────────";
-    println!("  {:<12}  {:<12}  {:>5}  {:>10}  {:>10}  {:>7}  {:>9}", "Date", "Agent", "Calls", "Input tok", "Output tok", "Saved", "Reduction");
+    println!(
+        "  {:<12}  {:<12}  {:>5}  {:>10}  {:>10}  {:>7}  {:>9}",
+        "Date", "Agent", "Calls", "Input tok", "Output tok", "Saved", "Reduction"
+    );
     println!("{sep}");
 
     let mut total_calls: u64 = 0;
@@ -488,7 +502,9 @@ fn log_stats(
     reduction: f64,
 ) {
     // Best-effort — never fail the main pipeline
-    let _ = try_log_stats(input_path, format, fidelity, input_tok, output_tok, reduction);
+    let _ = try_log_stats(
+        input_path, format, fidelity, input_tok, output_tok, reduction,
+    );
 }
 
 fn try_log_stats(
@@ -575,7 +591,7 @@ fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{aggregate_lines, epoch_days_to_ymd, format_num, StatsRow};
+    use super::{StatsRow, aggregate_lines, epoch_days_to_ymd, format_num};
 
     #[test]
     fn day_0_unix_epoch() {

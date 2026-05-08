@@ -3,7 +3,7 @@ use std::process::Command;
 
 fn transpile_bin() -> Command {
     // Use `cargo run --bin transpile` so the test works before installation.
-    
+
     Command::new(env!("CARGO_BIN_EXE_transpile"))
 }
 
@@ -58,8 +58,5 @@ fn print_hook_script_stderr_is_empty() {
         .expect("failed to run transpile");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.is_empty(),
-        "expected empty stderr, got:\n{stderr}"
-    );
+    assert!(stderr.is_empty(), "expected empty stderr, got:\n{stderr}");
 }
