@@ -141,6 +141,7 @@ fn chars_per_token(c: char) -> u32 {
         // Emoji: ~1–2 tokens per char per GPT-4 → approximate as cpt=2
         0x1F300..=0x1F9FF => 2, // Misc Symbols & Pictographs, Emoticons, Supplemental Symbols
         0x1FA00..=0x1FAFF => 2, // Symbols and Pictographs Extended-A
+        0xE000..=0xF8FF => 1,   // Unicode PUA — LLM tokenizers typically encode as 1 token
         _ => 4,                 // Latin and other scripts
     }
 }
@@ -591,6 +592,30 @@ mod tests {
         assert!(
             hangul > latin,
             "Hangul ({hangul}) must have more tokens than Latin ({latin})"
+        );
+    }
+
+    #[test]
+    #[cfg(not(feature = "tiktoken"))]
+    fn estimate_tokens_pua_is_one_per_char() {
+        // PUA characters should be estimated at ~1 token each
+        let pua_text = "\u{E000}\u{E001}\u{E002}\u{E003}"; // 4 PUA chars
+        let tokens = estimate_tokens(pua_text);
+        assert_eq!(
+            tokens, 4,
+            "4 PUA chars should estimate to 4 tokens, got {tokens}"
+        );
+    }
+
+    #[test]
+    #[cfg(not(feature = "tiktoken"))]
+    fn estimate_tokens_pua_less_than_latin() {
+        // Same character count: PUA should have more tokens (lower cpt) than Latin
+        let pua = estimate_tokens("\u{E000}\u{E001}\u{E002}\u{E003}"); // 4 PUA chars
+        let latin = estimate_tokens("hell"); // 4 Latin chars
+        assert!(
+            pua > latin,
+            "PUA ({pua}) should estimate more tokens than Latin ({latin})"
         );
     }
 
