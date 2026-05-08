@@ -310,7 +310,11 @@ fn skip_trailing_space(bytes: &[u8], mut pos: usize) -> usize {
 // 3. Internal compression functions
 // ────────────────────────────────────────────────
 
+/// Maximum fraction of paragraphs that may be removed by pruning.
+const MAX_PRUNE_RATIO: f32 = 0.40;
+
 /// Removes `Para` nodes in the bottom `threshold` fraction by importance.
+/// Never removes more than `MAX_PRUNE_RATIO` of total paragraphs.
 fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
     // Only paragraphs are subject to filtering
     let para_importances: Vec<f32> = nodes
@@ -334,20 +338,39 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
     let cutoff_idx = ((sorted.len() as f32 * threshold) as usize).min(sorted.len() - 1);
     let cutoff = sorted[cutoff_idx];
 
+    // If cutoff equals the maximum importance, all paragraphs share the same value
+    // and there is nothing meaningfully "low importance" to prune.
+    if cutoff >= sorted[sorted.len() - 1] {
+        return nodes;
+    }
+
+    // Calculate max allowed removals
+    let total_paras = para_importances.len();
+    let max_removals = ((total_paras as f32 * MAX_PRUNE_RATIO) as usize).max(1);
+    let mut removed = 0usize;
+
     let filtered: Vec<DocNode> = nodes
         .iter()
         .filter(|n| {
             if let DocNode::Para { importance, .. } = n {
-                *importance > cutoff
+                if *importance > cutoff {
+                    true
+                } else {
+                    if removed < max_removals {
+                        removed += 1;
+                        false
+                    } else {
+                        true // Keep -- we've hit the cap
+                    }
+                }
             } else {
-                true // non-paragraph nodes are always preserved
+                true
             }
         })
         .cloned()
         .collect();
 
-    // Safety net: if the input had Para nodes but none remain after filtering, return the original.
-    // (When all paragraphs share the same importance, cutoff == all importances → prevents total elimination)
+    // Safety net: if all paragraphs would be removed, return original
     let filtered_has_para = filtered.iter().any(|n| matches!(n, DocNode::Para { .. }));
     let input_had_para = nodes.iter().any(|n| matches!(n, DocNode::Para { .. }));
 
@@ -358,27 +381,49 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
     }
 }
 
-/// Removes `Para` nodes with identical content, keeping only the first occurrence.
+/// Removes `Para` nodes with near-identical content using Jaccard similarity.
+/// Paragraphs with similarity >= 0.85 are considered duplicates; only the first is kept.
 fn deduplicate_paras(nodes: Vec<DocNode>) -> Vec<DocNode> {
     use std::collections::HashSet;
-    let mut seen: HashSet<String> = HashSet::new();
+
+    const SIMILARITY_THRESHOLD: f64 = 0.85;
+
+    let mut signatures: Vec<HashSet<String>> = Vec::new();
     nodes
         .into_iter()
         .filter(|n| {
             if let DocNode::Para { text, .. } = n {
-                let mut normalized = String::with_capacity(text.len());
-                for token in text.split_whitespace() {
-                    if !normalized.is_empty() {
-                        normalized.push(' ');
-                    }
-                    normalized.push_str(token);
+                let tokens: HashSet<String> =
+                    text.split_whitespace().map(|t| t.to_lowercase()).collect();
+
+                if tokens.is_empty() {
+                    return true;
                 }
-                seen.insert(normalized)
-            } else {
-                true
+
+                for existing in &signatures {
+                    let sim = jaccard_similarity(&tokens, existing);
+                    if sim >= SIMILARITY_THRESHOLD {
+                        return false;
+                    }
+                }
+                signatures.push(tokens);
             }
+            true
         })
         .collect()
+}
+
+/// Computes Jaccard similarity between two sets: |intersection| / |union|.
+fn jaccard_similarity(
+    a: &std::collections::HashSet<String>,
+    b: &std::collections::HashSet<String>,
+) -> f64 {
+    if a.is_empty() && b.is_empty() {
+        return 1.0;
+    }
+    let intersection = a.intersection(b).count();
+    let union = a.union(b).count();
+    intersection as f64 / union as f64
 }
 
 /// Truncates each `Para` to its first sentence.
@@ -399,11 +444,21 @@ fn truncate_to_first_sentence(nodes: Vec<DocNode>) -> Vec<DocNode> {
 }
 
 /// Extracts the first sentence from text (delimited by `.`, `!`, or `?`).
+///
+/// Periods that are part of common abbreviations (e.g. "Dr.", "U.S.", "Fig.")
+/// or decimal numbers (e.g. "3.50") are skipped and do not terminate a sentence.
 fn first_sentence(text: &str) -> String {
     for (i, c) in text.char_indices() {
+        if c == '.' {
+            // Check if this period is part of an abbreviation or a decimal number.
+            if is_abbreviation_or_decimal(text, i) {
+                continue;
+            }
+            return text[..i + c.len_utf8()].trim().to_string();
+        }
         if matches!(
             c,
-            '.' | '!' | '?'           // ASCII
+            '!' | '?'
             | '。' | '！' | '？'      // CJK fullwidth (U+3002, U+FF01, U+FF1F)
             | '।' | '॥'              // Devanagari Danda / Double Danda (U+0964, U+0965)
             | '۔'                    // Arabic Full Stop (U+06D4)
@@ -418,6 +473,82 @@ fn first_sentence(text: &str) -> String {
         }
     }
     text.trim().to_string() // No sentence terminator found — return the full text
+}
+
+/// Common abbreviations whose trailing period is NOT a sentence terminator.
+const ABBREVIATIONS: &[&str] = &[
+    "dr", "mr", "mrs", "ms", "prof", "sr", "jr", "vs", "etc", "eg", "ie", "fig", "eq", "no", "vol",
+    "us", "am", "pm", "gen", "sgt", "capt", "lt", "col", "inc", "ltd", "corp", "dept", "est",
+    "govt", "assn", "al", "approx", "appt", "apt", "ave", "blvd", "cot", "def", "div", "fx", "min",
+    "max", "misc", "mon", "tue", "wed", "thu", "fri", "sat", "sun", "jan", "feb", "mar", "apr",
+    "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "st", "nd", "rd", "th",
+];
+
+/// Returns true if the period at byte position `pos` in `text` is part of
+/// an abbreviation (e.g., "Dr.", "U.S.") or a decimal number (e.g., "3.50").
+fn is_abbreviation_or_decimal(text: &str, pos: usize) -> bool {
+    let bytes = text.as_bytes();
+
+    // Check if this is a decimal point: digit on both sides (e.g., "3.50") or
+    // digit on the right side only (e.g., ".5").
+    // A period preceded by a digit but followed by a non-digit is a sentence end
+    // (e.g., "1234." at end of sentence), NOT a decimal.
+    let preceded_by_digit = pos > 0 && bytes[pos - 1].is_ascii_digit();
+    let followed_by_digit = pos + 1 < bytes.len() && bytes[pos + 1].is_ascii_digit();
+    if followed_by_digit {
+        return true;
+    }
+    if preceded_by_digit && !followed_by_digit {
+        // "1234." is a sentence-ending period, not a decimal.
+        return false;
+    }
+
+    // Extract the word token before the period: go backwards to find a word boundary.
+    // Periods are included so that multi-period abbreviations like "U.S." stay intact.
+    let before = &text[..pos];
+    let word_start = before
+        .rfind(|c: char| !c.is_alphanumeric() && c != '.')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let word_before = &before[word_start..];
+
+    // Also collect the continuation after the period (letter + period pairs like "g." in "e.g.").
+    // This handles multi-period abbreviations when the first period is encountered.
+    let after = &text[pos + 1..]; // skip the current period (ASCII '.')
+    let mut extended = word_before.to_string();
+    let mut rest = after.chars().peekable();
+    while let Some(c) = rest.peek() {
+        if c.is_ascii_alphabetic() {
+            extended.push(*c);
+            rest.next();
+            // If followed by a period, include it and continue
+            if let Some('.') = rest.peek() {
+                extended.push('.');
+                rest.next();
+            } else {
+                // Letter not followed by a period — not part of a multi-period abbreviation.
+                // Remove the last letter we added (it belongs to the next word).
+                extended.pop();
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    // Collect alphabetic characters only (strips internal periods for "U.S." -> "us"),
+    // then lowercase for comparison.
+    let cleaned: String = extended
+        .chars()
+        .filter(|c| c.is_alphabetic())
+        .collect::<String>()
+        .to_lowercase();
+
+    if cleaned.is_empty() {
+        return false;
+    }
+
+    ABBREVIATIONS.contains(&cleaned.as_str())
 }
 
 // ────────────────────────────────────────────────
@@ -481,7 +612,6 @@ fn default_stopwords() -> Vec<String> {
         "그러므로",
         "한편",
         "반면",
-        "다만",
         "이처럼",
         "이렇게",
         "이에",
@@ -805,6 +935,80 @@ mod tests {
     }
 
     #[test]
+    fn default_stopwords_no_duplicates() {
+        let stopwords = default_stopwords();
+        let mut seen = std::collections::HashSet::new();
+        let mut duplicates = Vec::new();
+        for sw in &stopwords {
+            if !seen.insert(sw.as_str()) {
+                duplicates.push(sw.clone());
+            }
+        }
+        assert!(
+            duplicates.is_empty(),
+            "duplicate stopwords found: {:?}",
+            duplicates
+        );
+    }
+
+    #[test]
+    fn first_sentence_skips_abbreviation_dr() {
+        assert_eq!(
+            first_sentence("Dr. Smith confirmed the results. The experiment was successful."),
+            "Dr. Smith confirmed the results."
+        );
+    }
+
+    #[test]
+    fn first_sentence_skips_abbreviation_us() {
+        assert_eq!(
+            first_sentence("U.S. patent no. 1234. Filed in 2024."),
+            "U.S. patent no. 1234."
+        );
+    }
+
+    #[test]
+    fn first_sentence_skips_abbreviation_eg() {
+        assert_eq!(
+            first_sentence("e.g. machine learning. Used widely."),
+            "e.g. machine learning."
+        );
+    }
+
+    #[test]
+    fn first_sentence_skips_abbreviation_ie() {
+        assert_eq!(
+            first_sentence("i.e. the model output. This is correct."),
+            "i.e. the model output."
+        );
+    }
+
+    #[test]
+    fn first_sentence_skips_abbreviation_fig() {
+        assert_eq!(
+            first_sentence("See Fig. 3 for details. The chart shows growth."),
+            "See Fig. 3 for details."
+        );
+    }
+
+    #[test]
+    fn first_sentence_preserves_normal_period() {
+        assert_eq!(
+            first_sentence("This is a normal sentence. And another one."),
+            "This is a normal sentence."
+        );
+    }
+
+    #[test]
+    fn first_sentence_handles_price() {
+        // "$3.50" should not be treated as end of sentence
+        assert_eq!(
+            first_sentence("This costs $3.50 per unit. Total is $350."),
+            "This costs $3.50 per unit."
+        );
+    }
+
+    #[test]
     fn stage_thresholds() {
         let base = CompressionConfig {
             budget: 100,
@@ -820,5 +1024,64 @@ mod tests {
         assert_eq!(at(70).stage(), CompressionStage::PruneLowImportance);
         assert_eq!(at(85).stage(), CompressionStage::DeduplicateAndLinearize);
         assert_eq!(at(96).stage(), CompressionStage::MaxCompression);
+    }
+
+    // ── R7: Fuzzy deduplication tests ──────────────────────────────────────
+
+    #[test]
+    fn fuzzy_dedup_removes_near_duplicates() {
+        // "The system processes requests" vs "The system processes the requests"
+        // Jaccard similarity should be high enough to trigger dedup
+        let nodes = vec![
+            make_para("The system processes requests", 1.0),
+            make_para("The system processes the requests", 0.9),
+            make_para("Completely different content here", 1.0),
+        ];
+        let result = deduplicate_paras(nodes);
+        assert_eq!(
+            result.len(),
+            2,
+            "near-duplicate paragraphs should be deduped: {:?}",
+            result
+                .iter()
+                .filter_map(|n| if let DocNode::Para { text, .. } = n {
+                    Some(text.clone())
+                } else {
+                    None
+                })
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn fuzzy_dedup_keeps_dissimilar() {
+        let nodes = vec![
+            make_para("The quick brown fox jumps", 1.0),
+            make_para("Completely different content here", 1.0),
+        ];
+        let result = deduplicate_paras(nodes);
+        assert_eq!(result.len(), 2, "dissimilar paragraphs must be kept");
+    }
+
+    // ── R8: Prune cap tests ───────────────────────────────────────────────
+
+    #[test]
+    fn prune_caps_at_40_percent() {
+        // 10 paragraphs all with importance 0.5 except 2 at 0.6
+        // Without cap, 80% would be removed (all 0.5 ones)
+        // With cap, at most 4 should be removed
+        let mut nodes = vec![];
+        for _ in 0..8 {
+            nodes.push(make_para("medium importance", 0.5));
+        }
+        for _ in 0..2 {
+            nodes.push(make_para("high importance", 0.6));
+        }
+        let result = prune_low_importance(nodes, 0.20);
+        let remaining = result.len();
+        assert!(
+            remaining >= 6,
+            "at least 60% of paragraphs must survive the cap, got {remaining}/10"
+        );
     }
 }

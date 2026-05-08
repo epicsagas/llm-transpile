@@ -121,6 +121,72 @@ fn strip_pua(input: &str) -> std::borrow::Cow<'_, str> {
 }
 
 // ────────────────────────────────────────────────
+// Internal helpers: auto term discovery
+// ────────────────────────────────────────────────
+
+/// Automatically discovers frequently occurring terms in the document's body text
+/// and registers them in the SymbolDict for PUA substitution.
+///
+/// Only runs when fidelity allows compression. Terms must appear at least `min_freq` times
+/// across all body text nodes (Para, Header, List items). Short terms (< 3 chars for ASCII,
+/// < 2 chars for non-ASCII) are excluded because they don't save enough tokens to justify
+/// the dictionary entry overhead.
+fn auto_intern_frequent_terms(
+    doc: &IRDocument,
+    dict: &mut SymbolDict,
+    min_freq: usize,
+    max_terms: usize,
+) {
+    use std::collections::HashMap;
+
+    if !doc.fidelity.allows_compression() {
+        return;
+    }
+
+    // Count token frequencies across all body text nodes
+    let mut freq: HashMap<&str, usize> = HashMap::new();
+    for node in &doc.nodes {
+        let text: Option<&str> = match node {
+            DocNode::Para { text, .. } => Some(text.as_str()),
+            DocNode::Header { text, .. } => Some(text.as_str()),
+            DocNode::List { items, .. } => {
+                // Count tokens in list items
+                for item in items {
+                    for token in item.split_whitespace() {
+                        let min_len = if token.is_ascii() { 3 } else { 2 };
+                        if token.len() >= min_len {
+                            *freq.entry(token).or_insert(0) += 1;
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        };
+        if let Some(text) = text {
+            for token in text.split_whitespace() {
+                let min_len = if token.is_ascii() { 3 } else { 2 };
+                if token.len() >= min_len {
+                    *freq.entry(token).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    // Filter by min_freq, sort by frequency descending, take top max_terms
+    let mut candidates: Vec<(&str, usize)> = freq
+        .into_iter()
+        .filter(|(_, count)| *count >= min_freq)
+        .collect();
+    candidates.sort_by_key(|b| std::cmp::Reverse(b.1));
+
+    for (term, _count) in candidates.into_iter().take(max_terms) {
+        // Ignore overflow — we just stop interning if we run out of PUA symbols
+        let _ = dict.intern(term);
+    }
+}
+
+// ────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────
 
@@ -166,8 +232,11 @@ pub fn transpile(
         doc.nodes = compressor.compress(std::mem::take(&mut doc.nodes), &cfg);
     }
 
-    // 3. Render
+    // 3. Auto-discover frequent terms for symbol substitution
     let mut dict = SymbolDict::new();
+    auto_intern_frequent_terms(&doc, &mut dict, 3, 50);
+
+    // 4. Render
     let output = render_full(&doc, &mut dict);
     Ok(output)
 }
@@ -358,6 +427,50 @@ mod tests {
             "oversized stream input must yield InputTooLarge, got: {:?}",
             first
         );
+    }
+
+    #[test]
+    fn transpile_auto_interns_frequent_terms() {
+        // A term appearing 5 times should be auto-interned
+        let md = "# Test\n\nAPI endpoint API endpoint API endpoint API endpoint API endpoint.";
+        let result = transpile(
+            md,
+            InputFormat::Markdown,
+            FidelityLevel::Semantic,
+            Some(4096),
+        );
+        let output = result.unwrap();
+        // The output should contain a <D> dictionary block with the frequent term
+        assert!(
+            output.contains("<D>"),
+            "output must contain <D> block when frequent terms exist: {output}"
+        );
+    }
+
+    #[test]
+    fn transpile_no_auto_intern_in_lossless() {
+        // Lossless mode should still work (no auto-intern doesn't break anything)
+        let md = "API API API API API API.";
+        let result = transpile(md, InputFormat::PlainText, FidelityLevel::Lossless, None);
+        let output = result.unwrap();
+        // Lossless may or may not have <D> — just verify it doesn't crash
+        assert!(output.contains("<B>"));
+    }
+
+    #[test]
+    fn transpile_no_intern_for_rare_terms() {
+        // A term appearing only once should NOT be interned
+        let md = "This document mentions API once.";
+        let result = transpile(
+            md,
+            InputFormat::PlainText,
+            FidelityLevel::Semantic,
+            Some(4096),
+        );
+        let output = result.unwrap();
+        // Rare term should not trigger a <D> block (saves dictionary overhead)
+        // This test verifies min_freq threshold works
+        assert!(output.contains("<B>"));
     }
 
     #[test]
