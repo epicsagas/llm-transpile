@@ -18,7 +18,7 @@ The file extension alone triggers this. No size check needed.
 ## Usage
 
 ```bash
-transpile --input <file> --fidelity semantic --quiet
+TRANSPILE_AGENT=cursor transpile --input <file> --fidelity semantic --quiet
 ```
 
 ## Fidelity options
