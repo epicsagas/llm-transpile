@@ -69,7 +69,8 @@ llm-transpile = "0.1"
 
 ```bash
 # Homebrew (macOS)
-brew install epicsagas/tap/llm-transpile
+brew tap epicsagas/tap
+brew install llm-transpile
 
 # पूर्व-निर्मित बाइनरी (तेज़, बिना संकलन के)
 cargo binstall llm-transpile

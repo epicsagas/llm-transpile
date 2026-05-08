@@ -1,3 +1,4 @@
+<div align="center">
 # llm-transpile
 
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
@@ -8,7 +9,9 @@
 
 **Token-optimized document transpiler for LLM pipelines**
 
-[한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+[한국어](docs/i18n/README.ko.md) · [日本語](docs/i18n/README.ja.md) · [中文](docs/i18n/README.zh.md) · [Español](docs/i18n/README.es.md) · [Français](docs/i18n/README.fr.md) · [Deutsch](docs/i18n/README.de.md) · [Português](docs/i18n/README.pt.md) · [Русский](docs/i18n/README.ru.md) · [العربية](docs/i18n/README.ar.md) · [हिन्दी](docs/i18n/README.hi.md)
+
+</div>
 
 Raw documents (Markdown, HTML, plain text) → structured bridge format `<D>?<H><B>` — with adaptive compression that keeps you under token budget.
 
@@ -27,7 +30,8 @@ This agreement is made between Licensor and Licensee.
 
 ---
 
-## Table of Contents
+<details>
+<summary>Table of Contents</summary>
 
 - [Why](#why)
 - [Installation](#installation)
@@ -42,6 +46,8 @@ This agreement is made between Licensor and Licensee.
 - [Performance](#performance)
 - [Contributing](#contributing)
 - [License](#license)
+
+</details>
 
 ---
 
@@ -73,8 +79,15 @@ Requires **Rust 1.92+**.
 ### CLI binary + tool integration
 
 ```bash
+# One-line install (macOS / Linux)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+
+# One-line install (Windows PowerShell)
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+
 # Homebrew (macOS)
-brew install epicsagas/tap/llm-transpile
+brew tap epicsagas/tap
+brew install llm-transpile
 
 # Pre-built binary (faster, no compile)
 cargo binstall llm-transpile

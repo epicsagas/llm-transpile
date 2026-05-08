@@ -69,7 +69,8 @@ llm-transpile = "0.1"
 
 ```bash
 # Homebrew (macOS)
-brew install epicsagas/tap/llm-transpile
+brew tap epicsagas/tap
+brew install llm-transpile
 
 # 预构建二进制文件（更快，无需编译）
 cargo binstall llm-transpile

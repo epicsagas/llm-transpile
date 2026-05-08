@@ -129,6 +129,8 @@ jobs:
             transpile-*.tar.gz
             transpile-*.zip
             sbom.spdx.json
+            install.sh
+            install.ps1
 
   publish-crates:
     name: Publish to crates.io

@@ -69,7 +69,8 @@ Requiere **Rust 1.75+**.
 
 ```bash
 # Homebrew (macOS)
-brew install epicsagas/tap/llm-transpile
+brew tap epicsagas/tap
+brew install llm-transpile
 
 # Binario precompilado (más rápido, sin compilar)
 cargo binstall llm-transpile
