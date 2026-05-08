@@ -25,8 +25,8 @@ Dieser Vertrag wird zwischen dem Lizenzgeber und dem Lizenznehmer geschlossen.
 
 ---
 
-## Inhaltsverzeichnis
-
+<details>
+<summary>Inhaltsverzeichnis</summary>
 - [Warum](#warum)
 - [Installation](#installation)
 - [CLI-Nutzung](#cli-nutzung)
@@ -39,6 +39,7 @@ Dieser Vertrag wird zwischen dem Lizenzgeber und dem Lizenznehmer geschlossen.
 - [Leistung](#leistung)
 - [Mitwirken](#mitwirken)
 - [Lizenz](#lizenz)
+</details>
 
 ---
 

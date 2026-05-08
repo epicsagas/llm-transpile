@@ -25,8 +25,8 @@ Este acordo é celebrado entre o Licenciante e o Licenciado.
 
 ---
 
-## Índice
-
+<details>
+<summary>Índice</summary>
 - [Por quê](#por-quê)
 - [Instalação](#instalação)
 - [Uso do CLI](#uso-do-cli)
@@ -39,6 +39,7 @@ Este acordo é celebrado entre o Licenciante e o Licenciado.
 - [Desempenho](#desempenho)
 - [Contribuir](#contribuir)
 - [Licença](#licença)
+</details>
 
 ---
 

@@ -25,8 +25,8 @@ Este acuerdo se celebra entre el Licenciante y el Licenciatario.
 
 ---
 
-## Tabla de contenidos
-
+<details>
+<summary>Tabla de contenidos</summary>
 - [Por qué](#por-qué)
 - [Instalación](#instalación)
 - [Uso de CLI](#uso-de-cli)
@@ -39,6 +39,7 @@ Este acuerdo se celebra entre el Licenciante y el Licenciatario.
 - [Rendimiento](#rendimiento)
 - [Contribuir](#contribuir)
 - [Licencia](#licencia)
+</details>
 
 ---
 

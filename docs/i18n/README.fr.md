@@ -25,8 +25,8 @@ Le présent accord est conclu entre le Donneur de licence et le Preneur de licen
 
 ---
 
-## Table des matières
-
+<details>
+<summary>Table des matières</summary>
 - [Pourquoi](#pourquoi)
 - [Installation](#installation)
 - [Utilisation CLI](#utilisation-cli)
@@ -39,6 +39,7 @@ Le présent accord est conclu entre le Donneur de licence et le Preneur de licen
 - [Performance](#performance)
 - [Contribuer](#contribuer)
 - [Licence](#licence)
+</details>
 
 ---
 
