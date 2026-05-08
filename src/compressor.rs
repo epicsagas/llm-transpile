@@ -1022,10 +1022,7 @@ mod tests {
     #[test]
     fn first_sentence_us_pronoun_not_abbreviation() {
         // "us" as a pronoun should NOT be treated as an abbreviation
-        assert_eq!(
-            first_sentence("Tell us. We will respond."),
-            "Tell us."
-        );
+        assert_eq!(first_sentence("Tell us. We will respond."), "Tell us.");
     }
 
     #[test]
