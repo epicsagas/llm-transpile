@@ -548,7 +548,18 @@ fn is_abbreviation_or_decimal(text: &str, pos: usize) -> bool {
         return false;
     }
 
-    ABBREVIATIONS.contains(&cleaned.as_str())
+    if !ABBREVIATIONS.contains(&cleaned.as_str()) {
+        return false;
+    }
+
+    // Guard: "us" as a standalone word (the pronoun) should not be treated as
+    // an abbreviation. Only accept it when the extended token contains internal
+    // periods (i.e., it's "U.S." not "us").
+    if cleaned == "us" && !extended.contains('.') {
+        return false;
+    }
+
+    true
 }
 
 // ────────────────────────────────────────────────
@@ -1005,6 +1016,15 @@ mod tests {
         assert_eq!(
             first_sentence("This costs $3.50 per unit. Total is $350."),
             "This costs $3.50 per unit."
+        );
+    }
+
+    #[test]
+    fn first_sentence_us_pronoun_not_abbreviation() {
+        // "us" as a pronoun should NOT be treated as an abbreviation
+        assert_eq!(
+            first_sentence("Tell us. We will respond."),
+            "Tell us."
         );
     }
 
