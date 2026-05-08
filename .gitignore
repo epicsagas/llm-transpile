@@ -212,5 +212,6 @@ secrets.*
 *_secret.*
 credentials.*
 *.local.json
+.claude/
 .harness/
 eval/.tmp/
