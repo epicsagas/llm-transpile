@@ -62,7 +62,7 @@ clap       = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
 tokio     = { version = "1", features = ["full", "test-util"] }
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.tar.gz"
