@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-09
+
+### Added
+
+- Abbreviation-aware `first_sentence` — skips periods in Dr., U.S., e.g., i.e., Fig., etc.
+- PUA character token estimation (cpt=1) in heuristic estimator
+- Auto-discovery of frequent terms for SymbolDict substitution (min_freq=3, max_terms=50)
+- Header-body duplicate text removal (Semantic/Compressed modes)
+- Code block comment stripping and blank line collapsing (Semantic+ fidelity)
+- Jaccard similarity-based fuzzy paragraph dedup (threshold ≥ 0.85)
+- 40% cap on paragraph pruning to prevent over-removal
+
+### Fixed
+
+- "us" pronoun no longer confused with "U.S." abbreviation
+- Duplicate Korean stopword "다만" removed
+- `dtolnay/rust-toolchain` missing required `toolchain` input in CI workflows
+- `anchore/sbom-action` pinned SHA no longer resolvable (updated to v0.24.0)
+
+### Changed
+
+- Bump tiktoken-rs from 0.5.9 to 0.11.0
+- Bump criterion from 0.5.1 to 0.8.2
+
 ## [0.1.5] - 2026-04-13
 
 ### Added
@@ -72,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Evaluation suite with 37 documents across 15 languages
 - Apache-2.0 license
 
+[0.2.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.0
 [0.1.5]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.1.5
 [0.1.4]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.1.4
 [0.1.3]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.1.3
