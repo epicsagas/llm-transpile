@@ -23,6 +23,16 @@ exclude      = [
     "eval/quality_bench_results.json",
 ]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.zip"
+pkg-fmt = "zip"
+bin-dir = "transpile.exe"
+
 [package.metadata.wix]
 upgrade-guid = "113D8780-6A48-4BA3-8FC0-3613FE1661AB"
 path-guid = "237664C0-D802-4791-8C8F-F34B342447DA"
