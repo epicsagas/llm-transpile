@@ -22,7 +22,7 @@ targets = [
   "aarch64-pc-windows-msvc",
 ]
 # Publish jobs to run in CI
-publish-jobs = ["homebrew"]
+publish-jobs = ["homebrew", "cargo"]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs
 auto-includes = true
 # Whether to enable GitHub Attestations
