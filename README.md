@@ -80,24 +80,22 @@ Requires **Rust 1.92+**.
 ### CLI binary + tool integration
 
 ```bash
-# One-line install (macOS / Linux)
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+# macOS / Linux — pre-built binary, no Rust required
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/llm-transpile/releases/latest/download/llm-transpile-installer.sh | sh
 
-# One-line install (Windows PowerShell)
-irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+# Windows — pre-built binary, no Rust required
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/llm-transpile-installer.ps1 | iex
 
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+# Homebrew (macOS / Linux)
+brew install epicsagas/tap/llm-transpile
 
-# Scoop (Windows)
-scoop bucket add epicsagas https://github.com/epicsagas/scoop-bucket
-scoop install llm-transpile
+# Scoop (Windows, no admin required)
+scoop bucket add epicsagas https://github.com/epicsagas/scoop-bucket && scoop install llm-transpile
 
-# Pre-built binary (faster, no compile)
+# cargo-binstall — pre-built binary via Rust toolchain
 cargo binstall llm-transpile
 
-# From crates.io
+# cargo install — build from source (requires Rust toolchain)
 cargo install llm-transpile
 ```
 
@@ -154,12 +152,12 @@ transpile install
 
 | Method | Command |
 |--------|---------|
+| curl installer (macOS/Linux) | Re-run the install script above |
+| PowerShell installer (Windows) | Re-run the install command above |
 | Homebrew | `brew upgrade llm-transpile` |
 | Scoop | `scoop update llm-transpile` |
 | cargo binstall | `cargo binstall llm-transpile@latest` |
 | cargo install | `cargo install llm-transpile@latest` |
-| curl installer (macOS/Linux) | Re-run the install script |
-| PowerShell installer (Windows) | Re-run the install command |
 
 Verify the installed version:
 
