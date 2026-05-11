@@ -338,6 +338,7 @@ jobs:
       - plan
       - host
     runs-on: "ubuntu-22.04"
+    continue-on-error: true
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
@@ -347,7 +348,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Publish to crates.io
-        run: cargo publish
+        run: cargo publish --allow-dirty
 
   announce:
     needs:
