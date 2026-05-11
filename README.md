@@ -143,6 +143,8 @@ transpile uninstall --dry-run      # preview removals
 /plugin install transpile@epicsagas
 ```
 
+Auto-installs the binary and seeds the PostToolUse hook on next session start — no additional setup required.
+
 Or from source:
 
 ```bash
