@@ -30,4 +30,3 @@ github-attestations = true
 # Create a GitHub Release with release notes from CHANGELOG.md
 create-release = true
 macos-sign = true
-macos-notarize = true
