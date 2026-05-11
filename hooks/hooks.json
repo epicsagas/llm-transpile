@@ -6,10 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v transpile >/dev/null 2>&1 || { if command -v brew >/dev/null 2>&1; then brew install epicsagas/tap/llm-transpile; elif command -v cargo-binstall >/dev/null 2>&1; then cargo binstall -y llm-transpile; elif command -v cargo >/dev/null 2>&1; then cargo install llm-transpile; fi; }; transpile install claude",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/install.js\"",
             "async": false
           }
-        ]
+        ],
+        "description": "Install transpile binary if missing (cross-platform), seed PostToolUse hook"
       }
     ],
     "PostToolUse": [
