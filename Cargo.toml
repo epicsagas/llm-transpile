@@ -8,6 +8,7 @@ license      = "Apache-2.0"
 readme       = "README.md"
 repository   = "https://github.com/epicsagas/llm-transpile"
 homepage     = "https://github.com/epicsagas/llm-transpile"
+authors      = ["epicsagas"]
 keywords     = ["llm", "tokenizer", "markdown", "compression", "rag"]
 categories   = ["text-processing", "command-line-utilities", "encoding"]
 autobins     = false
@@ -21,6 +22,12 @@ exclude      = [
     "eval/quality_bench.py",
     "eval/quality_bench_results.json",
 ]
+
+[package.metadata.wix]
+upgrade-guid = "113D8780-6A48-4BA3-8FC0-3613FE1661AB"
+path-guid = "237664C0-D802-4791-8C8F-F34B342447DA"
+license = false
+eula = false
 
 # ── Feature flags ──────────────────────────────────────────────────────────────
 # tiktoken: enables accurate token counting via OpenAI's cl100k_base tokenizer.
@@ -64,20 +71,6 @@ clap       = { version = "4", features = ["derive"] }
 tokio     = { version = "1", features = ["full", "test-util"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.tar.gz"
-pkg-fmt = "tgz"
-bin-dir = "transpile"
-
-[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
-pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.zip"
-pkg-fmt = "zip"
-bin-dir = "transpile.exe"
-
-[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
-pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.zip"
-pkg-fmt = "zip"
-bin-dir = "transpile.exe"
 
 [profile.release]
 opt-level = 3
@@ -85,6 +78,11 @@ lto = true
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
 
 [[bin]]
 name = "transpile"
