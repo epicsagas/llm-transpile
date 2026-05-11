@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **LLM 파이프라인을 위한 토큰 최적화 문서 트랜스파일러**
@@ -29,7 +29,9 @@ k: [라이선스, 계약, 소프트웨어]
 <summary>목차</summary>
 - [왜 사용하는가](#왜-사용하는가)
 - [설치](#설치)
+- [업데이트](#업데이트)
 - [CLI 사용법](#cli-사용법)
+- [사용 통계](#사용-통계)
 - [라이브러리 사용법](#라이브러리-사용법)
 - [출력 포맷](#출력-포맷)
 - [충실도 수준](#충실도-수준)
@@ -47,11 +49,13 @@ k: [라이선스, 계약, 소프트웨어]
 
 LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. 이 라이브러리가 기계적인 작업을 대신 처리합니다:
 
-- **구조적 파싱** — Markdown/HTML/일반 텍스트 → 타입이 지정된 IR 노드(제목, 단락, 표, 목록, 코드 블록)
-- **적응형 압축** — 토큰 예산이 소진될수록 4단계를 자동으로 에스컬레이션
-- **심볼 치환** — 반복되는 도메인 용어 → 유니코드 PUA 문자, `<D>` 사전 헤더로 복원
-- **표 선형화** — Markdown 표 → 간결한 `Key:Val` 시퀀스(≤5행) 또는 파이프 구분 행(`h1|h2\nv1|v2`)
-- **스트리밍 출력** — Tokio 스트림이 첫 번째 청크를 즉시 전달해 TTFT 최소화
+| | 기능 | 중요한 이유 |
+|--|------|------------|
+| 🏗️ | **구조적 파싱** | Markdown/HTML/일반 텍스트 → 타입이 지정된 IR 노드(제목, 단락, 표, 목록, 코드 블록) |
+| 📉 | **적응형 압축** | 토큰 예산이 소진될수록 4단계를 자동으로 에스컬레이션 |
+| 🔣 | **심볼 치환** | 반복되는 도메인 용어 → 유니코드 PUA 문자, `<D>` 사전 헤더로 복원 |
+| 📊 | **표 선형화** | Markdown 표 → 간결한 `Key:Val`(≤5행) 또는 파이프 구분 행으로 변환 |
+| 🌊 | **스트리밍 출력** | Tokio 스트림이 첫 번째 청크를 즉시 전달해 TTFT 최소화 |
 
 ---
 
@@ -64,20 +68,34 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 llm-transpile = "0.1"
 ```
 
-**Rust 1.75+** 필요.
+**Rust 1.92+** 필요.
 
 ### CLI 바이너리 + 도구 연동
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# 사전 빌드 바이너리 (컴파일 없이 빠르게)
-cargo binstall llm-transpile
+Homebrew가 없다면 설치 스크립트를 사용하세요:
 
-# crates.io에서 설치
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Rust 도구 체인**
+
+```bash
+cargo binstall llm-transpile   # 사전 빌드 바이너리 (빠름)
+cargo install llm-transpile    # 소스에서 빌드
 ```
 
 도구 연동 설정:
@@ -95,6 +113,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
 | **Cursor** | `.mdc` 규칙 (`alwaysApply`) | 문서 파일 읽기 전 `transpile` 실행 |
 | **OpenCode** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
+
+Claude Code가 아닌 모든 도구는 LLM이 `TRANSPILE_AGENT=<agent> transpile --input <file>`을 자동으로 실행하도록 가이드하는 스킬 파일을 사용합니다. 크기 검사가 필요 없으며, 확장자만으로 트리거됩니다.
 
 **선택적 설치 / 제거**
 
@@ -116,6 +136,8 @@ transpile uninstall --dry-run      # 제거 미리보기
 /plugin install transpile@epicsagas
 ```
 
+다음 세션 시작 시 바이너리를 자동 설치하고 PostToolUse 훅을 구성합니다 — 추가 설정이 필요 없습니다.
+
 소스에서 설치:
 
 ```bash
@@ -123,6 +145,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## 업데이트
+
+| 방법 | 명령어 |
+|--------|---------|
+| Homebrew | `brew upgrade llm-transpile` |
+| curl / PowerShell 설치 | 위의 설치 명령어 재실행 |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -136,7 +173,7 @@ Options:
   -i, --input <FILE>       입력 파일 경로 (생략 시 stdin에서 읽음)
   -f, --format <FORMAT>    입력 포맷: markdown | html | plaintext  [기본값: markdown]
                            --input 사용 시 파일 확장자로 자동 감지
-  -l, --fidelity <LEVEL>  압축 수준: lossless | semantic | compressed  [기본값: semantic]
+  -l, --fidelity <LEVEL>   압축 수준: lossless | semantic | compressed  [기본값: semantic]
   -b, --budget <N>         토큰 예산 상한 (생략 시 무제한)
   -c, --count              입력 토큰 수만 출력하고 종료
   -j, --json               JSON 형식으로 출력 {input_tok, output_tok, reduction_pct, content}
@@ -174,7 +211,54 @@ transpile --input contract.md --fidelity lossless
 transpile --input article.md --fidelity compressed --budget 512
 ```
 
-> 통계(`[273 → 150 tok  45.1% reduction]`)는 기본적으로 **stderr**로 출력되어 stdout은 파이프용으로 깨끗하게 유지됩니다. `--quiet`로 숨기거나 `--stats`로 stdout에 출력할 수 있습니다.
+> 통계(`[273 → 150 tok  45.1% reduction]`)는 기본적으로 **stderr**로 출력되어 stdout은 파이프용으로 깔끔하게 유지됩니다. `--quiet`로 숨기거나 `--stats`로 stdout에 출력할 수 있습니다.
+
+---
+
+## 사용 통계
+
+`transpile`을 실행할 때마다 `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`에 레코드가 자동으로 추가됩니다. `transpile stats` 서브커맨드로 해당 파일을 읽어 요약 테이블을 출력합니다.
+
+```
+transpile stats                # 오늘
+transpile stats --days 7       # 최근 N일
+transpile stats --agent claude # 에이전트별 필터
+```
+
+출력 예시:
+
+```
+transpile stats — 최근 7일
+
+  날짜       에이전트    호출   입력 tok   출력 tok   절약    축소율
+  ──────────────────────────────────────────────────────────────────
+  2026-04-13  claude       5     14 965      10 872   4 093     27.3%
+  2026-04-13  gemini       2      4 800       3 500   1 300     27.1%
+  ──────────────────────────────────────────────────────────────────
+  Total                    7     19 765       14 372   5 393     27.3%
+```
+
+**JSONL 레코드 필드**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `ts` | ISO 8601 | 실행 타임스탬프 |
+| `agent` | 문자열 | 호출을 트리거한 도구 (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | 문자열 | 입력 파일 경로 (stdin 읽기 시 빈 값) |
+| `format` | 문자열 | `markdown`, `html`, 또는 `plaintext` |
+| `fidelity` | 문자열 | `lossless`, `semantic`, 또는 `compressed` |
+| `input_tok` | 정수 | 트랜스파일 전 토큰 수 |
+| `output_tok` | 정수 | 트랜스파일 후 토큰 수 |
+| `reduction_pct` | 실수 | 절약된 토큰 비율 |
+| `saved` | 정수 | 절약된 절대 토큰 수 (`input_tok − output_tok`) |
+
+**`TRANSPILE_AGENT` 환경변수**
+
+`agent` 필드는 `TRANSPILE_AGENT` 환경변수에서 가져옵니다. 각 연동 도구가 자동으로 설정합니다(`claude`, `gemini`, `codex`, `opencode`, `cursor`). 수동으로 설정할 수도 있습니다:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -218,7 +302,7 @@ while let Some(chunk) = stream.next().await {
 ### 토큰 수 추정
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -283,7 +367,7 @@ k: [키워드1, 키워드2]
 ## 에러 처리
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* 출력 사용 */ }
@@ -319,31 +403,7 @@ cargo run --release --example eval
 
 ## 기여
 
-버그 리포트, 기능 요청, 풀 리퀘스트 모두 환영합니다.
-
-```bash
-# 클론 및 빌드
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# 테스트 실행
-cargo test
-
-# 벤치마크 실행 (HTML 리포트 → target/criterion/)
-cargo bench
-
-# 린트 및 포맷
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**가이드라인**
-
-- MSRV를 Rust 1.75로 유지 — 이후에 도입된 기능 사용 금지.
-- 새로운 압축 동작이 `Lossless` 모드에 영향을 주어서는 안 됩니다.
-- 각 PR에는 관련 모듈(`ir`, `compressor`, `symbol`, `renderer`)의 새 로직에 대한 테스트를 포함해야 합니다.
-- 제출 전 `cargo clippy -- -D warnings`와 `cargo fmt`를 실행하세요.
+자세한 가이드라인은 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 참조하세요. PR 환영 — `good first issue` 라벨이 있는 오픈 이슈를 확인해 보세요.
 
 ---
 

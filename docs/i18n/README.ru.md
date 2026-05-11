@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **Оптимизированный по токенам транспилятор документов для LLM-конвейеров**
@@ -30,7 +30,9 @@ k: [лицензия, договор, программное обеспечен�
 
 - [Зачем использовать](#зачем-использовать)
 - [Установка](#установка)
+- [Обновление](#обновление)
 - [Использование CLI](#использование-cli)
+- [Статистика использования](#статистика-использования)
 - [Использование библиотеки](#использование-библиотеки)
 - [Формат вывода](#формат-вывода)
 - [Уровни точности](#уровни-точности)
@@ -48,11 +50,13 @@ k: [лицензия, договор, программное обеспечен�
 
 LLM работают лучше, когда контекст чистый и плотный. Эта библиотека берёт на себя механическую работу:
 
-- **Структурный разбор** — Markdown/HTML/обычный текст → типизированные IR-узлы (заголовки, абзацы, таблицы, списки, блоки кода)
-- **Адаптивное сжатие** — автоматически переходит через 4 стадии по мере заполнения токенного бюджета
-- **Замена символов** — повторяющиеся термины предметной области → символы Unicode PUA, декодируемые заголовком словаря `<D>`
-- **Линеаризация таблиц** — таблицы Markdown → компактные последовательности `Key:Val` (≤5 строк) или строки через pipe для больших таблиц
-- **Потоковый вывод** — поток Tokio доставляет первый блок немедленно, минимизируя TTFT
+| | Функция | Почему это важно |
+|--|---------|------------------|
+| 🏗️ | **Структурный разбор** | Markdown/HTML/обычный текст → типизированные IR-узлы (заголовки, абзацы, таблицы, списки, блоки кода) |
+| 📉 | **Адаптивное сжатие** | Автоматически переходит через 4 стадии по мере заполнения токенного бюджета |
+| 🔣 | **Замена символов** | Повторяющиеся термины предметной области → символы Unicode PUA, декодируемые заголовком словаря `<D>` |
+| 📊 | **Линеаризация таблиц** | Таблицы Markdown → компактные последовательности `Key:Val` (≤5 строк) или строки через pipe для больших таблиц |
+| 🌊 | **Потоковый вывод** | Поток Tokio доставляет первый блок немедленно, минимизируя TTFT |
 
 ---
 
@@ -65,20 +69,34 @@ LLM работают лучше, когда контекст чистый и п�
 llm-transpile = "0.1"
 ```
 
-Требуется **Rust 1.75+**.
+Требуется **Rust 1.92+**.
 
 ### CLI-бинарник + интеграция инструментов
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# Готовый бинарник (быстрее, без компиляции)
-cargo binstall llm-transpile
+Нет Homebrew? Используйте скрипт установки:
 
-# Из crates.io
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Через инструментальный цепочку Rust**
+
+```bash
+cargo binstall llm-transpile   # готовый бинарник (быстро)
+cargo install llm-transpile    # сборка из исходного кода
 ```
 
 Настройка интеграций:
@@ -96,6 +114,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
 | **Cursor** | Правило `.mdc` (`alwaysApply`) | Запускает `transpile` перед чтением документов |
 | **OpenCode** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
+
+Все инструменты, кроме Claude, используют файл навыка, который обучает LLM автоматически выполнять `TRANSPILE_AGENT=<agent> transpile --input <file>` — проверка размера не требуется, одного расширения файла достаточно для активации.
 
 **Выборочная установка / удаление**
 
@@ -117,6 +137,8 @@ transpile uninstall --dry-run      # предварительный просмо
 /plugin install transpile@epicsagas
 ```
 
+Бинарник и хук PostToolUse автоматически устанавливаются при следующем запуске сессии — дополнительная настройка не требуется.
+
 Из исходного кода:
 
 ```bash
@@ -124,6 +146,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## Обновление
+
+| Метод | Команда |
+|-------|---------|
+| Homebrew | `brew upgrade llm-transpile` |
+| curl / PowerShell установщик | Повторно выполните команду установки выше |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -176,6 +213,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > Статистика (`[273 → 150 tok  45.1% reduction]`) по умолчанию выводится в **stderr**, чтобы stdout оставался чистым для pipe. Используйте `--quiet` для подавления или `--stats` для перенаправления в stdout.
+
+---
+
+## Статистика использования
+
+Каждый вызов `transpile` автоматически добавляет запись в `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. Подкоманда `transpile stats` считывает эти файлы и выводит сводную таблицу.
+
+```
+transpile stats                # за сегодня
+transpile stats --days 7       # за последние N дней
+transpile stats --agent claude # фильтр по агенту
+```
+
+Пример вывода:
+
+```
+transpile stats — за последние 7 дней
+
+  Дата        Агент      Вызовы  Вход. токены  Выход. токены  Сэкономлено  Сокращение
+  ──────────────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude         5      14 965        10 872        4 093       27.3%
+  2026-04-13  gemini         2       4 800         3 500        1 300       27.1%
+  ──────────────────────────────────────────────────────────────────────────────────
+  Итого                      7      19 765        14 372        5 393       27.3%
+```
+
+**Поля записи JSONL**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `ts` | ISO 8601 | Временная метка вызова |
+| `agent` | строка | Инструмент, инициировавший вызов (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | строка | Путь к входному файлу (пусто при чтении из stdin) |
+| `format` | строка | `markdown`, `html` или `plaintext` |
+| `fidelity` | строка | `lossless`, `semantic` или `compressed` |
+| `input_tok` | целое | Количество токенов до транспиляции |
+| `output_tok` | целое | Количество токенов после транспиляции |
+| `reduction_pct` | число | Процент сэкономленных токенов |
+| `saved` | целое | Абсолютное количество сэкономленных токенов (`input_tok − output_tok`) |
+
+**Переменная окружения `TRANSPILE_AGENT`**
+
+Поле `agent` заполняется из переменной окружения `TRANSPILE_AGENT`. Каждая интеграция устанавливает её автоматически (`claude`, `gemini`, `codex`, `opencode`, `cursor`). Также можно задать вручную:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -320,34 +404,10 @@ cargo run --release --example eval
 
 ## Участие в разработке
 
-Приветствуются отчёты об ошибках, запросы функций и pull request'ы.
-
-```bash
-# Клонировать и собрать
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# Запустить тесты
-cargo test
-
-# Запустить бенчмарки (HTML-отчёт → target/criterion/)
-cargo bench
-
-# Линтинг и форматирование
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**Рекомендации**
-
-- Поддерживать MSRV на уровне Rust 1.75 — избегать функций, введённых после этой версии.
-- Новое поведение сжатия не должно влиять на режим `Lossless`.
-- Каждый PR должен включать тесты для новой логики в соответствующем модуле (`ir`, `compressor`, `symbol`, `renderer`).
-- Перед отправкой выполнить `cargo clippy -- -D warnings` и `cargo fmt`.
+См. [CONTRIBUTING.md](../../CONTRIBUTING.md) для полных рекомендаций. PR приветствуются — см. открытые issues с меткой `good first issue`.
 
 ---
 
 ## Лицензия
 
-Apache-2.0 — см. [LICENSE](LICENSE).
+Apache-2.0 — см. [LICENSE](../../LICENSE).

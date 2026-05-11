@@ -3,12 +3,12 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
-**Transpilateur de documents optimisé en tokens pour les pipelines LLM**
+**Transpilateur de documents optimise en tokens pour les pipelines LLM**
 
-Documents bruts (Markdown, HTML, texte brut) → format pont structuré `<D>?<H><B>` — avec compression adaptative pour rester dans le budget de tokens.
+Documents bruts (Markdown, HTML, texte brut) → format pont structure `<D>?<H><B>` — avec compression adaptative pour rester dans le budget de tokens.
 
 ```
 <H>
@@ -29,7 +29,9 @@ Le présent accord est conclu entre le Donneur de licence et le Preneur de licen
 <summary>Table des matières</summary>
 - [Pourquoi](#pourquoi)
 - [Installation](#installation)
+- [Mise à jour](#mise-à-jour)
 - [Utilisation CLI](#utilisation-cli)
+- [Statistiques d'utilisation](#statistiques-dutilisation)
 - [Utilisation de la bibliothèque](#utilisation-de-la-bibliothèque)
 - [Format de sortie](#format-de-sortie)
 - [Niveaux de fidélité](#niveaux-de-fidélité)
@@ -47,11 +49,13 @@ Le présent accord est conclu entre le Donneur de licence et le Preneur de licen
 
 Les LLM fonctionnent mieux lorsque le contexte est propre et dense. Cette bibliothèque gère le travail mécanique :
 
-- **Analyse structurelle** — Markdown/HTML/texte brut → nœuds IR typés (titres, paragraphes, tableaux, listes, blocs de code)
-- **Compression adaptative** — monte automatiquement en 4 étapes au fur et à mesure que le budget de tokens se remplit
-- **Substitution de symboles** — termes de domaine répétés → caractères Unicode PUA, décodés par l'en-tête de dictionnaire `<D>`
-- **Linéarisation des tableaux** — tableaux Markdown → séquences compactes `Key:Val` (≤5 lignes) ou lignes séparées par des pipes pour les grands tableaux
-- **Sortie en streaming** — le flux Tokio livre le premier bloc immédiatement, minimisant le TTFT
+| | Fonctionnalité | Pourquoi c'est important |
+|--|----------------|--------------------------|
+| 🏗️ | **Analyse structurelle** | Markdown/HTML/texte brut → nœuds IR typés (titres, paragraphes, tableaux, listes, blocs de code) |
+| 📉 | **Compression adaptative** | Monte automatiquement en 4 étapes au fur et à mesure que le budget de tokens se remplit |
+| 🔣 | **Substitution de symboles** | Termes de domaine répétés → caractères Unicode PUA, décodés par l'en-tête de dictionnaire `<D>` |
+| 📊 | **Linéarisation des tableaux** | Tableaux Markdown → séquences compactes `Key:Val` (≤5 lignes) ou lignes séparées par des pipes pour les grands tableaux |
+| 🌊 | **Sortie en streaming** | Le flux Tokio livre le premier bloc immédiatement, minimisant le TTFT |
 
 ---
 
@@ -64,20 +68,34 @@ Les LLM fonctionnent mieux lorsque le contexte est propre et dense. Cette biblio
 llm-transpile = "0.1"
 ```
 
-Requiert **Rust 1.75+**.
+Requiert **Rust 1.92+**.
 
 ### Binaire CLI + intégration d'outils
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# Binaire précompilé (plus rapide, sans compilation)
-cargo binstall llm-transpile
+Pas de Homebrew ? Utilisez le script d'installation :
 
-# Depuis crates.io
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Via la toolchain Rust**
+
+```bash
+cargo binstall llm-transpile   # binaire précompilé (rapide)
+cargo install llm-transpile    # compiler depuis les sources
 ```
 
 Configurer les intégrations d'outils :
@@ -95,6 +113,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | Le LLM invoque automatiquement `transpile` sur les extensions de fichier |
 | **Cursor** | Règle `.mdc` (`alwaysApply`) | Déclenche `transpile` avant la lecture des fichiers document |
 | **OpenCode** | `SKILL.md` | Le LLM invoque automatiquement `transpile` sur les extensions de fichier |
+
+Tous les outils autres que Claude utilisent un fichier skill qui apprend au LLM à exécuter `TRANSPILE_AGENT=<agent> transpile --input <file>` automatiquement — aucune vérification de taille nécessaire, l'extension seule suffit pour le déclencher.
 
 **Installation / désinstallation sélective**
 
@@ -116,6 +136,8 @@ transpile uninstall --dry-run      # aperçu des suppressions
 /plugin install transpile@epicsagas
 ```
 
+Auto-installe le binaire et configure le hook PostToolUse au prochain démarrage de session — aucune configuration supplémentaire requise.
+
 Depuis les sources :
 
 ```bash
@@ -123,6 +145,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## Mise à jour
+
+| Méthode | Commande |
+|---------|----------|
+| Homebrew | `brew upgrade llm-transpile` |
+| Installateur curl / PowerShell | Relancer la commande d'installation ci-dessus |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -175,6 +212,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > Les statistiques (`[273 → 150 tok  45.1% reduction]`) sont écrites sur **stderr** par défaut, gardant stdout propre pour les pipes. Utilisez `--quiet` pour les supprimer, ou `--stats` pour les rediriger vers stdout.
+
+---
+
+## Statistiques d'utilisation
+
+Chaque invocation de `transpile` ajoute automatiquement un enregistrement à `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. La sous-commande `transpile stats` lit ces fichiers et affiche un tableau récapitulatif.
+
+```
+transpile stats                # aujourd'hui
+transpile stats --days 7       # N derniers jours
+transpile stats --agent claude # filtrer par agent
+```
+
+Exemple de sortie :
+
+```
+transpile stats — 7 derniers jours
+
+  Date        Agent      Appels  Tokens entrée  Tokens sortie  Économisés  Réduction
+  ──────────────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude        5      14 965          10 872       4 093      27.3%
+  2026-04-13  gemini        2       4 800           3 500       1 300      27.1%
+  ──────────────────────────────────────────────────────────────────────────────────
+  Total                     7      19 765          14 372       5 393      27.3%
+```
+
+**Champs de l'enregistrement JSONL**
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `ts` | ISO 8601 | Horodatage de l'invocation |
+| `agent` | string | Outil ayant déclenché l'appel (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | string | Chemin du fichier d'entrée (vide si lecture depuis stdin) |
+| `format` | string | `markdown`, `html`, ou `plaintext` |
+| `fidelity` | string | `lossless`, `semantic`, ou `compressed` |
+| `input_tok` | integer | Nombre de tokens avant transpilation |
+| `output_tok` | integer | Nombre de tokens après transpilation |
+| `reduction_pct` | float | Pourcentage de tokens économisés |
+| `saved` | integer | Tokens économisés en valeur absolue (`input_tok − output_tok`) |
+
+**Variable d'environnement `TRANSPILE_AGENT`**
+
+Le champ `agent` est renseigné depuis la variable d'environnement `TRANSPILE_AGENT`. Chaque intégration la définit automatiquement (`claude`, `gemini`, `codex`, `opencode`, `cursor`). Vous pouvez aussi la définir manuellement :
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -319,31 +403,7 @@ cargo run --release --example eval
 
 ## Contribuer
 
-Les rapports de bugs, demandes de fonctionnalités et pull requests sont les bienvenus.
-
-```bash
-# Cloner et compiler
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# Exécuter les tests
-cargo test
-
-# Exécuter les benchmarks (rapport HTML → target/criterion/)
-cargo bench
-
-# Lint et formatage
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**Directives**
-
-- Maintenir le MSRV à Rust 1.75 — éviter les fonctionnalités introduites après.
-- Les nouveaux comportements de compression ne doivent pas affecter le mode `Lossless`.
-- Chaque PR doit inclure des tests pour toute nouvelle logique dans le module concerné (`ir`, `compressor`, `symbol`, `renderer`).
-- Exécuter `cargo clippy -- -D warnings` et `cargo fmt` avant de soumettre.
+Consultez [CONTRIBUTING.md](../../CONTRIBUTING.md) pour les directives complètes. Les PR sont les bienvenus — consultez les issues ouverts étiquetés `good first issue`.
 
 ---
 

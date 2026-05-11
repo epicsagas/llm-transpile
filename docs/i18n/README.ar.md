@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **محوّل وثائق مُحسَّن للرموز في مسارات LLM**
@@ -25,12 +25,13 @@ k: [ترخيص, عقد, برمجيات]
 
 ---
 
-
 <details>
 <summary> جدول المحتويات </summary>
 - [لماذا](#لماذا)
 - [التثبيت](#التثبيت)
+- [التحديث](#التحديث)
 - [استخدام CLI](#استخدام-cli)
+- [إحصائيات الاستخدام](#إحصائيات-الاستخدام)
 - [استخدام المكتبة](#استخدام-المكتبة)
 - [تنسيق الإخراج](#تنسيق-الإخراج)
 - [مستويات الدقة](#مستويات-الدقة)
@@ -48,11 +49,13 @@ k: [ترخيص, عقد, برمجيات]
 
 تعمل نماذج اللغة الكبيرة بشكل أفضل عندما يكون السياق نظيفاً وكثيفاً. تتولى هذه المكتبة العمل الميكانيكي:
 
-- **التحليل الهيكلي** — Markdown/HTML/نص عادي ← عُقد IR مكتوبة (عناوين، فقرات، جداول، قوائم، كتل برمجية)
-- **الضغط التكيّفي** — يتصاعد تلقائياً عبر 4 مراحل مع امتلاء ميزانية الرموز
-- **استبدال الرموز** — مصطلحات النطاق المتكررة ← أحرف Unicode PUA، يفكّها رأس القاموس `<D>`
-- **تحويل الجداول إلى خطي** — جداول Markdown ← تسلسلات `Key:Val` مضغوطة (≤5 صفوف) أو صفوف مفصولة بـ pipe للجداول الكبيرة
-- **الإخراج المتدفق** — يُسلّم دفق Tokio أول قطعة فوراً، مما يُقلّص TTFT
+| | الميزة | لماذا هي مهمة |
+|--|--------|--------------|
+| 🏗️ | **التحليل الهيكلي** | Markdown/HTML/نص عادي ← عُقد IR مكتوبة (عناوين، فقرات، جداول، قوائم، كتل برمجية) |
+| 📉 | **الضغط التكيّفي** | يتصاعد تلقائياً عبر 4 مراحل مع امتلاء ميزانية الرموز |
+| 🔣 | **استبدال الرموز** | مصطلحات النطاق المتكررة ← أحرف Unicode PUA، يفكّها رأس القاموس `<D>` |
+| 📊 | **تحويل الجداول إلى خطي** | جداول Markdown ← تسلسلات `Key:Val` مضغوطة (≤5 صفوف) أو صفوف مفصولة بـ pipe للجداول الكبيرة |
+| 🌊 | **الإخراج المتدفق** | يُسلّم دفق Tokio أول قطعة فوراً، مما يُقلّص TTFT |
 
 ---
 
@@ -65,20 +68,34 @@ k: [ترخيص, عقد, برمجيات]
 llm-transpile = "0.1"
 ```
 
-يتطلب **Rust 1.75+**.
+يتطلب **Rust 1.92+**.
 
 ### ملف CLI الثنائي + تكامل الأدوات
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# ملف ثنائي جاهز (أسرع، بدون تجميع)
-cargo binstall llm-transpile
+لا تستخدم Homebrew؟ استخدم نص التثبيت:
 
-# من crates.io
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**عبر سلسلة أدوات Rust**
+
+```bash
+cargo binstall llm-transpile   # ملف ثنائي جاهز (أسرع)
+cargo install llm-transpile    # بناء من المصدر
 ```
 
 تهيئة تكاملات الأدوات:
@@ -96,6 +113,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
 | **Cursor** | قاعدة `.mdc` (`alwaysApply`) | يُشغّل `transpile` قبل قراءة ملفات الوثائق |
 | **OpenCode** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
+
+جميع الأدوات غير Claude تستخدم ملف مهارة يُعلّم النموذج تشغيل `TRANSPILE_AGENT=<agent> transpile --input <file>` تلقائياً — لا حاجة لفحص الحجم، الامتداد وحده يُفعّله.
 
 **التثبيت / إلغاء التثبيت الانتقائي**
 
@@ -117,6 +136,8 @@ transpile uninstall --dry-run      # معاينة الإزالات
 /plugin install transpile@epicsagas
 ```
 
+يُثبّت الملف الثنائي ويهيّئ خطاف PostToolUse تلقائياً عند بدء الجلسة التالية — لا حاجة لإعداد إضافي.
+
 من الكود المصدري:
 
 ```bash
@@ -124,6 +145,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## التحديث
+
+| الطريقة | الأمر |
+|---------|-------|
+| Homebrew | `brew upgrade llm-transpile` |
+| مثبّت curl / PowerShell | أعد تشغيل أمر التثبيت أعلاه |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -176,6 +212,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > تُكتب الإحصائيات (`[273 → 150 tok  45.1% reduction]`) في **stderr** افتراضياً، مما يُبقي stdout نظيفاً للتوصيل. استخدم `--quiet` لإخفائها، أو `--stats` لإعادة توجيهها إلى stdout.
+
+---
+
+## إحصائيات الاستخدام
+
+كل استدعاء لـ `transpile` يُضيف تلقائياً سجلاً إلى `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. تقرأ الأوامر الفرعية `transpile stats` هذه الملفات وتطبع جدولاً ملخصاً.
+
+```
+transpile stats                # اليوم
+transpile stats --days 7       # آخر N أيام
+transpile stats --agent claude # تصفية حسب الأداة
+```
+
+مثال على الإخراج:
+
+```
+transpile stats — آخر 7 أيام
+
+  التاريخ     الأداة     الاستدعاءات  رموز الإدخال  رموز الإخراج  الموفّرة  النسبة
+  ──────────────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude         5        14 965        10 872       4 093     27.3%
+  2026-04-13  gemini         2         4 800         3 500       1 300     27.1%
+  ──────────────────────────────────────────────────────────────────────────────────
+  الإجمالي                  7        19 765        14 372       5 393     27.3%
+```
+
+**حقول سجل JSONL**
+
+| الحقل | النوع | الوصف |
+|-------|-------|-------|
+| `ts` | ISO 8601 | الطابع الزمني للاستدعاء |
+| `agent` | نص | الأداة التي بدأت الاستدعاء (`claude`، `gemini`، `codex`، `opencode`) |
+| `file` | نص | مسار ملف الإدخال (فارغ عند القراءة من stdin) |
+| `format` | نص | `markdown` أو `html` أو `plaintext` |
+| `fidelity` | نص | `lossless` أو `semantic` أو `compressed` |
+| `input_tok` | عدد صحيح | عدد الرموز قبل التحويل |
+| `output_tok` | عدد صحيح | عدد الرموز بعد التحويل |
+| `reduction_pct` | عدد عشري | نسبة الرموز الموفّرة |
+| `saved` | عدد صحيح | الرموز الموفّرة المطلقة (`input_tok − output_tok`) |
+
+**متغير البيئة `TRANSPILE_AGENT`**
+
+يُملأ حقل `agent` من متغير البيئة `TRANSPILE_AGENT`. تعيّن كل تكامل هذه القيمة تلقائياً (`claude`، `gemini`، `codex`، `opencode`، `cursor`). يمكن أيضاً تعيينها يدوياً:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -320,34 +403,10 @@ cargo run --release --example eval
 
 ## المساهمة
 
-نرحب بتقارير الأخطاء وطلبات الميزات وطلبات السحب.
-
-```bash
-# الاستنساخ والبناء
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# تشغيل الاختبارات
-cargo test
-
-# تشغيل المعايير (تقرير HTML ← target/criterion/)
-cargo bench
-
-# الفحص والتنسيق
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**الإرشادات**
-
-- الحفاظ على MSRV عند Rust 1.75 — تجنّب الميزات المُقدَّمة بعد ذلك.
-- يجب ألا يؤثر سلوك الضغط الجديد على وضع `Lossless`.
-- يجب أن يشمل كل PR اختبارات لأي منطق جديد في الوحدة ذات الصلة (`ir`، `compressor`، `symbol`، `renderer`).
-- تشغيل `cargo clippy -- -D warnings` و`cargo fmt` قبل التقديم.
+انظر [CONTRIBUTING.md](../../CONTRIBUTING.md) للإرشادات الكاملة. نرحب بطلبات السحب — راجع المشاكل المفتوحة المُوسومة بـ `good first issue`.
 
 ---
 
 ## الرخصة
 
-Apache-2.0 — انظر [LICENSE](LICENSE).
+Apache-2.0 — انظر [LICENSE](../../LICENSE).

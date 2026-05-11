@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **LLMパイプライン向けトークン最適化ドキュメントトランスパイラー**
@@ -29,7 +29,9 @@ k: [ライセンス, 契約, ソフトウェア]
 <summary>目次</summary>
 - [なぜ使うのか](#なぜ使うのか)
 - [インストール](#インストール)
+- [アップデート](#アップデート)
 - [CLI使用法](#cli使用法)
+- [使用統計](#使用統計)
 - [ライブラリ使用法](#ライブラリ使用法)
 - [出力フォーマット](#出力フォーマット)
 - [忠実度レベル](#忠実度レベル)
@@ -47,11 +49,13 @@ k: [ライセンス, 契約, ソフトウェア]
 
 LLMはコンテキストがクリーンで密度が高いほど性能が向上します。このライブラリが機械的な作業を担当します:
 
-- **構造的パース** — Markdown/HTML/プレーンテキスト → 型付きIRノード（見出し、段落、表、リスト、コードブロック）
-- **適応型圧縮** — トークン予算が埋まるにつれて4段階を自動的にエスカレーション
-- **シンボル置換** — 繰り返されるドメイン用語 → Unicode PUA文字、`<D>`辞書ヘッダーで復元
-- **表の線形化** — Markdown表 → コンパクトな`Key:Val`シーケンス（≤5行）または大きな表はパイプ区切り行
-- **ストリーミング出力** — TokioストリームがTTFTを最小化するために最初のチャンクを即座に配信
+| | 機能 | なぜ重要か |
+|--|------|-----------|
+| 🏗️ | **構造的パース** | Markdown/HTML/プレーンテキスト → 型付きIRノード（見出し、段落、表、リスト、コードブロック） |
+| 📉 | **適応型圧縮** | トークン予算が埋まるにつれて4段階を自動的にエスカレーション |
+| 🔣 | **シンボル置換** | 繰り返されるドメイン用語 → Unicode PUA文字、`<D>`辞書ヘッダーで復元 |
+| 📊 | **表の線形化** | Markdown表 → コンパクトな`Key:Val`（≤5行）または大きな表はパイプ区切り行 |
+| 🌊 | **ストリーミング出力** | TokioストリームがTTFTを最小化するために最初のチャンクを即座に配信 |
 
 ---
 
@@ -64,20 +68,34 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 llm-transpile = "0.1"
 ```
 
-**Rust 1.75+** が必要。
+**Rust 1.92+** が必要。
 
 ### CLIバイナリ + ツール連携
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# ビルド済みバイナリ（コンパイル不要で高速）
-cargo binstall llm-transpile
+Homebrewがない場合、インストールスクリプトを使用してください:
 
-# crates.ioからインストール
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Rustツールチェーン**
+
+```bash
+cargo binstall llm-transpile   # ビルド済みバイナリ（高速）
+cargo install llm-transpile    # ソースからビルド
 ```
 
 ツール連携の設定:
@@ -116,6 +134,8 @@ transpile uninstall --dry-run      # 削除のプレビュー
 /plugin install transpile@epicsagas
 ```
 
+次回セッション開始時にバイナリを自動インストールし、PostToolUseフックを設定します — 追加のセットアップは不要です。
+
 ソースからインストール:
 
 ```bash
@@ -123,6 +143,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## アップデート
+
+| 方法 | コマンド |
+|------|----------|
+| Homebrew | `brew upgrade llm-transpile` |
+| curl / PowerShellインストーラー | 上記のインストールコマンドを再実行 |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -175,6 +210,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > 統計（`[273 → 150 tok  45.1% reduction]`）はデフォルトで**stderr**に出力されるため、stdoutはパイプ用にクリーンな状態を保ちます。`--quiet`で非表示、`--stats`でstdoutに出力できます。
+
+---
+
+## 使用統計
+
+`transpile`の呼び出しごとに、`~/.agents/transpile/stats/YYYY-MM-DD.jsonl`にレコードが自動的に追記されます。`transpile stats`サブコマンドはこれらのファイルを読み取り、サマリーテーブルを表示します。
+
+```
+transpile stats                # 今日
+transpile stats --days 7       # 過去N日間
+transpile stats --agent claude # エージェントでフィルター
+```
+
+出力例:
+
+```
+transpile stats — 過去7日間
+
+  日付        エージェント  呼び出し  入力tok    出力tok    削減    削減率
+  ──────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude          5      14 965       10 872   4 093      27.3%
+  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  ──────────────────────────────────────────────────────────────────────────
+  合計                         7      19 765       14 372   5 393      27.3%
+```
+
+**JSONLレコードフィールド**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `ts` | ISO 8601 | 呼び出しのタイムスタンプ |
+| `agent` | 文字列 | 呼び出しをトリガーしたツール（`claude`、`gemini`、`codex`、`opencode`） |
+| `file` | 文字列 | 入力ファイルパス（stdin読み込み時は空） |
+| `format` | 文字列 | `markdown`、`html`、`plaintext`のいずれか |
+| `fidelity` | 文字列 | `lossless`、`semantic`、`compressed`のいずれか |
+| `input_tok` | 整数 | トランスパイル前のトークン数 |
+| `output_tok` | 整数 | トランスパイル後のトークン数 |
+| `reduction_pct` | 浮動小数点 | 削減されたトークンの割合 |
+| `saved` | 整数 | 削減されたトークンの絶対数（`input_tok − output_tok`） |
+
+**`TRANSPILE_AGENT`環境変数**
+
+`agent`フィールドは`TRANSPILE_AGENT`環境変数から取得されます。各連携ツールはこれを自動的に設定します（`claude`、`gemini`、`codex`、`opencode`、`cursor`）。手動で設定することも可能です:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -319,31 +401,7 @@ cargo run --release --example eval
 
 ## コントリビュート
 
-バグレポート、機能リクエスト、プルリクエストを歓迎します。
-
-```bash
-# クローンとビルド
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# テスト実行
-cargo test
-
-# ベンチマーク実行（HTMLレポート → target/criterion/）
-cargo bench
-
-# リントとフォーマット
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**ガイドライン**
-
-- MSRVをRust 1.75に維持 — それ以降に導入された機能は使用しないこと。
-- 新しい圧縮動作は`Lossless`モードに影響を与えてはなりません。
-- 各PRには関連モジュール（`ir`、`compressor`、`symbol`、`renderer`）の新しいロジックのテストを含めること。
-- 提出前に`cargo clippy -- -D warnings`と`cargo fmt`を実行すること。
+完全なガイドラインは[CONTRIBUTING.md](../../CONTRIBUTING.md)を参照してください。プルリクエストを歓迎します — `good first issue`ラベルの未解決Issueを確認してください。
 
 ---
 

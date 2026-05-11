@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **Transpilador de documentos optimizado para tokens en pipelines LLM**
@@ -29,7 +29,9 @@ Este acuerdo se celebra entre el Licenciante y el Licenciatario.
 <summary>Tabla de contenidos</summary>
 - [Por qué](#por-qué)
 - [Instalación](#instalación)
+- [Actualización](#actualización)
 - [Uso de CLI](#uso-de-cli)
+- [Estadísticas de uso](#estadísticas-de-uso)
 - [Uso de la biblioteca](#uso-de-la-biblioteca)
 - [Formato de salida](#formato-de-salida)
 - [Niveles de fidelidad](#niveles-de-fidelidad)
@@ -47,11 +49,13 @@ Este acuerdo se celebra entre el Licenciante y el Licenciatario.
 
 Los LLM funcionan mejor cuando el contexto es limpio y denso. Esta biblioteca maneja el trabajo mecánico:
 
-- **Análisis estructural** — Markdown/HTML/texto plano → nodos IR tipados (encabezados, párrafos, tablas, listas, bloques de código)
-- **Compresión adaptativa** — escala automáticamente por 4 etapas a medida que el presupuesto de tokens se agota
-- **Sustitución de símbolos** — términos de dominio repetidos → caracteres Unicode PUA, decodificados por el encabezado de diccionario `<D>`
-- **Linearización de tablas** — tablas Markdown → secuencias compactas `Key:Val` (≤5 filas) o filas separadas por pipes para tablas más grandes
-- **Salida en streaming** — el stream de Tokio entrega el primer bloque inmediatamente, minimizando el TTFT
+| | Característica | Por qué importa |
+|--|----------------|-----------------|
+| 🏗️ | **Análisis estructural** | Markdown/HTML/texto plano → nodos IR tipados (encabezados, párrafos, tablas, listas, bloques de código) |
+| 📉 | **Compresión adaptativa** | Escala automáticamente por 4 etapas a medida que el presupuesto de tokens se agota |
+| 🔣 | **Sustitución de símbolos** | Términos de dominio repetidos → caracteres Unicode PUA, decodificados por el encabezado de diccionario `<D>` |
+| 📊 | **Linearización de tablas** | Tablas Markdown → secuencias compactas `Key:Val` (≤5 filas) o filas separadas por pipes para tablas más grandes |
+| 🌊 | **Salida en streaming** | El stream de Tokio entrega el primer bloque inmediatamente, minimizando el TTFT |
 
 ---
 
@@ -64,20 +68,34 @@ Los LLM funcionan mejor cuando el contexto es limpio y denso. Esta biblioteca ma
 llm-transpile = "0.1"
 ```
 
-Requiere **Rust 1.75+**.
+Requiere **Rust 1.92+**.
 
 ### Binario CLI + integración de herramientas
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# Binario precompilado (más rápido, sin compilar)
-cargo binstall llm-transpile
+¿Sin Homebrew? Usa el script de instalación:
 
-# Desde crates.io
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Vía toolchain de Rust**
+
+```bash
+cargo binstall llm-transpile   # binario precompilado (rápido)
+cargo install llm-transpile    # compilar desde fuente
 ```
 
 Configurar integraciones de herramientas:
@@ -95,6 +113,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | LLM invoca automáticamente `transpile` en extensiones de archivo |
 | **Cursor** | Regla `.mdc` (`alwaysApply`) | Activa `transpile` antes de leer archivos de documento |
 | **OpenCode** | `SKILL.md` | LLM invoca automáticamente `transpile` en extensiones de archivo |
+
+Todas las herramientas que no son Claude usan un archivo skill que enseña al LLM a ejecutar `TRANSPILE_AGENT=<agent> transpile --input <file>` automáticamente — no se necesita verificación de tamaño, la extensión por sí sola lo activa.
 
 **Instalación / desinstalación selectiva**
 
@@ -116,6 +136,8 @@ transpile uninstall --dry-run      # previsualizar eliminaciones
 /plugin install transpile@epicsagas
 ```
 
+Auto-instala el binario y configura el hook PostToolUse en el próximo inicio de sesión — sin configuración adicional necesaria.
+
 Desde el código fuente:
 
 ```bash
@@ -123,6 +145,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## Actualización
+
+| Método | Comando |
+|--------|---------|
+| Homebrew | `brew upgrade llm-transpile` |
+| Instalador curl / PowerShell | Re-ejecutar el comando de instalación anterior |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -175,6 +212,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > Las estadísticas (`[273 → 150 tok  45.1% reduction]`) se escriben en **stderr** por defecto, manteniendo stdout limpio para pipes. Use `--quiet` para suprimirlas, o `--stats` para redirigirlas a stdout.
+
+---
+
+## Estadísticas de uso
+
+Cada invocación de `transpile` agrega automáticamente un registro a `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. El subcomando `transpile stats` lee esos archivos e imprime una tabla resumen.
+
+```
+transpile stats                # hoy
+transpile stats --days 7       # últimos N días
+transpile stats --agent claude # filtrar por agente
+```
+
+Ejemplo de salida:
+
+```
+transpile stats — últimos 7 días
+
+  Fecha       Agente     Llamadas  Tokens entrada  Tokens salida  Ahorrados  Reducción
+  ──────────────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude          5      14 965           10 872       4 093      27.3%
+  2026-04-13  gemini          2       4 800            3 500       1 300      27.1%
+  ──────────────────────────────────────────────────────────────────────────────────
+  Total                       7      19 765           14 372       5 393      27.3%
+```
+
+**Campos del registro JSONL**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `ts` | ISO 8601 | Marca de tiempo de la invocación |
+| `agent` | string | Herramienta que activó la llamada (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | string | Ruta del archivo de entrada (vacío al leer desde stdin) |
+| `format` | string | `markdown`, `html`, o `plaintext` |
+| `fidelity` | string | `lossless`, `semantic`, o `compressed` |
+| `input_tok` | integer | Recuento de tokens antes de la transpilación |
+| `output_tok` | integer | Recuento de tokens después de la transpilación |
+| `reduction_pct` | float | Porcentaje de tokens ahorrados |
+| `saved` | integer | Tokens ahorrados absolutos (`input_tok − output_tok`) |
+
+**Variable de entorno `TRANSPILE_AGENT`**
+
+El campo `agent` se completa desde la variable de entorno `TRANSPILE_AGENT`. Cada integración la configura automáticamente (`claude`, `gemini`, `codex`, `opencode`, `cursor`). También puedes configurarla manualmente:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -319,31 +403,7 @@ cargo run --release --example eval
 
 ## Contribuir
 
-Se aceptan reportes de errores, solicitudes de funciones y pull requests.
-
-```bash
-# Clonar y compilar
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# Ejecutar pruebas
-cargo test
-
-# Ejecutar benchmarks (informe HTML → target/criterion/)
-cargo bench
-
-# Lint y formato
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**Directrices**
-
-- Mantener MSRV en Rust 1.75 — evitar características introducidas después.
-- Los nuevos comportamientos de compresión no deben afectar el modo `Lossless`.
-- Cada PR debe incluir pruebas para la nueva lógica en el módulo relevante (`ir`, `compressor`, `symbol`, `renderer`).
-- Ejecutar `cargo clippy -- -D warnings` y `cargo fmt` antes de enviar.
+Consulta [CONTRIBUTING.md](../../CONTRIBUTING.md) para las directrices completas. Se aceptan PRs — revisa los issues abiertos etiquetados `good first issue`.
 
 ---
 

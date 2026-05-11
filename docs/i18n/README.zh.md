@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **面向 LLM 流水线的令牌优化文档转译器**
@@ -30,7 +30,9 @@ k: [许可证, 合同, 软件]
 
 - [为什么使用](#为什么使用)
 - [安装](#安装)
+- [更新](#更新)
 - [CLI 用法](#cli-用法)
+- [使用统计](#使用统计)
 - [库用法](#库用法)
 - [输出格式](#输出格式)
 - [保真度级别](#保真度级别)
@@ -48,11 +50,13 @@ k: [许可证, 合同, 软件]
 
 当上下文简洁且密度高时，LLM 表现更好。本库处理机械性工作：
 
-- **结构化解析** — Markdown/HTML/纯文本 → 类型化 IR 节点（标题、段落、表格、列表、代码块）
-- **自适应压缩** — 随着令牌预算消耗，自动升级压缩阶段（共 4 个阶段）
-- **符号替换** — 重复的领域术语 → Unicode PUA 字符，通过 `<D>` 字典头恢复
-- **表格线性化** — Markdown 表格 → 紧凑的 `Key:Val` 序列（≤5 行）或管道分隔行
-- **流式输出** — Tokio 流立即交付第一个块，最小化 TTFT
+| | 特性 | 重要性 |
+|--|------|--------|
+| 🏗️ | **结构化解析** | Markdown/HTML/纯文本 → 类型化 IR 节点（标题、段落、表格、列表、代码块） |
+| 📉 | **自适应压缩** | 随着令牌预算消耗，自动升级压缩阶段（共 4 个阶段） |
+| 🔣 | **符号替换** | 重复的领域术语 → Unicode PUA 字符，通过 `<D>` 字典头恢复 |
+| 📊 | **表格线性化** | Markdown 表格 → 紧凑的 `Key:Val` 序列（≤5 行）或管道分隔行 |
+| 🌊 | **流式输出** | Tokio 流立即交付第一个块，最小化 TTFT |
 
 ---
 
@@ -65,23 +69,37 @@ k: [许可证, 合同, 软件]
 llm-transpile = "0.1"
 ```
 
-需要 **Rust 1.75+**。
+需要 **Rust 1.92+**。
 
 ### CLI 二进制文件 + 工具集成
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
-
-# 预构建二进制文件（更快，无需编译）
-cargo binstall llm-transpile
-
-# 从 crates.io 安装
-cargo install llm-transpile
+brew install epicsagas/tap/llm-transpile
 ```
 
-配置工具集成：
+没有 Homebrew？使用安装脚本：
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**通过 Rust 工具链**
+
+```bash
+cargo binstall llm-transpile   # 预构建二进制文件（更快）
+cargo install llm-transpile    # 从源码构建
+```
+
+然后配置工具集成：
 
 ```bash
 transpile install
@@ -96,6 +114,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
 | **Cursor** | `.mdc` 规则（`alwaysApply`） | 读取文档文件前触发 `transpile` |
 | **OpenCode** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
+
+所有非 Claude 工具均使用技能文件，教导 LLM 自动运行 `TRANSPILE_AGENT=<agent> transpile --input <file>` — 无需大小检查，仅凭扩展名即可触发。
 
 **选择性安装 / 卸载**
 
@@ -117,6 +137,8 @@ transpile uninstall --dry-run      # 预览移除
 /plugin install transpile@epicsagas
 ```
 
+下次会话启动时自动安装二进制文件并配置 PostToolUse 钩子 — 无需额外设置。
+
 从源码安装：
 
 ```bash
@@ -124,6 +146,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## 更新
+
+| 方式 | 命令 |
+|------|------|
+| Homebrew | `brew upgrade llm-transpile` |
+| curl / PowerShell 安装脚本 | 重新运行上方的安装命令 |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -176,6 +213,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > 统计（`[273 → 150 tok  45.1% reduction]`）默认写入 **stderr**，保持 stdout 干净以便管道使用。使用 `--quiet` 抑制，或 `--stats` 重定向到 stdout。
+
+---
+
+## 使用统计
+
+每次 `transpile` 调用都会自动追加一条记录到 `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`。`transpile stats` 子命令读取这些文件并打印汇总表。
+
+```
+transpile stats                # 今天
+transpile stats --days 7       # 最近 N 天
+transpile stats --agent claude # 按代理筛选
+```
+
+示例输出：
+
+```
+transpile stats — 最近 7 天
+
+  日期       代理       调用次数   输入令牌   输出令牌   节省    缩减率
+  ──────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude          5      14 965       10 872   4 093      27.3%
+  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  ──────────────────────────────────────────────────────────────────────────
+  合计                       7      19 765       14 372   5 393      27.3%
+```
+
+**JSONL 记录字段**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ts` | ISO 8601 | 调用时间戳 |
+| `agent` | 字符串 | 触发调用的工具（`claude`、`gemini`、`codex`、`opencode`） |
+| `file` | 字符串 | 输入文件路径（从 stdin 读取时为空） |
+| `format` | 字符串 | `markdown`、`html` 或 `plaintext` |
+| `fidelity` | 字符串 | `lossless`、`semantic` 或 `compressed` |
+| `input_tok` | 整数 | 转译前令牌数 |
+| `output_tok` | 整数 | 转译后令牌数 |
+| `reduction_pct` | 浮点数 | 令牌节省百分比 |
+| `saved` | 整数 | 节省的令牌绝对值（`input_tok − output_tok`） |
+
+**`TRANSPILE_AGENT` 环境变量**
+
+`agent` 字段从 `TRANSPILE_AGENT` 环境变量中获取。每个集成会自动设置此变量（`claude`、`gemini`、`codex`、`opencode`、`cursor`）。您也可以手动设置：
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -320,31 +404,7 @@ cargo run --release --example eval
 
 ## 贡献
 
-欢迎错误报告、功能请求和拉取请求。
-
-```bash
-# 克隆并构建
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# 运行测试
-cargo test
-
-# 运行基准测试（HTML 报告 → target/criterion/）
-cargo bench
-
-# 代码检查和格式化
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**指南**
-
-- 将 MSRV 保持在 Rust 1.75 — 避免使用此后引入的功能。
-- 新的压缩行为不得影响 `Lossless` 模式。
-- 每个 PR 应包含相关模块（`ir`、`compressor`、`symbol`、`renderer`）中新逻辑的测试。
-- 提交前运行 `cargo clippy -- -D warnings` 和 `cargo fmt`。
+参见 [CONTRIBUTING.md](../../CONTRIBUTING.md) 了解完整指南。欢迎提交 PR — 请查看标记为 `good first issue` 的开放议题。
 
 ---
 

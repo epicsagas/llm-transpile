@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
 [![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.75+](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
 **LLM पाइपलाइन के लिए टोकन-अनुकूलित दस्तावेज़ ट्रांसपाइलर**
@@ -29,7 +29,9 @@ k: [लाइसेंस, अनुबंध, सॉफ़्टवेयर]
 <summary>विषय-सूची</summary>
 - [क्यों](#क्यों)
 - [स्थापना](#स्थापना)
+- [अपडेट करना](#अपडेट-करना)
 - [CLI उपयोग](#cli-उपयोग)
+- [उपयोग सांख्यिकी](#उपयोग-सांख्यिकी)
 - [लाइब्रेरी उपयोग](#लाइब्रेरी-उपयोग)
 - [आउटपुट फॉर्मेट](#आउटपुट-फॉर्मेट)
 - [फिडेलिटी स्तर](#फिडेलिटी-स्तर)
@@ -47,11 +49,13 @@ k: [लाइसेंस, अनुबंध, सॉफ़्टवेयर]
 
 LLM तब बेहतर काम करते हैं जब संदर्भ स्वच्छ और घना हो। यह लाइब्रेरी यांत्रिक कार्य संभालती है:
 
-- **संरचनात्मक पार्सिंग** — Markdown/HTML/सादा टेक्स्ट → टाइप किए गए IR नोड्स (शीर्षक, पैराग्राफ, तालिकाएं, सूचियां, कोड ब्लॉक)
-- **अनुकूली संपीड़न** — टोकन बजट भरते ही 4 चरणों के माध्यम से स्वचालित रूप से बढ़ता है
-- **प्रतीक प्रतिस्थापन** — दोहराए जाने वाले डोमेन शब्द → Unicode PUA वर्ण, `<D>` शब्दकोश हेडर द्वारा डिकोड किए गए
-- **तालिका रैखिकीकरण** — Markdown तालिकाएं → संक्षिप्त `Key:Val` अनुक्रम (≤5 पंक्तियां) या बड़ी तालिकाओं के लिए pipe-विभाजित पंक्तियां
-- **स्ट्रीमिंग आउटपुट** — Tokio स्ट्रीम TTFT को न्यूनतम करते हुए पहला chunk तुरंत देता है
+| | सुविधा | यह क्यों मायने रखती है |
+|--|--------|------------------------|
+| 🏗️ | **संरचनात्मक पार्सिंग** | Markdown/HTML/सादा टेक्स्ट → टाइप किए गए IR नोड्स (शीर्षक, पैराग्राफ, तालिकाएं, सूचियां, कोड ब्लॉक) |
+| 📉 | **अनुकूली संपीड़न** | टोकन बजट भरते ही 4 चरणों के माध्यम से स्वचालित रूप से बढ़ता है |
+| 🔣 | **प्रतीक प्रतिस्थापन** | दोहराए जाने वाले डोमेन शब्द → Unicode PUA वर्ण, `<D>` शब्दकोश हेडर द्वारा डिकोड किए गए |
+| 📊 | **तालिका रैखिकीकरण** | Markdown तालिकाएं → संक्षिप्त `Key:Val` अनुक्रम (≤5 पंक्तियां) या बड़ी तालिकाओं के लिए pipe-विभाजित पंक्तियां |
+| 🌊 | **स्ट्रीमिंग आउटपुट** | Tokio स्ट्रीम TTFT को न्यूनतम करते हुए पहला chunk तुरंत देता है |
 
 ---
 
@@ -64,20 +68,34 @@ LLM तब बेहतर काम करते हैं जब संदर�
 llm-transpile = "0.1"
 ```
 
-**Rust 1.75+** आवश्यक।
+**Rust 1.92+** आवश्यक।
 
 ### CLI बाइनरी + टूल इंटीग्रेशन
 
+**macOS / Linux**
+
 ```bash
-# Homebrew (macOS)
-brew tap epicsagas/tap
-brew install llm-transpile
+brew install epicsagas/tap/llm-transpile
+```
 
-# पूर्व-निर्मित बाइनरी (तेज़, बिना संकलन के)
-cargo binstall llm-transpile
+Homebrew नहीं है? इंस्टॉलर स्क्रिप्ट का उपयोग करें:
 
-# crates.io से
-cargo install llm-transpile
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+```
+
+**Windows**
+
+```powershell
+irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
+```
+
+**Rust टूलचेन के माध्यम से**
+
+```bash
+cargo binstall llm-transpile   # पूर्व-निर्मित बाइनरी (तेज़)
+cargo install llm-transpile    # सोर्स से बिल्ड
 ```
 
 टूल इंटीग्रेशन कॉन्फ़िगर करें:
@@ -95,6 +113,8 @@ transpile install
 | **Codex CLI** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
 | **Cursor** | `.mdc` नियम (`alwaysApply`) | दस्तावेज़ फ़ाइलें पढ़ने से पहले `transpile` ट्रिगर करता है |
 | **OpenCode** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
+
+Claude को छोड़कर सभी टूल एक स्किल फ़ाइल का उपयोग करते हैं जो LLM को `TRANSPILE_AGENT=<agent> transpile --input <file>` स्वचालित रूप से चलाना सिखाती है — साइज़ जांच की आवश्यकता नहीं, केवल एक्सटेंशन पर्याप्त है।
 
 **चयनात्मक इंस्टॉल / अनइंस्टॉल**
 
@@ -116,6 +136,8 @@ transpile uninstall --dry-run      # हटाने का पूर्वा�
 /plugin install transpile@epicsagas
 ```
 
+अगले सेशन स्टार्ट पर बाइनरी और PostToolUse हुक स्वचालित रूप से इंस्टॉल हो जाते हैं — कोई अतिरिक्त सेटअप आवश्यक नहीं।
+
 सोर्स से:
 
 ```bash
@@ -123,6 +145,21 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## अपडेट करना
+
+| विधि | कमांड |
+|------|-------|
+| Homebrew | `brew upgrade llm-transpile` |
+| curl / PowerShell इंस्टॉलर | ऊपर दी गई इंस्टॉल कमांड दोबारा चलाएं |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+
+```bash
+transpile --version
 ```
 
 ---
@@ -175,6 +212,53 @@ transpile --input article.md --fidelity compressed --budget 512
 ```
 
 > आंकड़े (`[273 → 150 tok  45.1% reduction]`) डिफ़ॉल्ट रूप से **stderr** पर लिखे जाते हैं, जिससे stdout पाइपिंग के लिए स्वच्छ रहता है। दबाने के लिए `--quiet` या stdout पर पुनर्निर्देशित करने के लिए `--stats` का उपयोग करें।
+
+---
+
+## उपयोग सांख्यिकी
+
+प्रत्येक `transpile` कॉल स्वचालित रूप से `~/.agents/transpile/stats/YYYY-MM-DD.jsonl` में एक रिकॉर्ड जोड़ता है। `transpile stats` सबकमांड उन फ़ाइलों को पढ़ता है और एक सारांश तालिका प्रिंट करता है।
+
+```
+transpile stats                # आज
+transpile stats --days 7       # अंतिम N दिन
+transpile stats --agent claude # एजेंट के अनुसार फ़िल्टर
+```
+
+आउटपुट उदाहरण:
+
+```
+transpile stats — अंतिम 7 दिन
+
+  दिनांक      एजेंट     कॉल   इनपुट टोकन  आउटपुट टोकन  बचत    कमी
+  ──────────────────────────────────────────────────────────────────────────
+  2026-04-13  claude        5     14 965       10 872      4 093    27.3%
+  2026-04-13  gemini        2      4 800        3 500      1 300    27.1%
+  ──────────────────────────────────────────────────────────────────────────
+  कुल                      7     19 765       14 372      5 393    27.3%
+```
+
+**JSONL रिकॉर्ड फ़ील्ड**
+
+| फ़ील्ड | प्रकार | विवरण |
+|--------|--------|--------|
+| `ts` | ISO 8601 | कॉल का टाइमस्टैम्प |
+| `agent` | स्ट्रिंग | कॉल शुरू करने वाला टूल (`claude`, `gemini`, `codex`, `opencode`) |
+| `file` | स्ट्रिंग | इनपुट फ़ाइल पथ (stdin से पढ़ने पर रिक्त) |
+| `format` | स्ट्रिंग | `markdown`, `html`, या `plaintext` |
+| `fidelity` | स्ट्रिंग | `lossless`, `semantic`, या `compressed` |
+| `input_tok` | पूर्णांक | ट्रांसपाइलेशन से पहले टोकन गिनती |
+| `output_tok` | पूर्णांक | ट्रांसपाइलेशन के बाद टोकन गिनती |
+| `reduction_pct` | दशमलव | टोकन बचत प्रतिशत |
+| `saved` | पूर्णांक | बचाए गए टोकन (`input_tok − output_tok`) |
+
+**`TRANSPILE_AGENT` पर्यावरण चर**
+
+`agent` फ़ील्ड `TRANSPILE_AGENT` पर्यावरण चर से भरा जाता है। प्रत्येक इंटीग्रेशन इसे स्वचालित रूप से सेट करता है (`claude`, `gemini`, `codex`, `opencode`, `cursor`)। आप इसे मैन्युअल रूप से भी सेट कर सकते हैं:
+
+```bash
+TRANSPILE_AGENT=claude transpile --input doc.md
+```
 
 ---
 
@@ -319,34 +403,10 @@ cargo run --release --example eval
 
 ## योगदान
 
-बग रिपोर्ट, फीचर अनुरोध और पुल रिक्वेस्ट का स्वागत है।
-
-```bash
-# क्लोन करें और बनाएं
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo build
-
-# परीक्षण चलाएं
-cargo test
-
-# बेंचमार्क चलाएं (HTML रिपोर्ट → target/criterion/)
-cargo bench
-
-# लिंट और फॉर्मेट
-cargo clippy -- -D warnings
-cargo fmt
-```
-
-**दिशानिर्देश**
-
-- MSRV को Rust 1.75 पर रखें — उसके बाद पेश की गई सुविधाओं से बचें।
-- नए संपीड़न व्यवहार से `Lossless` मोड प्रभावित नहीं होना चाहिए।
-- प्रत्येक PR में संबंधित मॉड्यूल (`ir`, `compressor`, `symbol`, `renderer`) में किसी भी नए तर्क के लिए परीक्षण शामिल होने चाहिए।
-- सबमिट करने से पहले `cargo clippy -- -D warnings` और `cargo fmt` चलाएं।
+पूर्ण दिशानिर्देशों के लिए [CONTRIBUTING.md](../../CONTRIBUTING.md) देखें। PR का स्वागत है — `good first issue` लेबल वाले खुले issues देखें।
 
 ---
 
 ## लाइसेंस
 
-Apache-2.0 — [LICENSE](LICENSE) देखें।
+Apache-2.0 — [LICENSE](../../LICENSE) देखें।
