@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'script=\"${CLAUDE_PLUGIN_ROOT}/hooks/setup.sh\"; [ -f \"$script\" ] && bash \"$script\" || true'"
+            "command": "command -v transpile >/dev/null 2>&1 || { if command -v brew >/dev/null 2>&1; then brew install epicsagas/tap/llm-transpile; elif command -v cargo-binstall >/dev/null 2>&1; then cargo binstall -y llm-transpile; elif command -v cargo >/dev/null 2>&1; then cargo install llm-transpile; fi; }; transpile install claude",
+            "async": false
           }
         ]
       }
