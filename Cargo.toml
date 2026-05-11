@@ -74,6 +74,18 @@ pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.zip"
 pkg-fmt = "zip"
 bin-dir = "transpile.exe"
 
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/transpile-{ target }.zip"
+pkg-fmt = "zip"
+bin-dir = "transpile.exe"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
 [[bin]]
 name = "transpile"
 path = "src/bin/transpile.rs"

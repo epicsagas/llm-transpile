@@ -35,6 +35,7 @@ This agreement is made between Licensor and Licensee.
 
 - [Why](#why)
 - [Installation](#installation)
+- [Updating](#updating)
 - [CLI Usage](#cli-usage)
 - [Usage Statistics](#usage-statistics)
 - [Library Usage](#library-usage)
@@ -89,6 +90,10 @@ irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.
 brew tap epicsagas/tap
 brew install llm-transpile
 
+# Scoop (Windows)
+scoop bucket add epicsagas https://github.com/epicsagas/scoop-bucket
+scoop install llm-transpile
+
 # Pre-built binary (faster, no compile)
 cargo binstall llm-transpile
 
@@ -141,6 +146,25 @@ git clone https://github.com/epicsagas/llm-transpile
 cd llm-transpile
 cargo install --path .
 transpile install
+```
+
+---
+
+## Updating
+
+| Method | Command |
+|--------|---------|
+| Homebrew | `brew upgrade llm-transpile` |
+| Scoop | `scoop update llm-transpile` |
+| cargo binstall | `cargo binstall llm-transpile@latest` |
+| cargo install | `cargo install llm-transpile@latest` |
+| curl installer (macOS/Linux) | Re-run the install script |
+| PowerShell installer (Windows) | Re-run the install command |
+
+Verify the installed version:
+
+```bash
+transpile --version
 ```
 
 ---

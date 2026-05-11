@@ -32,6 +32,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: transpile-x86_64-pc-windows-msvc.zip
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact: transpile-aarch64-pc-windows-msvc.zip
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -213,5 +216,67 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/llm-transpile.rb
+          git diff --cached --quiet || git commit -m "llm-transpile ${GITHUB_REF_NAME#v}"
+          git push
+
+  update-scoop:
+    name: Update Scoop Bucket
+    needs: release
+    runs-on: ubuntu-latest
+    if: "!contains(github.ref_name, '-')"
+    steps:
+      - name: Compute SHA256 for Windows binaries
+        id: sha
+        run: |
+          BASE="https://github.com/epicsagas/llm-transpile/releases/download/${GITHUB_REF_NAME}"
+          for i in 1 2 3; do
+            curl -sLf "${BASE}/transpile-x86_64-pc-windows-msvc.zip" -o x64.zip && break
+            sleep 10
+          done
+          for i in 1 2 3; do
+            curl -sLf "${BASE}/transpile-aarch64-pc-windows-msvc.zip" -o arm64.zip && break
+            sleep 10
+          done
+          echo "x64=$(sha256sum x64.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "arm64=$(sha256sum arm64.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Checkout scoop bucket
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: epicsagas/scoop-bucket
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+
+      - name: Update manifest
+        env:
+          SHA_X64: ${{ steps.sha.outputs.x64 }}
+          SHA_ARM64: ${{ steps.sha.outputs.arm64 }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BASE_URL="https://github.com/epicsagas/llm-transpile/releases/download/v${VERSION}"
+          cat > bucket/llm-transpile.json << JSON
+          {
+            "version": "${VERSION}",
+            "description": "Token-optimized document transpiler for LLM pipelines",
+            "homepage": "https://github.com/epicsagas/llm-transpile",
+            "license": "Apache-2.0",
+            "architecture": {
+              "64bit": {
+                "url": "${BASE_URL}/transpile-x86_64-pc-windows-msvc.zip",
+                "hash": "sha256:${SHA_X64}"
+              },
+              "arm64": {
+                "url": "${BASE_URL}/transpile-aarch64-pc-windows-msvc.zip",
+                "hash": "sha256:${SHA_ARM64}"
+              }
+            },
+            "bin": "transpile.exe"
+          }
+          JSON
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/llm-transpile.json
           git diff --cached --quiet || git commit -m "llm-transpile ${GITHUB_REF_NAME#v}"
           git push
