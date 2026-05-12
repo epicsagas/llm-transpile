@@ -38,7 +38,7 @@ pub fn parse(
             // pulldown-cmark does not see it as raw paragraph text.
             let (fm, body) = split_yaml_front_matter(input);
             if let Some(fm) = fm {
-                push_yaml_front_matter_metadata(&fm, &mut doc);
+                push_yaml_front_matter_metadata(fm, &mut doc);
             }
             parse_markdown(body, &mut doc);
         }
@@ -96,10 +96,7 @@ fn split_yaml_front_matter(input: &str) -> (Option<&str>, &str) {
         let is_close = rest.starts_with("---") || rest.starts_with("...");
         if is_close {
             // Consume the closing delimiter line.
-            let after_close = rest
-                .find('\n')
-                .map(|j| &rest[j + 1..])
-                .unwrap_or(""); // closing delimiter was the last line
+            let after_close = rest.find('\n').map(|j| &rest[j + 1..]).unwrap_or(""); // closing delimiter was the last line
             return (Some(up_to), after_close);
         }
     }
@@ -173,15 +170,15 @@ fn extract_html_metadata(html: &str, doc: &mut IRDocument) {
         let tag_lower = &lower[tag_start..tag_end];
         let tag_raw = &html[tag_start..tag_end];
 
-        if tag_lower.contains("name=\"description\"") || tag_lower.contains("name='description'") {
-            if let Some(content) = extract_attr_value(tag_raw, "content") {
-                let content = content.trim();
-                if !content.is_empty() {
-                    doc.push(DocNode::Metadata {
-                        key: "summary".to_string(),
-                        value: content.to_string(),
-                    });
-                }
+        if (tag_lower.contains("name=\"description\"") || tag_lower.contains("name='description'"))
+            && let Some(content) = extract_attr_value(tag_raw, "content")
+        {
+            let content = content.trim();
+            if !content.is_empty() {
+                doc.push(DocNode::Metadata {
+                    key: "summary".to_string(),
+                    value: content.to_string(),
+                });
             }
         }
 
@@ -483,11 +480,37 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
 /// closing tag with a single space *before* handing the sanitised string to
 /// ammonia, which then strips the remaining inline tags cleanly.
 const BLOCK_ELEMENTS: &[&str] = &[
-    "p", "div", "section", "article", "aside", "header", "footer", "main", "nav",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "li", "dt", "dd", "blockquote", "pre", "figure", "figcaption",
-    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-    "br", "hr",
+    "p",
+    "div",
+    "section",
+    "article",
+    "aside",
+    "header",
+    "footer",
+    "main",
+    "nav",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "li",
+    "dt",
+    "dd",
+    "blockquote",
+    "pre",
+    "figure",
+    "figcaption",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "br",
+    "hr",
 ];
 
 fn strip_html_tags(input: &str) -> String {
@@ -556,7 +579,10 @@ fn insert_block_element_spaces(input: &str) -> String {
 /// Minimal forward scan for a target byte — avoids pulling in `memchr` crate.
 #[inline]
 fn memchr_naive(bytes: &[u8], start: usize, target: u8) -> Option<usize> {
-    bytes[start..].iter().position(|&b| b == target).map(|p| start + p)
+    bytes[start..]
+        .iter()
+        .position(|&b| b == target)
+        .map(|p| start + p)
 }
 
 // ────────────────────────────────────────────────
@@ -861,9 +887,15 @@ mod tests {
 
     #[test]
     fn transpile_emits_h_block_with_yaml_front_matter() {
-        let md = "---\ntitle: 계약서\ndescription: 소프트웨어 라이선스 계약\n---\n\n본문 내용입니다.";
-        let output = crate::transpile(md, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))
-            .expect("transpile must succeed");
+        let md =
+            "---\ntitle: 계약서\ndescription: 소프트웨어 라이선스 계약\n---\n\n본문 내용입니다.";
+        let output = crate::transpile(
+            md,
+            InputFormat::Markdown,
+            FidelityLevel::Semantic,
+            Some(4096),
+        )
+        .expect("transpile must succeed");
         assert!(
             output.contains("<H>"),
             "output must contain <H> when front matter is present: {output}"

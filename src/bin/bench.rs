@@ -635,7 +635,58 @@ fn generate_html(records: &[BenchRecord], out_path: &str) {
     )
     .unwrap();
 
+    // Format distribution (pie chart)
     let fmt_list = ["markdown", "html", "plaintext"];
+    let fmt_counts: Vec<usize> = fmt_list
+        .iter()
+        .map(|f| records.iter().filter(|r| r.format == *f).count())
+        .collect();
+    let fmt_count_data = serde_json::to_string(&fmt_counts).unwrap();
+
+    // Input token size histogram (8 buckets)
+    let tok_buckets = [128usize, 512, 1024, 2048, 4096, 8192, 32768, usize::MAX];
+    let bucket_labels = ["<128", "<512", "<1K", "<2K", "<4K", "<8K", "<32K", "32K+"];
+    let mut hist = vec![0usize; tok_buckets.len()];
+    for r in records {
+        let bucket = tok_buckets
+            .iter()
+            .position(|&cap| r.input_tok < cap)
+            .unwrap_or(tok_buckets.len() - 1);
+        hist[bucket] += 1;
+    }
+    let hist_labels = serde_json::to_string(&bucket_labels).unwrap();
+    let hist_data = serde_json::to_string(&hist).unwrap();
+
+    // Word coverage donut buckets
+    let cov_buckets = [
+        (
+            "100%",
+            records.iter().filter(|r| r.word_coverage >= 100.0).count(),
+        ),
+        (
+            "≥95%",
+            records
+                .iter()
+                .filter(|r| r.word_coverage >= 95.0 && r.word_coverage < 100.0)
+                .count(),
+        ),
+        (
+            "≥80%",
+            records
+                .iter()
+                .filter(|r| r.word_coverage >= 80.0 && r.word_coverage < 95.0)
+                .count(),
+        ),
+        (
+            "<80%",
+            records.iter().filter(|r| r.word_coverage < 80.0).count(),
+        ),
+    ];
+    let cov_donut_labels =
+        serde_json::to_string(&cov_buckets.iter().map(|(l, _)| *l).collect::<Vec<_>>()).unwrap();
+    let cov_donut_data =
+        serde_json::to_string(&cov_buckets.iter().map(|(_, c)| *c).collect::<Vec<_>>()).unwrap();
+
     let box_data = serde_json::to_string(
         &fmt_list
             .iter()
@@ -833,6 +884,18 @@ button:hover{{opacity:.85;}}
     <h3>Reduction distribution by format (min/Q1/med/Q3/max)</h3>
     <canvas id="boxChart"></canvas>
   </div>
+  <div class="cbox">
+    <h3>File count by format</h3>
+    <canvas id="pieChart"></canvas>
+  </div>
+  <div class="cbox">
+    <h3>Input token size distribution</h3>
+    <canvas id="histChart"></canvas>
+  </div>
+  <div class="cbox">
+    <h3>Word coverage (lossless quality)</h3>
+    <canvas id="covDonut"></canvas>
+  </div>
 </div>
 
 <section>
@@ -918,6 +981,75 @@ new Chart(document.getElementById('boxChart'),{{
     scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'Semantic reduction %',color:'#8892a4'}}}}}}}}
 }});
 
+// Pie — format distribution
+new Chart(document.getElementById('pieChart'),{{
+  type:'doughnut',
+  data:{{
+    labels:{fmt_labels},
+    datasets:[{{
+      data:{fmt_count_data},
+      backgroundColor:['rgba(99,102,241,.8)','rgba(34,197,94,.8)','rgba(234,179,8,.8)'],
+      borderColor:['#6366f1','#22c55e','#eab308'],
+      borderWidth:2,
+    }}]
+  }},
+  options:{{
+    plugins:{{
+      legend:{{labels:{{color:'#e2e8f0',padding:16}}}},
+      tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files (${{Math.round(c.raw/c.dataset.data.reduce((a,b)=>a+b,0)*100)}}%)`}}}}
+    }}
+  }}
+}});
+
+// Histogram — input token size
+new Chart(document.getElementById('histChart'),{{
+  type:'bar',
+  data:{{
+    labels:{hist_labels},
+    datasets:[{{
+      label:'files',
+      data:{hist_data},
+      backgroundColor:'rgba(99,102,241,.65)',
+      borderColor:'#6366f1',
+      borderWidth:1,
+      borderRadius:4,
+    }}]
+  }},
+  options:{{
+    plugins:{{legend:{{display:false}}}},
+    scales:{{
+      x:{{ticks:F,grid:G,title:{{display:true,text:'Token range',color:'#8892a4'}}}},
+      y:{{ticks:{{...F,stepSize:1}},grid:G,title:{{display:true,text:'# files',color:'#8892a4'}}}}
+    }}
+  }}
+}});
+
+// Donut — word coverage buckets
+new Chart(document.getElementById('covDonut'),{{
+  type:'doughnut',
+  data:{{
+    labels:{cov_donut_labels},
+    datasets:[{{
+      data:{cov_donut_data},
+      backgroundColor:[
+        'rgba(34,197,94,.85)',
+        'rgba(34,197,94,.45)',
+        'rgba(234,179,8,.7)',
+        'rgba(239,68,68,.7)',
+      ],
+      borderColor:['#22c55e','#22c55e','#eab308','#ef4444'],
+      borderWidth:2,
+    }}]
+  }},
+  options:{{
+    plugins:{{
+      legend:{{labels:{{color:'#e2e8f0',padding:14}}}},
+      tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files`}}}}
+    }},
+    cutout:'60%',
+  }}
+}});
+
 // Filter
 function filter(){{
   const txt=document.getElementById('ftxt').value.toLowerCase();
@@ -966,6 +1098,12 @@ function exportCsv(){{
         cov_data = js_safe(&cov_data),
         scatter_data = js_safe(&scatter_data),
         box_data = js_safe(&box_data),
+        fmt_labels = js_safe(&serde_json::to_string(&["markdown", "html", "plaintext"]).unwrap()),
+        fmt_count_data = js_safe(&fmt_count_data),
+        hist_labels = js_safe(&hist_labels),
+        hist_data = js_safe(&hist_data),
+        cov_donut_labels = js_safe(&cov_donut_labels),
+        cov_donut_data = js_safe(&cov_donut_data),
     );
 
     if let Err(e) = fs::write(out_path, &html) {
