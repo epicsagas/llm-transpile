@@ -355,13 +355,11 @@ fn prune_low_importance(nodes: Vec<DocNode>, threshold: f32) -> Vec<DocNode> {
             if let DocNode::Para { importance, .. } = n {
                 if *importance > cutoff {
                     true
+                } else if removed < max_removals {
+                    removed += 1;
+                    false
                 } else {
-                    if removed < max_removals {
-                        removed += 1;
-                        false
-                    } else {
-                        true // Keep -- we've hit the cap
-                    }
+                    true
                 }
             } else {
                 true
