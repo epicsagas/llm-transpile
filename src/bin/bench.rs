@@ -1,89 +1,13 @@
 //! bench — llm-transpile file benchmark runner & HTML report generator
 //!
-//! ## Subcommands
-//!
-//! ```text
-//! bench run    Benchmark eval/dataset files → dated JSONL log
-//! bench report Aggregate JSONL logs → bench-report.html
-//! ```
-//!
-//! ### Log location
-//! `~/.agents/transpile/bench/YYYY-MM-DD_HH-MM-SS.jsonl`
-//!
-//! ### JSONL record schema
-//! ```json
-//! {
-//!   "ts":            "2026-05-12T09:00:00Z",
-//!   "run_id":        "2026-05-12_09-00-00",
-//!   "file":          "hub-docs_api.md",
-//!   "format":        "markdown",
-//!   "input_bytes":   12345,
-//!   "input_tok":     2048,
-//!   "semantic_tok":  1400,
-//!   "compressed_tok":1200,
-//!   "lossless_tok":  2060,
-//!   "sem_pct":       31.6,
-//!   "cmp_pct":       41.4,
-//!   "los_pct":       -0.6,
-//!   "semantic_us":   180,
-//!   "compressed_us": 210,
-//!   "tok_per_ms":    11378.0,
-//!   "word_coverage": 99.1
-//! }
-//! ```
+//! Used as `transpile bench run` / `transpile bench report`.
 
-use clap::{Parser, Subcommand};
 use llm_transpile::{FidelityLevel, InputFormat, token_count, transpile};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, BufRead, Write as IoWrite};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-
-// ── CLI ───────────────────────────────────────────────────────────────────────
-
-#[derive(Parser)]
-#[command(
-    name = "bench",
-    about = "llm-transpile file benchmark runner & HTML report generator",
-    version
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Cmd,
-}
-
-#[derive(Subcommand)]
-enum Cmd {
-    /// Benchmark eval/dataset files and write a dated JSONL log
-    Run {
-        /// Root directory of eval datasets (default: eval/dataset)
-        #[arg(long, default_value = "eval/dataset")]
-        dataset: String,
-
-        /// Log output directory (default: ~/.agents/transpile/bench)
-        #[arg(long)]
-        log_dir: Option<String>,
-
-        /// Also generate HTML report after run
-        #[arg(long, short = 'R')]
-        report: bool,
-
-        /// Path for the HTML report (default: bench-report.html)
-        #[arg(long, default_value = "bench-report.html")]
-        report_out: String,
-    },
-    /// Aggregate all JSONL logs and generate an HTML report
-    Report {
-        /// Log directory (default: ~/.agents/transpile/bench)
-        #[arg(long)]
-        log_dir: Option<String>,
-
-        /// Output HTML path
-        #[arg(long, short = 'o', default_value = "bench-report.html")]
-        out: String,
-    },
-}
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -119,6 +43,25 @@ fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
+}
+
+fn expand_tilde(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return format!("{home}/{rest}");
+    }
+    path.to_string()
+}
+
+fn ensure_parent_dir(path: &str) -> std::io::Result<()> {
+    let p = std::path::Path::new(path);
+    if let Some(parent) = p.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
+    Ok(())
 }
 
 // ── Time helpers (no chrono) ──────────────────────────────────────────────────
@@ -298,7 +241,7 @@ fn bench_file(path: &Path, fmt: InputFormat, ts: &str, run_id: &str) -> Option<B
 
 // ── run subcommand ────────────────────────────────────────────────────────────
 
-fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out: &str) {
+pub fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out: &str) -> i32 {
     let ts = now_iso();
     let run_id = iso_to_run_id(&ts);
 
@@ -311,7 +254,7 @@ fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out:
             "ERROR: cannot create log directory {}: {e}",
             log_dir.display()
         );
-        std::process::exit(1);
+        return 1;
     }
 
     let log_path = log_dir.join(format!("{run_id}.jsonl"));
@@ -319,7 +262,7 @@ fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out:
         Ok(f) => f,
         Err(e) => {
             eprintln!("ERROR: cannot create log file {}: {e}", log_path.display());
-            std::process::exit(1);
+            return 1;
         }
     };
 
@@ -362,22 +305,29 @@ fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out:
     // R7: no records produced → error exit
     if all.is_empty() {
         eprintln!("ERROR: no records produced. Check dataset path: {dataset}");
-        std::process::exit(1);
+        return 1;
     }
 
     print_grand_summary(&all);
 
     if report {
+        let report_out = expand_tilde(report_out);
         println!("\n  Generating report → {report_out}");
+        if let Err(e) = ensure_parent_dir(&report_out) {
+            eprintln!("ERROR: cannot create report directory: {e}");
+            return 1;
+        }
         let records = load_all_logs(&log_dir);
-        generate_html(&records, report_out);
+        generate_html(&records, &report_out);
         println!("  ✓ {report_out}");
     }
+
+    0
 }
 
 // ── report subcommand ─────────────────────────────────────────────────────────
 
-fn cmd_report(log_dir_opt: Option<String>, out: &str) {
+pub fn cmd_report(log_dir_opt: Option<String>, out: &str, no_open: bool) -> i32 {
     let log_dir = log_dir_opt
         .map(PathBuf::from)
         .unwrap_or_else(default_log_dir);
@@ -385,18 +335,28 @@ fn cmd_report(log_dir_opt: Option<String>, out: &str) {
     println!("  log dir : {}", log_dir.display());
 
     let records = load_all_logs(&log_dir);
-    // R7: empty log dir → error
     if records.is_empty() {
         eprintln!(
-            "ERROR: no JSONL logs found in {}. Run `bench run` first.",
+            "ERROR: no JSONL logs found in {}. Run `transpile bench run` first.",
             log_dir.display()
         );
-        std::process::exit(1);
+        return 1;
     }
 
     println!("  records : {}", records.len());
-    generate_html(&records, out);
+    let out = expand_tilde(out);
+    if let Err(e) = ensure_parent_dir(&out) {
+        eprintln!("ERROR: cannot create report directory: {e}");
+        return 1;
+    }
+    generate_html(&records, &out);
     println!("  ✓ {out}");
+
+    if !no_open {
+        let _ = std::process::Command::new("open").arg(&out).spawn();
+    }
+
+    0
 }
 
 // ── Log loader ────────────────────────────────────────────────────────────────
@@ -791,15 +751,18 @@ fn generate_html(records: &[BenchRecord], out_path: &str) {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <style>
 :root{{--bg:#0f1117;--surf:#1a1d27;--bdr:#2e3147;--txt:#e2e8f0;--mut:#8892a4;
-  --acc:#6366f1;--grn:#22c55e;--ylw:#eab308;--red:#ef4444;}}
+  --acc:#6366f1;--grn:#22c55e;--ylw:#eab308;--red:#ef4444;--thead:#1e2235;}}
+:root[data-theme="light"]{{--bg:#f5f5f7;--surf:#ffffff;--bdr:#d1d5db;--txt:#1e293b;--mut:#374151;
+  --acc:#4f46e5;--grn:#16a34a;--ylw:#ca8a04;--red:#dc2626;--thead:#f1f5f9;}}
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{background:var(--bg);color:var(--txt);font-family:system-ui,sans-serif;font-size:14px;}}
 header{{padding:16px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}}
 header h1{{font-size:20px;font-weight:700;}}
 .badge{{background:var(--acc);color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;}}
-.lang-btn{{margin-left:auto;background:transparent;border:1px solid var(--bdr);color:var(--mut);
+.lang-btn{{background:transparent;border:1px solid var(--bdr);color:var(--mut);
   border-radius:7px;padding:4px 12px;font-size:12px;cursor:pointer;font-weight:600;transition:all .15s;}}
 .lang-btn:hover{{border-color:var(--acc);color:var(--txt);}}
+.hdr-actions{{display:flex;gap:6px;flex-shrink:0;}}
 .hdr-meta{{font-size:12px;color:var(--mut);}}
 .wrap{{max-width:1400px;margin:0 auto;padding:20px 28px;}}
 /* ── KPI cards ── */
@@ -809,12 +772,33 @@ header h1{{font-size:20px;font-weight:700;}}
 .card .val{{font-size:26px;font-weight:700;}}
 .card .sub{{font-size:11px;color:var(--mut);margin-top:3px;}}
 .card .tip{{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
-  background:#1e2235;border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
+  background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
   font-size:12px;color:var(--txt);line-height:1.6;width:220px;z-index:99;
   box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:none;white-space:normal;}}
 .card:hover .tip{{display:block;}}
 /* ── Charts ── */
 .charts{{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:28px;}}
+@media(max-width:1200px){{.charts{{grid-template-columns:1fr 1fr;gap:14px;}}}}
+@media(max-width:768px){{
+  .charts{{grid-template-columns:1fr;gap:12px;}}
+  .cards{{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}}
+  header{{padding:12px 16px;flex-wrap:wrap;}}
+  header h1{{font-size:16px;}}
+  .hdr-meta{{display:none;}}
+  .wrap{{padding:14px 16px;}}
+  .cbox{{padding:14px;}}
+  .cbox canvas{{max-height:200px;}}
+  table{{font-size:12px;}}
+  th,td{{padding:5px 6px;}}
+}}
+@media(max-width:480px){{
+  .cards{{grid-template-columns:1fr 1fr;}}
+  .card .val{{font-size:22px;}}
+  header h1{{font-size:14px;}}
+  .badge{{font-size:10px;padding:2px 6px;}}
+  table{{display:block;overflow-x:auto;}}
+  .frow{{flex-direction:column;align-items:stretch;}}
+}}
 .cbox{{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:18px;}}
 .cbox-hdr{{display:flex;align-items:center;gap:6px;margin-bottom:14px;}}
 .cbox h3{{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;flex:1;}}
@@ -822,7 +806,7 @@ header h1{{font-size:20px;font-weight:700;}}
   font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
   cursor:help;position:relative;flex-shrink:0;}}
 .tip-icon .tip{{display:none;position:absolute;top:calc(100% + 6px);right:0;
-  background:#1e2235;border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
+  background:var(--surf);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
   font-size:12px;color:var(--txt);line-height:1.6;width:240px;z-index:99;
   box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:none;white-space:normal;text-transform:none;letter-spacing:0;}}
 .tip-icon:hover .tip{{display:block;}}
@@ -832,7 +816,7 @@ section{{margin-bottom:28px;}}
 section .sec-hdr{{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid var(--bdr);}}
 section .sec-hdr h2{{font-size:15px;font-weight:600;}}
 table{{width:100%;border-collapse:collapse;background:var(--surf);border-radius:10px;overflow:hidden;border:1px solid var(--bdr);}}
-thead tr{{background:#1e2235;}}
+thead tr{{background:var(--thead);}}
 th{{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);
   text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}}
 td{{padding:8px 12px;border-top:1px solid var(--bdr);font-size:13px;white-space:nowrap;}}
@@ -851,17 +835,19 @@ button:hover{{opacity:.85;}}
 .legend{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--mut);}}
 .legend span{{display:flex;align-items:center;gap:5px;}}
 .dot{{width:10px;height:10px;border-radius:50%;display:inline-block;}}
-@media(max-width:900px){{.charts{{grid-template-columns:1fr;}}}}
 </style>
 </head>
 <body>
-<header>
+<div class="wrap">
+<header style="margin-bottom:18px;">
   <h1>bench</h1>
   <span class="badge">llm-transpile</span>
   <span class="hdr-meta" data-i18n="hdr_meta">{runs} runs · {total_files} records</span>
-  <button class="lang-btn" onclick="toggleLang()" id="langBtn">한국어</button>
+  <span class="hdr-actions">
+    <button class="lang-btn" onclick="toggleLang()" id="langBtn">한국어</button>
+    <button class="lang-btn" onclick="toggleTheme()" id="themeBtn">☀</button>
+  </span>
 </header>
-<div class="wrap">
 
 <!-- ── KPI Cards ── -->
 <div class="cards">
@@ -1131,129 +1117,50 @@ function toggleLang() {{
   LANG = LANG === 'en' ? 'ko' : 'en';
   applyLang();
 }}
+function toggleTheme(){{
+  const r=document.documentElement;
+  const next=(r.getAttribute('data-theme')||'dark')==='dark'?'light':'dark';
+  r.setAttribute('data-theme',next);
+  document.getElementById('themeBtn').textContent=next==='dark'?'☀':'🌙';
+  localStorage.setItem('bench-theme',next);
+  renderCharts();
+}}
+(function(){{const s=localStorage.getItem('bench-theme');if(s){{document.documentElement.setAttribute('data-theme',s);document.getElementById('themeBtn').textContent=s==='dark'?'☀':'🌙';}}}})();
 // auto-detect browser language
 if (navigator.language && navigator.language.startsWith('ko')) {{ LANG = 'ko'; }}
 applyLang();
 
 // ── Chart.js ─────────────────────────────────────────────────────────────────
-const G = {{color:'rgba(255,255,255,.05)'}}, F = {{color:'#8892a4'}};
+function getStyle(v){{return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}}
+function getTC(){{return getStyle('--mut')||'#8892a4';}}
+function getGC(){{return getStyle('--bdr')||'rgba(128,128,128,.15)';}}
 const LABELS={labels}, SEM={sem_data}, CMP={cmp_data}, TOK={tok_data}, COV={cov_data};
 const SCATTER={scatter_data}, BOX={box_data};
-
-// Trend
-new Chart(document.getElementById('trendChart'),{{
-  type:'line',
-  data:{{labels:LABELS,datasets:[
-    {{label:'Semantic%',data:SEM,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',tension:.3,pointRadius:4}},
-    {{label:'Compressed%',data:CMP,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.3,pointRadius:4}},
-  ]}},
-  options:{{plugins:{{legend:{{labels:{{color:'#e2e8f0'}}}}}},
-    scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'% reduction',color:'#8892a4'}}}}}}}}
-}});
-
-// Throughput
-new Chart(document.getElementById('thruChart'),{{
-  type:'bar',
-  data:{{labels:LABELS,datasets:[{{label:'tok/ms',data:TOK,backgroundColor:'rgba(99,102,241,.7)',borderRadius:4}}]}},
-  options:{{plugins:{{legend:{{labels:{{color:'#e2e8f0'}}}}}},
-    scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'tok/ms',color:'#8892a4'}}}}}}}}
-}});
-
-// Scatter
 const FMT_COL={{'markdown':'#6366f1','html':'#22c55e','plaintext':'#eab308'}};
 const grps={{}};
 for(const p of SCATTER){{if(!grps[p.fmt])grps[p.fmt]=[];grps[p.fmt].push({{x:p.x,y:p.y,file:p.file,run:p.run}});}}
-new Chart(document.getElementById('scatterChart'),{{
-  type:'scatter',
-  data:{{datasets:Object.entries(grps).map(([fmt,pts])=>({{'label':fmt,'data':pts,'backgroundColor':(FMT_COL[fmt]||'#fff')+'cc','pointRadius':5}})) }},
-  options:{{
-    plugins:{{legend:{{labels:{{color:'#e2e8f0'}}}},
-      tooltip:{{callbacks:{{label:c=>`${{c.raw.file}} (${{c.raw.run}}): ${{c.raw.x}}% / ${{c.raw.y.toFixed(0)}} tok/ms`}}}}}},
-    scales:{{x:{{ticks:F,grid:G,title:{{display:true,text:'Semantic reduction %',color:'#8892a4'}}}},
-             y:{{ticks:F,grid:G,title:{{display:true,text:'Throughput (tok/ms)',color:'#8892a4'}}}}}}}}
-}});
-
-// Box (floating bars)
-new Chart(document.getElementById('boxChart'),{{
-  type:'bar',
-  data:{{labels:BOX.map(b=>b.fmt),datasets:[
+let charts={{}};
+function mkChart(id,cfg){{if(charts[id]){{charts[id].destroy();}}charts[id]=new Chart(document.getElementById(id),cfg);}}
+function renderCharts(){{
+  const tc=getTC(),gc=getGC();
+  const F={{color:tc}},G={{color:gc}};
+  mkChart('trendChart',{{type:'line',data:{{labels:LABELS,datasets:[
+    {{label:'Semantic%',data:SEM,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.08)',tension:.3,pointRadius:4}},
+    {{label:'Compressed%',data:CMP,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.3,pointRadius:4}},
+  ]}},options:{{plugins:{{legend:{{labels:{{color:tc}}}}}},scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'% reduction',color:tc}}}}}}}}}});
+  mkChart('thruChart',{{type:'bar',data:{{labels:LABELS,datasets:[{{label:'tok/ms',data:TOK,backgroundColor:'rgba(99,102,241,.7)',borderRadius:4}}]}},options:{{plugins:{{legend:{{labels:{{color:tc}}}}}},scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'tok/ms',color:tc}}}}}}}}}});
+  mkChart('scatterChart',{{type:'scatter',data:{{datasets:Object.entries(grps).map(([fmt,pts])=>({{'label':fmt,'data':pts,'backgroundColor':(FMT_COL[fmt]||'#fff')+'cc','pointRadius':5}}))}},options:{{plugins:{{legend:{{labels:{{color:tc}}}},tooltip:{{callbacks:{{label:c=>`${{c.raw.file}} (${{c.raw.run}}): ${{c.raw.x}}% / ${{c.raw.y.toFixed(0)}} tok/ms`}}}}}},scales:{{x:{{ticks:F,grid:G,title:{{display:true,text:'Semantic reduction %',color:tc}}}},y:{{ticks:F,grid:G,title:{{display:true,text:'Throughput (tok/ms)',color:tc}}}}}}}}}});
+  mkChart('boxChart',{{type:'bar',data:{{labels:BOX.map(b=>b.fmt),datasets:[
     {{label:'min–Q1',data:BOX.map(b=>[b.min,b.q1]),backgroundColor:'rgba(99,102,241,.3)',borderSkipped:false}},
     {{label:'Q1–med',data:BOX.map(b=>[b.q1,b.med]),backgroundColor:'rgba(99,102,241,.6)',borderSkipped:false}},
     {{label:'med–Q3',data:BOX.map(b=>[b.med,b.q3]),backgroundColor:'rgba(34,197,94,.6)',borderSkipped:false}},
     {{label:'Q3–max',data:BOX.map(b=>[b.q3,b.max]),backgroundColor:'rgba(34,197,94,.3)',borderSkipped:false}},
-  ]}},
-  options:{{plugins:{{legend:{{labels:{{color:'#e2e8f0'}}}}}},
-    scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'Semantic reduction %',color:'#8892a4'}}}}}}}}
-}});
-
-// Pie — format distribution
-new Chart(document.getElementById('pieChart'),{{
-  type:'doughnut',
-  data:{{
-    labels:{fmt_labels},
-    datasets:[{{
-      data:{fmt_count_data},
-      backgroundColor:['rgba(99,102,241,.8)','rgba(34,197,94,.8)','rgba(234,179,8,.8)'],
-      borderColor:['#6366f1','#22c55e','#eab308'],
-      borderWidth:2,
-    }}]
-  }},
-  options:{{
-    plugins:{{
-      legend:{{labels:{{color:'#e2e8f0',padding:16}}}},
-      tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files (${{Math.round(c.raw/c.dataset.data.reduce((a,b)=>a+b,0)*100)}}%)`}}}}
-    }}
-  }}
-}});
-
-// Histogram — input token size
-new Chart(document.getElementById('histChart'),{{
-  type:'bar',
-  data:{{
-    labels:{hist_labels},
-    datasets:[{{
-      label:'files',
-      data:{hist_data},
-      backgroundColor:'rgba(99,102,241,.65)',
-      borderColor:'#6366f1',
-      borderWidth:1,
-      borderRadius:4,
-    }}]
-  }},
-  options:{{
-    plugins:{{legend:{{display:false}}}},
-    scales:{{
-      x:{{ticks:F,grid:G,title:{{display:true,text:'Token range',color:'#8892a4'}}}},
-      y:{{ticks:{{...F,stepSize:1}},grid:G,title:{{display:true,text:'# files',color:'#8892a4'}}}}
-    }}
-  }}
-}});
-
-// Donut — word coverage buckets
-new Chart(document.getElementById('covDonut'),{{
-  type:'doughnut',
-  data:{{
-    labels:{cov_donut_labels},
-    datasets:[{{
-      data:{cov_donut_data},
-      backgroundColor:[
-        'rgba(34,197,94,.85)',
-        'rgba(34,197,94,.45)',
-        'rgba(234,179,8,.7)',
-        'rgba(239,68,68,.7)',
-      ],
-      borderColor:['#22c55e','#22c55e','#eab308','#ef4444'],
-      borderWidth:2,
-    }}]
-  }},
-  options:{{
-    plugins:{{
-      legend:{{labels:{{color:'#e2e8f0',padding:14}}}},
-      tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files`}}}}
-    }},
-    cutout:'60%',
-  }}
-}});
+  ]}},options:{{plugins:{{legend:{{labels:{{color:tc}}}}}},scales:{{x:{{ticks:F,grid:G}},y:{{ticks:F,grid:G,title:{{display:true,text:'Semantic reduction %',color:tc}}}}}}}}}});
+  mkChart('pieChart',{{type:'doughnut',data:{{labels:{fmt_labels},datasets:[{{data:{fmt_count_data},backgroundColor:['rgba(99,102,241,.8)','rgba(34,197,94,.8)','rgba(234,179,8,.8)'],borderColor:['#6366f1','#22c55e','#eab308'],borderWidth:2}}]}},options:{{plugins:{{legend:{{labels:{{color:tc,padding:16}}}},tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files (${{Math.round(c.raw/c.dataset.data.reduce((a,b)=>a+b,0)*100)}}%)`}}}}}}}}}});
+  mkChart('histChart',{{type:'bar',data:{{labels:{hist_labels},datasets:[{{label:'files',data:{hist_data},backgroundColor:'rgba(99,102,241,.65)',borderColor:'#6366f1',borderWidth:1,borderRadius:4}}]}},options:{{plugins:{{legend:{{display:false}}}},scales:{{x:{{ticks:F,grid:G,title:{{display:true,text:'Token range',color:tc}}}},y:{{ticks:{{...F,stepSize:1}},grid:G,title:{{display:true,text:'# files',color:tc}}}}}}}}}});
+  mkChart('covDonut',{{type:'doughnut',data:{{labels:{cov_donut_labels},datasets:[{{data:{cov_donut_data},backgroundColor:['rgba(34,197,94,.85)','rgba(34,197,94,.45)','rgba(234,179,8,.7)','rgba(239,68,68,.7)'],borderColor:['#22c55e','#22c55e','#eab308','#ef4444'],borderWidth:2}}]}},options:{{plugins:{{legend:{{labels:{{color:tc,padding:14}}}},tooltip:{{callbacks:{{label:c=>`${{c.label}}: ${{c.raw}} files`}}}}}},cutout:'60%'}}}});
+}}
+renderCharts();
 
 // ── Filter & CSV ─────────────────────────────────────────────────────────────
 function filterTbl(){{
@@ -1316,20 +1223,7 @@ function exportCsv(){{
     }
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
-
-fn main() {
-    let cli = Cli::parse();
-    match cli.command {
-        Cmd::Run {
-            dataset,
-            log_dir,
-            report,
-            report_out,
-        } => cmd_run(&dataset, log_dir, report, &report_out),
-        Cmd::Report { log_dir, out } => cmd_report(log_dir, &out),
-    }
-}
+// ── Unit tests ────────────────────────────────────────────────────────────────
 
 // ── Unit tests ────────────────────────────────────────────────────────────────
 

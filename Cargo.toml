@@ -1,6 +1,6 @@
 [package]
 name         = "llm-transpile"
-version      = "0.2.1"
+version      = "0.2.2-dev"
 edition      = "2024"
 description  = "High-performance LLM context bridge — token-optimized document transpiler"
 rust-version = "1.92"
@@ -97,10 +97,6 @@ lto = "thin"
 [[bin]]
 name = "transpile"
 path = "src/bin/transpile.rs"
-
-[[bin]]
-name = "bench"
-path = "src/bin/bench.rs"
 
 [[example]]
 name = "eval"

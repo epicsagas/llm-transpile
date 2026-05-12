@@ -11,7 +11,9 @@
 //!   transpile install --all      # install all detected tools
 //!   transpile uninstall          # remove everything
 
+mod bench;
 mod install;
+mod stats_report;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use llm_transpile::{FidelityLevel, InputFormat, token_count, transpile};
@@ -71,19 +73,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Show transpile usage statistics
+    /// Show transpile usage statistics or generate HTML dashboard
     ///
     /// Examples:
-    ///   transpile stats                # last 1 day
-    ///   transpile stats --days 7       # last 7 days
-    ///   transpile stats --agent claude # filter by agent
+    ///   transpile stats show              # last 1 day, ASCII table
+    ///   transpile stats show --days 7     # last 7 days
+    ///   transpile stats show --agent claude
+    ///   transpile stats report            # HTML dashboard, last 7 days
+    ///   transpile stats report --days 30  # last 30 days
+    ///   transpile stats report --no-open  # don't open browser
     Stats {
-        /// Number of days to look back (default: 1)
-        #[arg(long, default_value = "1")]
-        days: u32,
-        /// Filter by agent name (claude, gemini, codex, opencode)
-        #[arg(long)]
-        agent: Option<String>,
+        #[command(subcommand)]
+        command: StatsCmd,
     },
     /// Configure integrations with AI coding tools (interactive wizard)
     ///
@@ -123,6 +124,79 @@ enum Command {
         /// Preview changes without removing any files
         #[arg(long)]
         dry_run: bool,
+    },
+    /// File benchmark runner & HTML report generator
+    ///
+    /// Examples:
+    ///   transpile bench run                  # benchmark eval/dataset
+    ///   transpile bench run -R               # run + generate report
+    ///   transpile bench report               # aggregate logs → HTML
+    ///   transpile bench report --no-open     # report without opening browser
+    Bench {
+        #[command(subcommand)]
+        command: BenchCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum StatsCmd {
+    /// Show ASCII table of usage statistics
+    Show {
+        /// Number of days to look back (default: 1)
+        #[arg(long, default_value = "1")]
+        days: u32,
+        /// Filter by agent name (claude, gemini, codex, opencode)
+        #[arg(long)]
+        agent: Option<String>,
+    },
+    /// Generate an HTML dashboard from usage stats
+    Report {
+        /// Number of days to look back (default: 7)
+        #[arg(long, default_value = "7")]
+        days: u32,
+        /// Filter by agent name
+        #[arg(long)]
+        agent: Option<String>,
+        /// Filter by project name
+        #[arg(long)]
+        project: Option<String>,
+        /// Output HTML path
+        #[arg(long, short = 'o', default_value = "~/.agents/transpile/reports/stats-report.html")]
+        out: String,
+        /// Do not open the report in a browser after generating
+        #[arg(long)]
+        no_open: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum BenchCmd {
+    /// Benchmark eval/dataset files and write a dated JSONL log
+    Run {
+        /// Root directory of eval datasets (default: eval/dataset)
+        #[arg(long, default_value = "eval/dataset")]
+        dataset: String,
+        /// Log output directory (default: ~/.agents/transpile/bench)
+        #[arg(long)]
+        log_dir: Option<String>,
+        /// Also generate HTML report after run
+        #[arg(long, short = 'R')]
+        report: bool,
+        /// Path for the HTML report
+        #[arg(long, default_value = "~/.agents/transpile/reports/bench-report.html")]
+        report_out: String,
+    },
+    /// Aggregate all JSONL logs and generate an HTML report
+    Report {
+        /// Log directory (default: ~/.agents/transpile/bench)
+        #[arg(long)]
+        log_dir: Option<String>,
+        /// Output HTML path
+        #[arg(long, short = 'o', default_value = "~/.agents/transpile/reports/bench-report.html")]
+        out: String,
+        /// Do not open the report in a browser after generating
+        #[arg(long)]
+        no_open: bool,
     },
 }
 
@@ -218,9 +292,16 @@ fn main() {
     }
 
     match cli.command {
-        Some(Command::Stats { days, agent }) => {
-            process::exit(run_stats(days, agent));
-        }
+        Some(Command::Stats { command }) => match command {
+            StatsCmd::Show { days, agent } => process::exit(run_stats(days, agent)),
+            StatsCmd::Report {
+                days,
+                agent,
+                project,
+                out,
+                no_open,
+            } => process::exit(stats_report::cmd_stats_report(days, agent, project, &out, no_open)),
+        },
         Some(Command::Install {
             tools,
             all,
@@ -236,6 +317,19 @@ fn main() {
         }) => {
             process::exit(install::run_uninstall(tools, all, dry_run));
         }
+        Some(Command::Bench { command }) => match command {
+            BenchCmd::Run {
+                dataset,
+                log_dir,
+                report,
+                report_out,
+            } => process::exit(bench::cmd_run(&dataset, log_dir, report, &report_out)),
+            BenchCmd::Report {
+                log_dir,
+                out,
+                no_open,
+            } => process::exit(bench::cmd_report(log_dir, &out, no_open)),
+        },
         None => run_transpile(cli),
     }
 }
@@ -534,6 +628,7 @@ fn try_log_stats(
     let ts = format!("{date_str}T{h:02}:{min:02}:{s:02}Z");
 
     let agent = std::env::var("TRANSPILE_AGENT").unwrap_or_default();
+    let project = std::env::var("TRANSPILE_PROJECT").unwrap_or_default();
     let file_name = input_path
         .and_then(|p| p.file_name())
         .and_then(|f| f.to_str())
@@ -553,6 +648,7 @@ fn try_log_stats(
     let entry = serde_json::json!({
         "ts": ts,
         "agent": agent,
+        "project": project,
         "file": file_name,
         "format": fmt_str,
         "fidelity": fid_str,
