@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # install.sh — one-line installer for transpile
-# Usage: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
+# Usage: curl --proto '=https' --tlsv1.2 -LsSf \
+#   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 set -eu
 
 REPO="epicsagas/llm-transpile"
@@ -20,21 +21,32 @@ case "${os}-${arch}" in
 esac
 
 # ── Resolve latest version ────────────────────────────────────────────────────
-version="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"v\(.*\)".*/\1/')"
+version="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' | head -1 | sed 's/.*"v\(.*\)".*/\1/')"
 if [ -z "${version}" ]; then
     echo "Error: could not determine latest version" >&2
     exit 1
 fi
 
-url="https://github.com/${REPO}/releases/download/v${version}/${BINARY}-${target}.tar.gz"
+base_url="https://github.com/${REPO}/releases/download/v${version}"
+archive="${BINARY}-${target}.tar.gz"
+url="${base_url}/${archive}"
+sha_url="${base_url}/${archive}.sha256"
 
-# ── Download and install ──────────────────────────────────────────────────────
+# ── Download, verify, and install ────────────────────────────────────────────
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 
 echo "Installing ${BINARY} v${version} for ${target}..."
 
-curl -fsSL "${url}" | tar -xzf - -C "${tmpdir}"
+curl -fsSL "${url}"     -o "${tmpdir}/${archive}"
+curl -fsSL "${sha_url}" -o "${tmpdir}/${archive}.sha256"
+
+(cd "${tmpdir}" && sha256sum -c "${archive}.sha256" 2>/dev/null \
+    || shasum -a 256 -c "${archive}.sha256") \
+    || { echo "Error: SHA-256 verification failed" >&2; exit 1; }
+
+tar -xzf "${tmpdir}/${archive}" -C "${tmpdir}"
 
 mkdir -p "${INSTALL_DIR}"
 mv "${tmpdir}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
