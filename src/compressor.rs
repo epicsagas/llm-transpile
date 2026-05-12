@@ -505,8 +505,9 @@ fn is_abbreviation_or_decimal(text: &str, pos: usize) -> bool {
     // Periods are included so that multi-period abbreviations like "U.S." stay intact.
     let before = &text[..pos];
     let word_start = before
-        .rfind(|c: char| !c.is_alphanumeric() && c != '.')
-        .map(|i| i + 1)
+        .char_indices()
+        .rfind(|(_, c)| !c.is_alphanumeric() && *c != '.')
+        .map(|(i, c)| i + c.len_utf8())
         .unwrap_or(0);
     let word_before = &before[word_start..];
 

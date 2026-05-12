@@ -25,6 +25,7 @@ Raw documents (Markdown, HTML, plain text) → structured bridge format `<D>?<H>
 - [Updating](#updating)
 - [CLI Usage](#cli-usage)
 - [Usage Statistics](#usage-statistics)
+- [Benchmarking](#benchmarking)
 - [Library Usage](#library-usage)
 - [Output Format](#output-format)
 - [Fidelity Levels](#fidelity-levels)
@@ -232,6 +233,26 @@ transpile stats — last 7 days
   Total                       7      19 765       14 372   5 393      27.3%
 ```
 
+**Interactive HTML dashboard**
+
+```bash
+transpile stats report                 # opens in browser (default: last 7 days)
+transpile stats report --days 30       # last 30 days
+transpile stats report --no-open       # generate without opening
+transpile stats report --out /tmp/custom.html
+```
+
+> Reports are generated at `~/.agents/transpile/reports/` by default. Override with `--out`.
+
+The dashboard includes:
+
+- **KPI cards** — total calls, tokens saved, avg reduction, unique files, agents, active days
+- **6 charts** — daily token usage, fidelity breakdown, input vs output trend, agent distribution, hourly pattern, reduction distribution
+- **Date range presets** — one-click filtering: `Today` · `1W` · `2W` · `1M` · `90D` (default: 1 week)
+- **Filters** — project, agent, and file-text filters with CSV export
+- **Theme toggle** — dark / light mode with persistent preference
+- **Bilingual** — auto-detects Korean locale; manual 한/EN toggle
+
 **JSONL record fields**
 
 | Field | Type | Description |
@@ -253,6 +274,24 @@ The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md
 ```
+
+### Benchmarking
+
+```bash
+# Run benchmarks against a directory of test files
+transpile bench run --dataset ./eval                    # generates JSONL log
+transpile bench run --dataset ./eval --report           # run + open HTML report
+transpile bench report                                 # regenerate report from logs
+```
+
+The HTML benchmark report includes:
+
+- **KPI cards** — semantic reduction, compressed reduction, throughput (tok/ms), word coverage, total input tokens, run count
+- **7 charts** — reduction trend over time, throughput per run, semantic vs throughput scatter, box plot per format, format distribution, token size histogram, word coverage donut
+- **Runs table** — per-run summary with aggregate metrics
+- **Records table** — per-file detail with filter by format, run, and filename
+- **Theme toggle** — dark / light mode with persistent preference
+- **Bilingual** — auto-detects Korean locale; manual 한/EN toggle
 
 ---
 

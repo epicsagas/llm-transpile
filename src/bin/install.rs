@@ -490,18 +490,25 @@ set -euo pipefail
 
 THRESHOLD=${TRANSPILE_THRESHOLD:-8192}   # bytes; override via env var
 
-# Parse file_path from hook JSON on stdin
+# Parse file_path and project from hook JSON on stdin
 INPUT=$(cat)
-FILE=$(printf '%s' "$INPUT" | python3 -c "
-import json, sys
+PARSED=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys, os
 d = json.load(sys.stdin)
-print(d.get('tool_input', {}).get('file_path', ''))
+file_path = d.get('tool_input', {}).get('file_path', '')
+cwd = d.get('cwd', '') or os.getcwd()
+project = os.path.basename(cwd.rstrip('/')) if cwd else ''
+print(file_path)
+print(project)
 " 2>/dev/null) || exit 0
+FILE=$(printf '%s' "$PARSED" | sed -n '1p')
+PROJECT=$(printf '%s' "$PARSED" | sed -n '2p')
+export TRANSPILE_PROJECT="${PROJECT}"
 
 [ -z "$FILE" ] && exit 0
 [ -f "$FILE" ] || exit 0
 
-BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
+BYTES=$(wc -c < "$FILE" 2>/dev/null | tr -d ' ' || echo 0)
 [ "$BYTES" -lt "$THRESHOLD" ] && exit 0
 
 # Run transpile; silently skip if binary not on PATH or transpile fails
@@ -509,17 +516,17 @@ COMPRESSED=$(transpile --input "$FILE" --fidelity semantic --quiet 2>/dev/null) 
 [ -z "$COMPRESSED" ] && exit 0
 
 FNAME=$(basename "$FILE")
-python3 -c "
-import json, sys
-compressed = sys.argv[1]
-fname      = sys.argv[2]
-bytes_val  = sys.argv[3]
+printf '%s' "$COMPRESSED" | TRANSPILE_FNAME="$FNAME" TRANSPILE_BYTES="$BYTES" python3 -c "
+import json, os, sys
+compressed = sys.stdin.read()
+fname     = os.environ['TRANSPILE_FNAME']
+bytes_val = os.environ['TRANSPILE_BYTES']
 msg = (
     f'[llm-transpile] {fname} is {bytes_val}B — token-compressed version below '
     f'(prefer this over the raw content above):\n\n{compressed}'
 )
 print(json.dumps({'additionalContext': msg}))
-" "$COMPRESSED" "$FNAME" "$BYTES"
+"
 "#;
 
 fn merge_claude_hook(hook_script: &std::path::Path, settings_path: &std::path::Path) -> SyncResult {
