@@ -16,5 +16,4 @@
     "context",
     "token"
   ],
-  "hooks": "./hooks/hooks.json"
 }

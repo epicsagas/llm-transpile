@@ -134,6 +134,8 @@ fn esc(s: &str) -> String {
 
 fn js_safe(json: &str) -> String {
     json.replace("</", "<\\/")
+        .replace('\u{2028}', "\\u2028")
+        .replace('\u{2029}', "\\u2029")
 }
 
 fn expand_tilde(path: &str) -> String {
@@ -170,7 +172,7 @@ fn generate_html(records: &[StatsRecord], out_path: &str) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>stats — llm-transpile usage report</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" integrity="sha384-e6cc9LaIG7xZ3XD5B+jtr1NhTWPQGQdRCh6xiZ+ZFUtWCpg4ycv3Sh+SkZoopvUY" crossorigin="anonymous"></script>
 <style>
 :root{{--bg:#0f1117;--surf:#1a1d27;--bdr:#2e3147;--txt:#e2e8f0;--mut:#8892a4;
   --acc:#6366f1;--grn:#22c55e;--ylw:#eab308;--red:#ef4444;--thead:#1e2235;}}
@@ -367,7 +369,7 @@ button:hover{{opacity:.85;}}
 <section>
   <h2 data-i18n="sec_records">All Records</h2>
   <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-    <input type="text" id="ftxt" placeholder="Filter file…" oninput="applyFilter()">
+    <input type="text" id="ftxt" placeholder="Filter file…">
   </div>
   <table id="tbl"><thead><tr>
     <th data-i18n="col_date">date</th><th data-i18n="col_project">project</th>
@@ -513,8 +515,8 @@ function calNav(dir){{
   drawCal();
 }}
 function drawCal(){{
-  const mn=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('calTitle').textContent=`${{calYear}} ${{mn[calMonth]}}`;
+  const mn=new Intl.DateTimeFormat(LANG==='ko'?'ko':'en',{{month:'long'}});
+  document.getElementById('calTitle').textContent=`${{calYear}} ${{mn.format(new Date(calYear,calMonth,1))}}`;
   document.getElementById('drHint').textContent=pickPhase===0?t('dr_hint_start'):t('dr_hint_end');
   const grid=document.getElementById('calGrid');
   const dn=['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -654,10 +656,10 @@ function render(){{
   const dailySem={{}},dailyCmp={{}};
   recs.forEach(r=>{{
     const d=dateOf(r.ts);
-    const e=dailyMap[d]||=(dailyMap[d]||{{c:0,i:0,o:0,s:0}});
+    dailyMap[d]??={{c:0,i:0,o:0,s:0}};const e=dailyMap[d];
     e.c++;e.i+=r.input_tok;e.o+=r.output_tok;e.s+=r.saved;
-    if(r.fidelity==='semantic'){{const s=dailySem[d]||=(dailySem[d]||{{s:0,c:0}});s.s+=r.reduction_pct;s.c++;}}
-    if(r.fidelity==='compressed'){{const s=dailyCmp[d]||=(dailyCmp[d]||{{s:0,c:0}});s.s+=r.reduction_pct;s.c++;}}
+    if(r.fidelity==='semantic'){{dailySem[d]??={{s:0,c:0}};const s=dailySem[d];s.s+=r.reduction_pct;s.c++;}}
+    if(r.fidelity==='compressed'){{dailyCmp[d]??={{s:0,c:0}};const s=dailyCmp[d];s.s+=r.reduction_pct;s.c++;}}
   }});
   const days=Object.keys(dailyMap).sort();
   const dInput=days.map(d=>dailyMap[d].i);
@@ -721,7 +723,7 @@ function render(){{
   // ── Daily table ──
   document.getElementById('dailyTbody').innerHTML=days.map(d=>{{
     const e=dailyMap[d];const pct=e.i>0?r2(e.s/e.i*100):0;
-    return `<tr><td>${{d}}</td><td class="n">${{e.c}}</td><td class="n">${{fmt(e.i)}}</td><td class="n">${{fmt(e.s)}}</td><td class="n ${{pcls(pct)}}">${{pct.toFixed(1)}}%</td></tr>`;
+    return `<tr><td>${{esc(d)}}</td><td class="n">${{e.c}}</td><td class="n">${{fmt(e.i)}}</td><td class="n">${{fmt(e.s)}}</td><td class="n ${{pcls(pct)}}">${{pct.toFixed(1)}}%</td></tr>`;
   }}).join('');
 
   // ── All records table ──
@@ -747,6 +749,14 @@ function exportCsv(){{
   a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{{type:'text/csv'}}));
   a.download='stats.csv';a.click();
 }}
+
+// ftxt debounce — 200ms
+(function(){{
+  let _t;
+  document.getElementById('ftxt').addEventListener('input',()=>{{
+    clearTimeout(_t);_t=setTimeout(applyFilter,200);
+  }});
+}})();
 
 // Initial render — default to 1 week
 (function(){{

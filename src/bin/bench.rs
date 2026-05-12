@@ -82,34 +82,18 @@ fn secs_to_iso(secs: u64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{min:02}:{sec:02}Z")
 }
 
-fn days_to_ymd(mut days: u64) -> (u32, u32, u32) {
-    let mut year = 1970u32;
-    loop {
-        let dy = if is_leap(year) { 366 } else { 365 };
-        if days < dy {
-            break;
-        }
-        days -= dy;
-        year += 1;
-    }
-    let months = if is_leap(year) {
-        [31u32, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        [31u32, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-    let mut month = 1u32;
-    for dm in months {
-        if days < dm as u64 {
-            break;
-        }
-        days -= dm as u64;
-        month += 1;
-    }
-    (year, month, days as u32 + 1)
-}
-
-fn is_leap(y: u32) -> bool {
-    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
+fn days_to_ymd(days: u64) -> (u32, u32, u32) {
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as u32, m as u32, d as u32)
 }
 
 /// "2026-05-12T01:10:01Z" → "2026-05-12_01-10-01"
@@ -748,7 +732,7 @@ fn generate_html(records: &[BenchRecord], out_path: &str) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>bench — llm-transpile report</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" integrity="sha384-e6cc9LaIG7xZ3XD5B+jtr1NhTWPQGQdRCh6xiZ+ZFUtWCpg4ycv3Sh+SkZoopvUY" crossorigin="anonymous"></script>
 <style>
 :root{{--bg:#0f1117;--surf:#1a1d27;--bdr:#2e3147;--txt:#e2e8f0;--mut:#8892a4;
   --acc:#6366f1;--grn:#22c55e;--ylw:#eab308;--red:#ef4444;--thead:#1e2235;}}
