@@ -359,6 +359,12 @@ fn cmd_run(dataset: &str, log_dir_opt: Option<String>, report: bool, report_out:
         println!();
     }
 
+    // R7: no records produced → error exit
+    if all.is_empty() {
+        eprintln!("ERROR: no records produced. Check dataset path: {dataset}");
+        std::process::exit(1);
+    }
+
     print_grand_summary(&all);
 
     if report {
@@ -442,7 +448,7 @@ fn print_table_row(r: &BenchRecord) {
     println!(
         "    {:<36} {:>4} {:>6} {:>7.1} {:>7.1} {:>7.1} {:>7.1} {:>9.0}",
         trunc(&r.file, 36),
-        &r.format[..3],
+        r.format.get(..3).unwrap_or(&r.format),
         r.input_tok,
         r.sem_pct,
         r.cmp_pct,
@@ -481,11 +487,18 @@ fn print_grand_summary(all: &[BenchRecord]) {
 }
 
 fn trunc(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}…", &s[..max.saturating_sub(1)])
+        let cut: String = s.chars().take(max.saturating_sub(1)).collect();
+        format!("{cut}…")
     }
+}
+
+/// Escape `</` so JSON strings embedded in `<script>` cannot prematurely
+/// close the script block (JS spec allows `<\/` as valid escape).
+fn js_safe(json: &str) -> String {
+    json.replace("</", "<\\/")
 }
 
 // ── HTML report generator ─────────────────────────────────────────────────────
@@ -946,13 +959,13 @@ function exportCsv(){{
         run_rows = run_rows,
         run_options = run_options,
         table_rows = table_rows,
-        labels = labels,
-        sem_data = sem_data,
-        cmp_data = cmp_data,
-        tok_data = tok_data,
-        cov_data = cov_data,
-        scatter_data = scatter_data,
-        box_data = box_data,
+        labels = js_safe(&labels),
+        sem_data = js_safe(&sem_data),
+        cmp_data = js_safe(&cmp_data),
+        tok_data = js_safe(&tok_data),
+        cov_data = js_safe(&cov_data),
+        scatter_data = js_safe(&scatter_data),
+        box_data = js_safe(&box_data),
     );
 
     if let Err(e) = fs::write(out_path, &html) {
@@ -1019,7 +1032,27 @@ mod tests {
     #[test]
     fn trunc_long_truncated() {
         let s = trunc("abcdefghijk", 5);
-        assert!(s.len() <= 7); // 4 chars + '…' (3 UTF-8 bytes)
+        // 4 ASCII chars + '…' (3 UTF-8 bytes) = 7 bytes max
+        assert!(s.len() <= 7);
+        assert!(s.chars().count() <= 5);
+    }
+
+    #[test]
+    fn trunc_multibyte_no_panic() {
+        // Korean chars are 3 bytes each — must not panic on byte boundary
+        let s = trunc("안녕하세요반갑습니다", 5);
+        assert!(s.chars().count() <= 5);
+    }
+
+    #[test]
+    fn js_safe_escapes_script_close() {
+        assert_eq!(js_safe("</script>"), "<\\/script>");
+    }
+
+    #[test]
+    fn js_safe_leaves_normal_json_unchanged() {
+        let json = r#"{"x":1,"y":"hello"}"#;
+        assert_eq!(js_safe(json), json);
     }
 
     #[test]
