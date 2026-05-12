@@ -161,7 +161,11 @@ enum StatsCmd {
         #[arg(long)]
         project: Option<String>,
         /// Output HTML path
-        #[arg(long, short = 'o', default_value = "~/.agents/transpile/reports/stats-report.html")]
+        #[arg(
+            long,
+            short = 'o',
+            default_value = "~/.agents/transpile/reports/stats-report.html"
+        )]
         out: String,
         /// Do not open the report in a browser after generating
         #[arg(long)]
@@ -192,7 +196,11 @@ enum BenchCmd {
         #[arg(long)]
         log_dir: Option<String>,
         /// Output HTML path
-        #[arg(long, short = 'o', default_value = "~/.agents/transpile/reports/bench-report.html")]
+        #[arg(
+            long,
+            short = 'o',
+            default_value = "~/.agents/transpile/reports/bench-report.html"
+        )]
         out: String,
         /// Do not open the report in a browser after generating
         #[arg(long)]
@@ -300,7 +308,9 @@ fn main() {
                 project,
                 out,
                 no_open,
-            } => process::exit(stats_report::cmd_stats_report(days, agent, project, &out, no_open)),
+            } => process::exit(stats_report::cmd_stats_report(
+                days, agent, project, &out, no_open,
+            )),
         },
         Some(Command::Install {
             tools,

@@ -154,19 +154,46 @@ fn generate_html(records: &[StatsRecord], out_path: &str) {
     let records_json = js_safe(&serde_json::to_string(records).unwrap());
 
     // Collect unique filter values
-    let mut projects: Vec<String> = records.iter()
-        .map(|r| if r.project.is_empty() { "unknown".to_string() } else { r.project.clone() })
-        .collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let mut projects: Vec<String> = records
+        .iter()
+        .map(|r| {
+            if r.project.is_empty() {
+                "unknown".to_string()
+            } else {
+                r.project.clone()
+            }
+        })
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
     projects.sort();
-    let mut agents: Vec<String> = records.iter()
-        .map(|r| if r.agent.is_empty() { "unknown".to_string() } else { r.agent.clone() })
-        .collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let mut agents: Vec<String> = records
+        .iter()
+        .map(|r| {
+            if r.agent.is_empty() {
+                "unknown".to_string()
+            } else {
+                r.agent.clone()
+            }
+        })
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
     agents.sort();
 
-    let project_options = projects.iter().map(|p| format!("<option>{}</option>", esc(p))).collect::<Vec<_>>().join("");
-    let agent_options = agents.iter().map(|a| format!("<option>{}</option>", esc(a))).collect::<Vec<_>>().join("");
+    let project_options = projects
+        .iter()
+        .map(|p| format!("<option>{}</option>", esc(p)))
+        .collect::<Vec<_>>()
+        .join("");
+    let agent_options = agents
+        .iter()
+        .map(|a| format!("<option>{}</option>", esc(a)))
+        .collect::<Vec<_>>()
+        .join("");
 
-    let html = format!(r##"<!DOCTYPE html>
+    let html = format!(
+        r##"<!DOCTYPE html>
 <html lang="en" data-lang="en">
 <head>
 <meta charset="UTF-8">
