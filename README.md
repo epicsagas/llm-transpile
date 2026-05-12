@@ -15,19 +15,6 @@
 
 Raw documents (Markdown, HTML, plain text) → structured bridge format `<D>?<H><B>` — with adaptive compression that keeps you under token budget.
 
-```
-<H>
-t: Software License Agreement
-s: Annual license terms between licensor and licensee
-k: [license, contract, software]
-</H>
-<B>
-# Contracting Parties
-This agreement is made between Licensor and Licensee.
-...
-</B>
-```
-
 ---
 
 <details>
