@@ -623,7 +623,7 @@ fn skill_path(tool: &str) -> PathBuf {
             .join("transpile")
             .join("SKILL.md"),
         "codex" => PathBuf::from(&h)
-            .join(".agents")
+            .join(".codex")
             .join("skills")
             .join("transpile")
             .join("SKILL.md"),
