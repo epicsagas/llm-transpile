@@ -32,9 +32,22 @@ pub fn parse(
     let mut doc = IRDocument::new(fidelity, budget);
 
     match format {
-        InputFormat::Markdown => parse_markdown(input, &mut doc),
+        InputFormat::Markdown => {
+            // Extract YAML front matter (---...---) before handing off to the
+            // Markdown parser.  The front matter block is consumed here so that
+            // pulldown-cmark does not see it as raw paragraph text.
+            let (fm, body) = split_yaml_front_matter(input);
+            if let Some(fm) = fm {
+                push_yaml_front_matter_metadata(&fm, &mut doc);
+            }
+            parse_markdown(body, &mut doc);
+        }
         InputFormat::PlainText => parse_plaintext(input, &mut doc),
         InputFormat::Html => {
+            // Extract <title> and <meta name="description"> from raw HTML before
+            // stripping tags, so the YAML header can be populated.
+            extract_html_metadata(input, &mut doc);
+
             // Strip HTML → delegate to PlainText paragraph parser.
             // Re-apply PUA stripping after ammonia tag removal: ammonia decodes HTML
             // entities (e.g. &#xE000;) into actual PUA codepoints which would otherwise
@@ -46,6 +59,156 @@ pub fn parse(
     }
 
     Ok(doc)
+}
+
+// ────────────────────────────────────────────────
+// Metadata extraction helpers
+// ────────────────────────────────────────────────
+
+/// Splits a Markdown string into an optional YAML front matter block and the
+/// remaining body.
+///
+/// Front matter is recognised when the document starts with a line containing
+/// only `---`, followed by one or more lines, followed by a closing `---` or
+/// `...` line.  Returns `(Some(fm_text), body)` when found, or `(None, input)`
+/// when there is no front matter.
+fn split_yaml_front_matter(input: &str) -> (Option<&str>, &str) {
+    // Must start with "---" (optionally followed by whitespace on the same line).
+    let Some(after_open) = input.strip_prefix("---") else {
+        return (None, input);
+    };
+    // The opening delimiter must be immediately followed by a newline (or be the
+    // whole string, though that would be an empty front matter).
+    let after_open = match after_open.strip_prefix('\n') {
+        Some(s) => s,
+        None => match after_open.strip_prefix("\r\n") {
+            Some(s) => s,
+            None => return (None, input), // "---" not followed by newline — not FM
+        },
+    };
+
+    // Scan for the closing delimiter (--- or ...) on its own line.
+    for (i, line) in after_open.match_indices('\n') {
+        let _ = line; // we want the byte offset, not the matched char
+        let up_to = &after_open[..i];
+        let closing_start = i + 1; // byte offset of the line after '\n'
+        let rest = &after_open[closing_start..];
+        let is_close = rest.starts_with("---") || rest.starts_with("...");
+        if is_close {
+            // Consume the closing delimiter line.
+            let after_close = rest
+                .find('\n')
+                .map(|j| &rest[j + 1..])
+                .unwrap_or(""); // closing delimiter was the last line
+            return (Some(up_to), after_close);
+        }
+    }
+
+    // No closing delimiter found — treat entire document as body.
+    (None, input)
+}
+
+/// Parses key: value pairs from a YAML front matter string and pushes them as
+/// `DocNode::Metadata` nodes.  Only simple scalar mappings are supported
+/// (lists and nested maps are ignored).  Recognised keys: `title`, `summary`,
+/// `description` (alias for summary), `keywords`, `tags` (alias for keywords).
+fn push_yaml_front_matter_metadata(fm: &str, doc: &mut IRDocument) {
+    for line in fm.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((raw_key, raw_value)) = line.split_once(':') else {
+            continue;
+        };
+        let key = raw_key.trim().to_ascii_lowercase();
+        let value = raw_value.trim().trim_matches('"').trim_matches('\'');
+        if value.is_empty() {
+            continue;
+        }
+        let canonical_key = match key.as_str() {
+            "title" => "title",
+            "summary" | "description" => "summary",
+            "keywords" | "tags" => "keywords",
+            _ => continue, // ignore unrecognised keys
+        };
+        doc.push(DocNode::Metadata {
+            key: canonical_key.to_string(),
+            value: value.to_string(),
+        });
+    }
+}
+
+/// Extracts `<title>` and `<meta name="description" content="…">` from raw
+/// HTML and pushes them as `DocNode::Metadata` nodes.
+///
+/// Uses simple byte-level scanning — not a full HTML parser — which is
+/// sufficient for the well-formed subset produced by real-world pages.
+fn extract_html_metadata(html: &str, doc: &mut IRDocument) {
+    let lower = html.to_ascii_lowercase();
+
+    // ── <title>…</title> ────────────────────────────────────────────────────
+    if let Some(start) = lower.find("<title>") {
+        let after = start + "<title>".len();
+        if let Some(end) = lower[after..].find("</title>") {
+            let title = html[after..after + end].trim();
+            if !title.is_empty() {
+                doc.push(DocNode::Metadata {
+                    key: "title".to_string(),
+                    value: title.to_string(),
+                });
+            }
+        }
+    }
+
+    // ── <meta name="description" content="…"> ───────────────────────────────
+    // Scan all <meta …> tags and look for name="description".
+    let mut search_from = 0usize;
+    while let Some(rel) = lower[search_from..].find("<meta") {
+        let tag_start = search_from + rel;
+        let tag_end = lower[tag_start..]
+            .find('>')
+            .map(|e| tag_start + e + 1)
+            .unwrap_or(lower.len());
+        let tag_lower = &lower[tag_start..tag_end];
+        let tag_raw = &html[tag_start..tag_end];
+
+        if tag_lower.contains("name=\"description\"") || tag_lower.contains("name='description'") {
+            if let Some(content) = extract_attr_value(tag_raw, "content") {
+                let content = content.trim();
+                if !content.is_empty() {
+                    doc.push(DocNode::Metadata {
+                        key: "summary".to_string(),
+                        value: content.to_string(),
+                    });
+                }
+            }
+        }
+
+        search_from = tag_end;
+        if search_from >= lower.len() {
+            break;
+        }
+    }
+}
+
+/// Extracts the value of `attr="…"` or `attr='…'` from a tag string.
+fn extract_attr_value<'a>(tag: &'a str, attr: &str) -> Option<&'a str> {
+    let lower = tag.to_ascii_lowercase();
+    let needle_dq = format!("{}=\"", attr);
+    let needle_sq = format!("{}='", attr);
+
+    if let Some(pos) = lower.find(&needle_dq) {
+        let value_start = pos + needle_dq.len();
+        let value_end = tag[value_start..].find('"').map(|e| value_start + e)?;
+        return Some(&tag[value_start..value_end]);
+    }
+    if let Some(pos) = lower.find(&needle_sq) {
+        let value_start = pos + needle_sq.len();
+        let value_end = tag[value_start..].find('\'').map(|e| value_start + e)?;
+        return Some(&tag[value_start..value_end]);
+    }
+    None
 }
 
 // ────────────────────────────────────────────────
@@ -312,13 +475,88 @@ fn parse_plaintext(input: &str, doc: &mut IRDocument) {
 // HTML tag stripping (safe parsing via ammonia)
 // ────────────────────────────────────────────────
 
+/// HTML block-level and line-break elements whose removal must insert a space
+/// so that adjacent text nodes are not merged without a separator.
+///
+/// Without this, `<p>foo</p><p>bar</p>` would become `"foobar"` after tag
+/// removal, losing the word boundary.  We replace each matching opening or
+/// closing tag with a single space *before* handing the sanitised string to
+/// ammonia, which then strips the remaining inline tags cleanly.
+const BLOCK_ELEMENTS: &[&str] = &[
+    "p", "div", "section", "article", "aside", "header", "footer", "main", "nav",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "li", "dt", "dd", "blockquote", "pre", "figure", "figcaption",
+    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+    "br", "hr",
+];
+
 fn strip_html_tags(input: &str) -> String {
-    // Passing an empty allowed-tag set to ammonia removes all tags and decodes entities.
-    // Unlike a regex approach, this safely handles nested tags, comments, and malicious HTML.
+    // Phase 1: replace block/line-break element tags with a single space so
+    // that adjacent text content is not concatenated without a separator.
+    // This is a lightweight, regex-free approach: scan for `<` and check the
+    // tag name against the block list.
+    let spaced = insert_block_element_spaces(input);
+
+    // Phase 2: use ammonia with an empty allowed-tag set to safely remove all
+    // remaining tags and decode HTML entities.
+    // Unlike a regex approach, this correctly handles nested tags, comments,
+    // and potentially malicious HTML.
     ammonia::Builder::new()
         .tags(std::collections::HashSet::new())
-        .clean(input)
+        .clean(&spaced)
         .to_string()
+}
+
+/// Replaces opening and closing tags of known block-level / line-break elements
+/// with a single space character.  All other tags are left intact for ammonia
+/// to remove in the second phase.
+fn insert_block_element_spaces(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'<' {
+            // Find the end of this tag.
+            if let Some(close) = memchr_naive(bytes, i + 1, b'>') {
+                let tag_content = &input[i + 1..close]; // content between < and >
+                let tag_content = tag_content.trim();
+
+                // Strip leading '/' for closing tags.
+                let name_part = tag_content.strip_prefix('/').unwrap_or(tag_content);
+                // Tag name ends at the first whitespace or '/'.
+                let tag_name = name_part
+                    .split(|c: char| c.is_whitespace() || c == '/')
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+
+                if BLOCK_ELEMENTS.contains(&tag_name.as_str()) {
+                    // Replace the entire tag with a single space.
+                    out.push(' ');
+                    i = close + 1;
+                    continue;
+                }
+            }
+            // Not a recognised block element — emit as-is for ammonia.
+            out.push('<');
+            i += 1;
+        } else {
+            out.push(input[i..].chars().next().unwrap_or_default());
+            // Advance by the byte length of the char, not just 1.
+            let ch = input[i..].chars().next().unwrap_or_default();
+            i += ch.len_utf8();
+        }
+    }
+
+    out
+}
+
+/// Minimal forward scan for a target byte — avoids pulling in `memchr` crate.
+#[inline]
+fn memchr_naive(bytes: &[u8], start: usize, target: u8) -> Option<usize> {
+    bytes[start..].iter().position(|&b| b == target).map(|p| start + p)
 }
 
 // ────────────────────────────────────────────────
@@ -523,6 +761,116 @@ mod tests {
         assert!(
             !all_same,
             "paragraph importance scores must be differentiated, got: {importances:?}"
+        );
+    }
+
+    // ── HTML block-element space insertion ───────────────────────────────────
+
+    #[test]
+    fn html_block_elements_produce_word_boundary() {
+        // Without the fix, <p>foo</p><p>bar</p> → "foobar" (merged).
+        // With the fix it must become "foo bar" (space-separated) after stripping.
+        let result = strip_html_tags("<p>foo</p><p>bar</p>");
+        assert!(
+            result.contains("foo") && result.contains("bar"),
+            "both words must survive: {result:?}"
+        );
+        // Must NOT be "foobar" — there should be a space between them.
+        assert!(
+            !result.replace(' ', "").starts_with("foobar") || result.contains(' '),
+            "block elements must produce a word boundary: {result:?}"
+        );
+    }
+
+    #[test]
+    fn html_br_inserts_space() {
+        let result = strip_html_tags("hello<br/>world");
+        assert!(
+            result.contains("hello") && result.contains("world"),
+            "text around <br/> must be preserved: {result:?}"
+        );
+        // "hello" and "world" must not be directly adjacent.
+        assert!(
+            !result.contains("helloworld"),
+            "<br/> must produce a separator: {result:?}"
+        );
+    }
+
+    // ── YAML front matter extraction ─────────────────────────────────────────
+
+    #[test]
+    fn markdown_yaml_front_matter_title_extracted() {
+        let md = "---\ntitle: My Document\n---\n\n# Body heading\n\nContent here.";
+        let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
+        let title = doc.get_metadata("title");
+        assert_eq!(
+            title,
+            Some("My Document"),
+            "YAML front matter title must be extracted as Metadata node"
+        );
+    }
+
+    #[test]
+    fn markdown_yaml_front_matter_summary_extracted() {
+        let md = "---\ntitle: Doc\ndescription: A short summary.\n---\n\nBody.";
+        let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
+        assert_eq!(doc.get_metadata("summary"), Some("A short summary."));
+    }
+
+    #[test]
+    fn markdown_yaml_front_matter_body_still_parsed() {
+        let md = "---\ntitle: Doc\n---\n\n# Heading\n\nParagraph content.";
+        let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
+        let has_para = doc
+            .nodes
+            .iter()
+            .any(|n| matches!(n, DocNode::Para { text, .. } if text.contains("Paragraph")));
+        assert!(has_para, "body content after front matter must be parsed");
+    }
+
+    #[test]
+    fn markdown_no_front_matter_unaffected() {
+        let md = "# Normal heading\n\nNormal paragraph.";
+        let doc = parse(md, InputFormat::Markdown, FidelityLevel::Semantic, None).unwrap();
+        // No Metadata nodes expected
+        let meta_count = doc
+            .nodes
+            .iter()
+            .filter(|n| matches!(n, DocNode::Metadata { .. }))
+            .count();
+        assert_eq!(meta_count, 0, "no Metadata nodes without front matter");
+    }
+
+    // ── HTML metadata extraction ─────────────────────────────────────────────
+
+    #[test]
+    fn html_title_extracted_as_metadata() {
+        let html = "<html><head><title>페이지 제목</title></head><body><p>본문</p></body></html>";
+        let doc = parse(html, InputFormat::Html, FidelityLevel::Semantic, None).unwrap();
+        assert_eq!(doc.get_metadata("title"), Some("페이지 제목"));
+    }
+
+    #[test]
+    fn html_meta_description_extracted_as_summary() {
+        let html = r#"<html><head><meta name="description" content="페이지 요약입니다."></head><body><p>본문</p></body></html>"#;
+        let doc = parse(html, InputFormat::Html, FidelityLevel::Semantic, None).unwrap();
+        assert_eq!(doc.get_metadata("summary"), Some("페이지 요약입니다."));
+    }
+
+    // ── transpile() end-to-end: <H> block appears when front matter present ──
+
+    #[test]
+    fn transpile_emits_h_block_with_yaml_front_matter() {
+        let md = "---\ntitle: 계약서\ndescription: 소프트웨어 라이선스 계약\n---\n\n본문 내용입니다.";
+        let output = crate::transpile(md, InputFormat::Markdown, FidelityLevel::Semantic, Some(4096))
+            .expect("transpile must succeed");
+        assert!(
+            output.contains("<H>"),
+            "output must contain <H> when front matter is present: {output}"
+        );
+        assert!(
+            output.contains("t: 계약서"),
+            "title must appear in <H> block: {output}"
         );
     }
 }

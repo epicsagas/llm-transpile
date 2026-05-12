@@ -17,7 +17,11 @@ fn test_file(path: &str, format: InputFormat, fidelity: FidelityLevel, budget: O
     match transpile(&content, format, fidelity, budget) {
         Ok(output) => {
             let output_tokens = llm_transpile::token_count(&output);
-            let reduction = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
+            let reduction = if input_tokens > 0 {
+                100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0)
+            } else {
+                0.0
+            };
             let elapsed = t0.elapsed().as_millis();
             println!(
                 "✓ {path}\n  input {input_tokens} tok → output {output_tokens} tok  ({reduction:.1}% reduction)  {elapsed}ms\n  ---\n{}\n",
