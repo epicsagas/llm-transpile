@@ -98,6 +98,10 @@ lto = "thin"
 name = "transpile"
 path = "src/bin/transpile.rs"
 
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+
 [[example]]
 name = "eval"
 path = "eval/eval.rs"
