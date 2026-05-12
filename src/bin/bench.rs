@@ -783,7 +783,7 @@ fn generate_html(records: &[BenchRecord], out_path: &str) {
 
     let html = format!(
         r##"<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -794,35 +794,63 @@ fn generate_html(records: &[BenchRecord], out_path: &str) {
   --acc:#6366f1;--grn:#22c55e;--ylw:#eab308;--red:#ef4444;}}
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{background:var(--bg);color:var(--txt);font-family:system-ui,sans-serif;font-size:14px;}}
-header{{padding:20px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;}}
+header{{padding:16px 28px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}}
 header h1{{font-size:20px;font-weight:700;}}
 .badge{{background:var(--acc);color:#fff;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;}}
+.lang-btn{{margin-left:auto;background:transparent;border:1px solid var(--bdr);color:var(--mut);
+  border-radius:7px;padding:4px 12px;font-size:12px;cursor:pointer;font-weight:600;transition:all .15s;}}
+.lang-btn:hover{{border-color:var(--acc);color:var(--txt);}}
+.hdr-meta{{font-size:12px;color:var(--mut);}}
 .wrap{{max-width:1400px;margin:0 auto;padding:20px 28px;}}
+/* ── KPI cards ── */
 .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;}}
-.card{{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:18px;}}
+.card{{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:18px;position:relative;cursor:help;}}
 .card .lbl{{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}}
 .card .val{{font-size:26px;font-weight:700;}}
 .card .sub{{font-size:11px;color:var(--mut);margin-top:3px;}}
+.card .tip{{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:#1e2235;border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
+  font-size:12px;color:var(--txt);line-height:1.6;width:220px;z-index:99;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:none;white-space:normal;}}
+.card:hover .tip{{display:block;}}
+/* ── Charts ── */
 .charts{{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:28px;}}
 .cbox{{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:18px;}}
-.cbox h3{{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}}
+.cbox-hdr{{display:flex;align-items:center;gap:6px;margin-bottom:14px;}}
+.cbox h3{{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;flex:1;}}
+.tip-icon{{width:16px;height:16px;border-radius:50%;background:var(--bdr);color:var(--mut);
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  cursor:help;position:relative;flex-shrink:0;}}
+.tip-icon .tip{{display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:#1e2235;border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;
+  font-size:12px;color:var(--txt);line-height:1.6;width:240px;z-index:99;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);pointer-events:none;white-space:normal;text-transform:none;letter-spacing:0;}}
+.tip-icon:hover .tip{{display:block;}}
 .cbox canvas{{max-height:240px;}}
+/* ── Tables ── */
 section{{margin-bottom:28px;}}
-section h2{{font-size:15px;font-weight:600;margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid var(--bdr);}}
+section .sec-hdr{{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid var(--bdr);}}
+section .sec-hdr h2{{font-size:15px;font-weight:600;}}
 table{{width:100%;border-collapse:collapse;background:var(--surf);border-radius:10px;overflow:hidden;border:1px solid var(--bdr);}}
 thead tr{{background:#1e2235;}}
-th{{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}}
+th{{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}}
 td{{padding:8px 12px;border-top:1px solid var(--bdr);font-size:13px;white-space:nowrap;}}
 td.n{{text-align:right;font-variant-numeric:tabular-nums;}}
 tr:hover td{{background:rgba(255,255,255,.02);}}
 .good{{color:var(--grn);}} .ok{{color:var(--ylw);}} .low{{color:var(--red);}}
-.frow{{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}}
+/* ── Filters ── */
+.frow{{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}}
 input[type=text],select{{background:var(--surf);border:1px solid var(--bdr);border-radius:7px;
   padding:5px 10px;color:var(--txt);font-size:13px;outline:none;}}
 input[type=text]:focus,select:focus{{border-color:var(--acc);}}
 button{{background:var(--acc);border:none;color:#fff;border-radius:7px;
   padding:5px 12px;font-size:13px;cursor:pointer;font-weight:600;}}
 button:hover{{opacity:.85;}}
+/* ── Legend ── */
+.legend{{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--mut);}}
+.legend span{{display:flex;align-items:center;gap:5px;}}
+.dot{{width:10px;height:10px;border-radius:50%;display:inline-block;}}
 @media(max-width:900px){{.charts{{grid-template-columns:1fr;}}}}
 </style>
 </head>
@@ -830,107 +858,284 @@ button:hover{{opacity:.85;}}
 <header>
   <h1>bench</h1>
   <span class="badge">llm-transpile</span>
-  <span style="color:var(--mut);margin-left:auto;font-size:12px">{runs} runs · {total_files} records</span>
+  <span class="hdr-meta" data-i18n="hdr_meta">{runs} runs · {total_files} records</span>
+  <button class="lang-btn" onclick="toggleLang()" id="langBtn">한국어</button>
 </header>
 <div class="wrap">
 
+<!-- ── KPI Cards ── -->
 <div class="cards">
   <div class="card">
-    <div class="lbl">Semantic reduction</div>
+    <div class="lbl" data-i18n="kpi_sem_lbl">Semantic Reduction</div>
     <div class="val" style="color:var(--grn)">{sem_pct:.1}%</div>
-    <div class="sub">avg all files</div>
+    <div class="sub" data-i18n="kpi_avg_files">avg all files</div>
+    <div class="tip" data-i18n="tip_sem"></div>
   </div>
   <div class="card">
-    <div class="lbl">Compressed reduction</div>
+    <div class="lbl" data-i18n="kpi_cmp_lbl">Compressed Reduction</div>
     <div class="val" style="color:var(--grn)">{cmp_pct:.1}%</div>
-    <div class="sub">avg all files</div>
+    <div class="sub" data-i18n="kpi_avg_files">avg all files</div>
+    <div class="tip" data-i18n="tip_cmp"></div>
   </div>
   <div class="card">
-    <div class="lbl">Throughput</div>
+    <div class="lbl" data-i18n="kpi_thru_lbl">Throughput</div>
     <div class="val" style="color:var(--acc)">{avg_tok_ms:.0}</div>
-    <div class="sub">tok/ms avg</div>
+    <div class="sub" data-i18n="kpi_tokms">tok/ms avg</div>
+    <div class="tip" data-i18n="tip_thru"></div>
   </div>
   <div class="card">
-    <div class="lbl">Word coverage</div>
+    <div class="lbl" data-i18n="kpi_cov_lbl">Word Coverage</div>
     <div class="val" style="color:var(--ylw)">{avg_cov:.1}%</div>
-    <div class="sub">lossless avg</div>
+    <div class="sub" data-i18n="kpi_lossless">lossless avg</div>
+    <div class="tip" data-i18n="tip_cov"></div>
   </div>
   <div class="card">
-    <div class="lbl">Total input tokens</div>
+    <div class="lbl" data-i18n="kpi_total_lbl">Total Input Tokens</div>
     <div class="val">{total_in}</div>
-    <div class="sub">across all runs</div>
+    <div class="sub" data-i18n="kpi_all_runs">across all runs</div>
+    <div class="tip" data-i18n="tip_total"></div>
   </div>
   <div class="card">
-    <div class="lbl">Runs</div>
+    <div class="lbl" data-i18n="kpi_runs_lbl">Runs</div>
     <div class="val">{runs}</div>
-    <div class="sub">{total_files} measurements</div>
+    <div class="sub"><span data-i18n="kpi_measurements">{total_files} measurements</span></div>
+    <div class="tip" data-i18n="tip_runs"></div>
   </div>
 </div>
 
+<!-- colour guide -->
+<div class="legend" style="margin-bottom:18px;">
+  <span><span class="dot" style="background:var(--grn)"></span><span data-i18n="legend_good">≥20% — good</span></span>
+  <span><span class="dot" style="background:var(--ylw)"></span><span data-i18n="legend_ok">5–20% — ok</span></span>
+  <span><span class="dot" style="background:var(--red)"></span><span data-i18n="legend_low">&lt;5% — low / negative</span></span>
+</div>
+
+<!-- ── Charts ── -->
 <div class="charts">
   <div class="cbox">
-    <h3>Token reduction over time (%)</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_trend_title">Token Reduction Over Time (%)</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_trend"></div></div>
+    </div>
     <canvas id="trendChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>Throughput over time (tok/ms)</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_thru_title">Throughput Over Time (tok/ms)</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_thru"></div></div>
+    </div>
     <canvas id="thruChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>Sem% vs Throughput — scatter per file</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_scatter_title">Sem% vs Throughput — Scatter</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_scatter"></div></div>
+    </div>
     <canvas id="scatterChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>Reduction distribution by format (min/Q1/med/Q3/max)</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_box_title">Reduction by Format (min/Q1/med/Q3/max)</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_box"></div></div>
+    </div>
     <canvas id="boxChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>File count by format</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_pie_title">File Count by Format</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_pie"></div></div>
+    </div>
     <canvas id="pieChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>Input token size distribution</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_hist_title">Input Token Size Distribution</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_hist"></div></div>
+    </div>
     <canvas id="histChart"></canvas>
   </div>
   <div class="cbox">
-    <h3>Word coverage (lossless quality)</h3>
+    <div class="cbox-hdr">
+      <h3 data-i18n="chart_cov_title">Word Coverage (Lossless Quality)</h3>
+      <div class="tip-icon">?<div class="tip" data-i18n="tip_chart_cov"></div></div>
+    </div>
     <canvas id="covDonut"></canvas>
   </div>
 </div>
 
+<!-- ── Runs table ── -->
 <section>
-  <h2>Runs</h2>
+  <div class="sec-hdr">
+    <h2 data-i18n="sec_runs">Runs</h2>
+    <div class="tip-icon">?<div class="tip" data-i18n="tip_sec_runs"></div></div>
+  </div>
   <table>
-    <thead><tr><th>run id</th><th>timestamp</th><th>files</th>
-      <th>sem%</th><th>cmp%</th><th>tok/ms</th><th>coverage</th></tr></thead>
+    <thead><tr>
+      <th data-i18n="col_run_id">run id</th>
+      <th data-i18n="col_timestamp">timestamp</th>
+      <th data-i18n="col_files">files</th>
+      <th>sem%</th><th>cmp%</th>
+      <th data-i18n="col_tokms">tok/ms</th>
+      <th data-i18n="col_coverage">coverage</th>
+    </tr></thead>
     <tbody>{run_rows}</tbody>
   </table>
 </section>
 
+<!-- ── All records ── -->
 <section>
-  <h2>All records</h2>
+  <div class="sec-hdr">
+    <h2 data-i18n="sec_records">All Records</h2>
+    <div class="tip-icon">?<div class="tip" data-i18n="tip_sec_records"></div></div>
+  </div>
   <div class="frow">
-    <input type="text" id="ftxt" placeholder="Filter file…" oninput="filter()">
-    <select id="ffmt" onchange="filter()">
-      <option value="">All formats</option>
+    <input type="text" id="ftxt" data-i18n-ph="filter_ph" placeholder="Filter file…" oninput="filterTbl()">
+    <select id="ffmt" onchange="filterTbl()">
+      <option value="" data-i18n="fmt_all">All formats</option>
       <option>markdown</option><option>html</option><option>plaintext</option>
     </select>
-    <select id="frun" onchange="filter()">
-      <option value="">All runs</option>
+    <select id="frun" onchange="filterTbl()">
+      <option value="" data-i18n="run_all">All runs</option>
       {run_options}
     </select>
-    <button onclick="exportCsv()">⬇ CSV</button>
+    <button onclick="exportCsv()" data-i18n="btn_csv">⬇ CSV</button>
   </div>
   <table id="tbl">
-    <thead><tr><th>run</th><th>file</th><th>format</th><th>in tok</th>
-      <th>sem%</th><th>cmp%</th><th>sem ms</th><th>cmp ms</th>
-      <th>tok/ms</th><th>coverage</th></tr></thead>
+    <thead><tr>
+      <th data-i18n="col_run">run</th>
+      <th data-i18n="col_file">file</th>
+      <th data-i18n="col_format">format</th>
+      <th data-i18n="col_intok">in tok</th>
+      <th>sem%</th><th>cmp%</th>
+      <th data-i18n="col_sem_ms">sem ms</th>
+      <th data-i18n="col_cmp_ms">cmp ms</th>
+      <th data-i18n="col_tokms">tok/ms</th>
+      <th data-i18n="col_coverage">coverage</th>
+    </tr></thead>
     <tbody id="tbody">{table_rows}</tbody>
   </table>
 </section>
 </div>
 
 <script>
+// ── i18n ─────────────────────────────────────────────────────────────────────
+const I18N = {{
+  en: {{
+    hdr_meta: '{runs} runs · {total_files} records',
+    kpi_sem_lbl: 'Semantic Reduction',
+    kpi_cmp_lbl: 'Compressed Reduction',
+    kpi_thru_lbl: 'Throughput',
+    kpi_cov_lbl: 'Word Coverage',
+    kpi_total_lbl: 'Total Input Tokens',
+    kpi_runs_lbl: 'Runs',
+    kpi_avg_files: 'avg all files',
+    kpi_tokms: 'tok/ms avg',
+    kpi_lossless: 'lossless avg',
+    kpi_all_runs: 'across all runs',
+    kpi_measurements: '{total_files} measurements',
+    tip_sem: 'Tokens saved in Semantic mode vs raw input. Target ≥15%. Green ≥20%, yellow 5–20%, red <5%.',
+    tip_cmp: 'Tokens saved in Compressed mode (aggressive). Higher than Semantic because more content is pruned.',
+    tip_thru: 'How many input tokens are processed per millisecond. Higher = faster. Depends on file size and CPU warmup.',
+    tip_cov: 'Fraction of unique content words (>5 chars) from source that survive in Lossless output. Should stay ≥95%.',
+    tip_total: 'Sum of all input tokens across every file and every run. Gives a sense of total workload processed.',
+    tip_runs: 'Each run = one invocation of `bench run`. Running repeatedly reveals throughput variance and warmup effects.',
+    legend_good: '≥20% — good',
+    legend_ok: '5–20% — ok',
+    legend_low: '<5% — low / negative',
+    chart_trend_title: 'Token Reduction Over Time (%)',
+    chart_thru_title: 'Throughput Over Time (tok/ms)',
+    chart_scatter_title: 'Sem% vs Throughput — Scatter',
+    chart_box_title: 'Reduction by Format (min/Q1/med/Q3/max)',
+    chart_pie_title: 'File Count by Format',
+    chart_hist_title: 'Input Token Size Distribution',
+    chart_cov_title: 'Word Coverage (Lossless Quality)',
+    tip_chart_trend: 'Line chart of Semantic% and Compressed% reduction per run. Rising trend = the compressor is getting better over time (or input files changed).',
+    tip_chart_thru: 'Bar chart: tok/ms per run. A large jump between runs usually indicates CPU cache warmup. Subsequent runs are more representative.',
+    tip_chart_scatter: 'Each dot is one file. X = semantic reduction %, Y = throughput. Hover to see filename. Files clustered top-right are both compact and fast.',
+    tip_chart_box: 'Box plot per format showing min, Q1, median, Q3, max of Semantic reduction. Wide spread = inconsistent compression. Negative means the output grew.',
+    tip_chart_pie: 'Share of each file format in the dataset. Dominated by Markdown; HTML/Plaintext are minority.',
+    tip_chart_hist: 'How many files fall into each token-size bucket. Most eval files are <4K tokens. 32K+ indicates very large documents.',
+    tip_chart_cov: 'Word coverage buckets for Lossless output. Ideally 100% (deep green). Yellow/red means content words were lost — investigate the compressor.',
+    sec_runs: 'Runs',
+    sec_records: 'All Records',
+    tip_sec_runs: 'One row per bench run. Compare sem% and cmp% across runs to spot regressions after code changes.',
+    tip_sec_records: 'Full record table. Filter by file name, format, or run. Click CSV to export the visible rows.',
+    col_run_id: 'run id', col_timestamp: 'timestamp', col_files: 'files',
+    col_tokms: 'tok/ms', col_coverage: 'coverage', col_run: 'run',
+    col_file: 'file', col_format: 'format', col_intok: 'in tok',
+    col_sem_ms: 'sem ms', col_cmp_ms: 'cmp ms',
+    filter_ph: 'Filter file…', fmt_all: 'All formats', run_all: 'All runs', btn_csv: '⬇ CSV',
+  }},
+  ko: {{
+    hdr_meta: '{runs}회 실행 · {total_files}개 기록',
+    kpi_sem_lbl: '시맨틱 압축률',
+    kpi_cmp_lbl: '최대 압축률',
+    kpi_thru_lbl: '처리 속도',
+    kpi_cov_lbl: '단어 보존율',
+    kpi_total_lbl: '총 입력 토큰',
+    kpi_runs_lbl: '실행 횟수',
+    kpi_avg_files: '전체 파일 평균',
+    kpi_tokms: 'tok/ms 평균',
+    kpi_lossless: '무손실 평균',
+    kpi_all_runs: '전체 실행 합산',
+    kpi_measurements: '{total_files}개 측정값',
+    tip_sem: '시맨틱 모드에서 원본 대비 줄어든 토큰 비율입니다. 목표 ≥15%. 초록 ≥20%, 노랑 5~20%, 빨강 <5%.',
+    tip_cmp: '압축 모드(적극적 제거)에서 절약된 토큰 비율. 시맨틱보다 높지만 정보 손실 가능성도 큽니다.',
+    tip_thru: '1밀리초당 처리되는 입력 토큰 수. 높을수록 빠릅니다. 파일 크기와 CPU 웜업 상태에 영향 받습니다.',
+    tip_cov: '원본의 주요 단어(5자 초과) 중 무손실 출력에 살아남은 비율. 95% 이상 유지 권장.',
+    tip_total: '모든 실행·파일에 걸친 입력 토큰 총합. 처리된 전체 워크로드 규모를 나타냅니다.',
+    tip_runs: '실행 1회 = `bench run` 1번 호출. 반복 실행으로 처리 속도 분산과 웜업 효과를 확인하세요.',
+    legend_good: '≥20% — 양호',
+    legend_ok: '5~20% — 보통',
+    legend_low: '<5% — 낮음 / 음수',
+    chart_trend_title: '실행별 토큰 압축률 추이 (%)',
+    chart_thru_title: '실행별 처리 속도 (tok/ms)',
+    chart_scatter_title: '시맨틱 압축률 vs 처리 속도 (파일별)',
+    chart_box_title: '포맷별 압축률 분포 (최소/Q1/중앙/Q3/최대)',
+    chart_pie_title: '포맷별 파일 수',
+    chart_hist_title: '입력 토큰 크기 분포',
+    chart_cov_title: '단어 보존율 (무손실 품질)',
+    tip_chart_trend: '실행별 시맨틱·압축 모드의 토큰 절약률 꺾은선 그래프입니다. 상승 추세라면 압축기 성능이 향상되거나 입력 파일이 바뀐 것입니다.',
+    tip_chart_thru: '실행별 처리 속도 막대 그래프. 첫 실행과 이후 실행 간 큰 차이는 CPU 캐시 웜업 때문입니다. 두 번째 이후 값이 더 신뢰할 수 있습니다.',
+    tip_chart_scatter: '각 점 = 파일 1개. X = 시맨틱 압축률, Y = 처리 속도. 마우스를 올리면 파일명이 표시됩니다. 오른쪽 위에 모일수록 빠르고 효율적입니다.',
+    tip_chart_box: '포맷별 시맨틱 압축률의 최솟값·Q1·중앙값·Q3·최댓값 박스 그래프. 범위가 넓으면 압축 결과가 일관되지 않은 것입니다. 음수면 출력이 오히려 커진 것.',
+    tip_chart_pie: '데이터셋 내 파일 포맷 비율. Markdown이 대부분을 차지하며 HTML·Plaintext는 소수입니다.',
+    tip_chart_hist: '토큰 크기 구간별 파일 수. 평가 파일 대부분은 4K 토큰 이하. 32K+ 는 매우 큰 문서입니다.',
+    tip_chart_cov: '무손실 출력의 단어 보존율 구간 도넛 차트. 진한 초록(100%)이 이상적입니다. 노랑·빨강이 나타나면 압축기가 핵심 단어를 제거하고 있다는 신호입니다.',
+    sec_runs: '실행 기록',
+    sec_records: '전체 측정값',
+    tip_sec_runs: '실행 1회당 1행. sem%·cmp%를 비교해 코드 변경 후 성능 저하를 감지하세요.',
+    tip_sec_records: '전체 레코드 테이블. 파일명·포맷·실행 ID로 필터링하고 CSV로 내보낼 수 있습니다.',
+    col_run_id: '실행 ID', col_timestamp: '타임스탬프', col_files: '파일 수',
+    col_tokms: 'tok/ms', col_coverage: '보존율', col_run: '실행',
+    col_file: '파일', col_format: '포맷', col_intok: '입력 토큰',
+    col_sem_ms: '시맨틱 ms', col_cmp_ms: '압축 ms',
+    filter_ph: '파일 필터…', fmt_all: '전체 포맷', run_all: '전체 실행', btn_csv: '⬇ CSV 내보내기',
+  }},
+}};
+
+let LANG = 'en';
+function t(k) {{ return (I18N[LANG]||I18N.en)[k] || k; }}
+function applyLang() {{
+  document.documentElement.setAttribute('lang', LANG);
+  document.querySelectorAll('[data-i18n]').forEach(el => {{
+    const k = el.getAttribute('data-i18n');
+    el.textContent = t(k);
+  }});
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {{
+    el.placeholder = t(el.getAttribute('data-i18n-ph'));
+  }});
+  document.getElementById('langBtn').textContent = LANG === 'en' ? '한국어' : 'English';
+}}
+function toggleLang() {{
+  LANG = LANG === 'en' ? 'ko' : 'en';
+  applyLang();
+}}
+// auto-detect browser language
+if (navigator.language && navigator.language.startsWith('ko')) {{ LANG = 'ko'; }}
+applyLang();
+
+// ── Chart.js ─────────────────────────────────────────────────────────────────
 const G = {{color:'rgba(255,255,255,.05)'}}, F = {{color:'#8892a4'}};
 const LABELS={labels}, SEM={sem_data}, CMP={cmp_data}, TOK={tok_data}, COV={cov_data};
 const SCATTER={scatter_data}, BOX={box_data};
@@ -1050,8 +1255,8 @@ new Chart(document.getElementById('covDonut'),{{
   }}
 }});
 
-// Filter
-function filter(){{
+// ── Filter & CSV ─────────────────────────────────────────────────────────────
+function filterTbl(){{
   const txt=document.getElementById('ftxt').value.toLowerCase();
   const fmt=document.getElementById('ffmt').value;
   const run=document.getElementById('frun').value;
@@ -1065,7 +1270,6 @@ function filter(){{
   }});
 }}
 
-// CSV export
 function exportCsv(){{
   const hdr=['run','file','format','in_tok','sem%','cmp%','sem_ms','cmp_ms','tok_ms','coverage'];
   const rows=[hdr];
