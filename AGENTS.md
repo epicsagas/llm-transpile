@@ -97,3 +97,15 @@ When creating a new release tag, update ALL of the following to the same version
 | Git tag | `vx.y.z` | `v0.1.6` |
 
 All three must match before tagging.
+
+## Release Success Route
+
+Verified working release path (2026-05-12):
+
+1. **Version bump**: `Cargo.toml`, `.claude-plugin/plugin.json` → same version, no `-dev` suffix
+2. **plugin.json rules**:
+   - `keywords` 배열 마지막 항목 뒤에 trailing comma 금지 (`],` → `]`)
+   - `hooks` 필드 금지 — `hooks/hooks.json`은 Claude Code가 자동 로드하므로 명시하면 중복 에러 발생
+3. **dist-workspace.toml**: `extra-artifacts` 블록 사용 금지 (cargo-dist 0.31은 `build` 필드를 시퀀스로 요구하며 정적 파일 첨부 불가)
+4. **release.yml**: `host` 잡의 Cleanup 스텝 직후 `cp install.sh install.ps1 artifacts/` 스텝 추가 → `gh release create artifacts/*`에 포함됨
+5. **Commit & tag**: `git tag vx.y.z && git push origin main --tags`
