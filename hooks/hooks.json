@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$HOME/.claude/transpile-hook.sh\""
+            "command": "node \"$HOME/.claude/transpile-hook.js\""
           }
         ]
       }

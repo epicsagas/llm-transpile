@@ -253,42 +253,39 @@ fn detect_format(path: &Path, flag: &FormatArg) -> InputFormat {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
-const HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
-set -euo pipefail
-THRESHOLD=${TRANSPILE_THRESHOLD:-8192}
-INPUT=$(cat)
-FILE=$(printf '%s' "$INPUT" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-print(d.get('tool_input', {}).get('file_path', ''))
-" 2>/dev/null) || exit 0
-[ -z "$FILE" ] && exit 0
-[ -f "$FILE" ] || exit 0
-BYTES=$(wc -c < "$FILE" 2>/dev/null || echo 0)
-[ "$BYTES" -lt "$THRESHOLD" ] && exit 0
-export TRANSPILE_AGENT=claude
-JSON_OUT=$(transpile --input "$FILE" --fidelity semantic --json 2>/dev/null) || exit 0
-[ -z "$JSON_OUT" ] && exit 0
-FNAME=$(basename "$FILE")
-python3 -c "
-import json, sys
+const HOOK_SCRIPT: &str = r#"#!/usr/bin/env node
+'use strict';
+const {execSync} = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-data  = json.loads(sys.argv[1])
-fname = sys.argv[2]
-size  = sys.argv[3]
+const THRESHOLD = parseInt(process.env.TRANSPILE_THRESHOLD || '8192', 10);
 
-content = data.get('content', '')
-inp     = data.get('input_tok', 0)
-out     = data.get('output_tok', 0)
-pct     = data.get('reduction_pct', '0')
-saved   = inp - out
+let input;
+try { input = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { process.exit(0); }
 
-msg = (
-    f'[llm-transpile] {fname} ({size}B) \u2192 {inp} tok \u2192 {out} tok '
-    f'({pct}% reduction, {saved} tokens saved)\n\n{content}'
-)
-print(json.dumps({'additionalContext': msg}))
-" "$JSON_OUT" "$FNAME" "$BYTES" 2>/dev/null || exit 0
+const file = (input.tool_input || {}).file_path || '';
+if (!file) process.exit(0);
+
+let bytes;
+try { bytes = fs.statSync(file).size; } catch { process.exit(0); }
+if (bytes < THRESHOLD) process.exit(0);
+
+process.env.TRANSPILE_AGENT = 'claude';
+
+let jsonOut;
+try { jsonOut = execSync(`transpile --input "${file}" --fidelity semantic --json`, {encoding: 'utf8', stdio: ['pipe','pipe','pipe']}); } catch { process.exit(0); }
+if (!jsonOut) process.exit(0);
+
+const data = JSON.parse(jsonOut);
+const fname = path.basename(file);
+const inp = data.input_tok || 0;
+const out = data.output_tok || 0;
+const pct = data.reduction_pct || '0';
+const saved = inp - out;
+
+const msg = `[llm-transpile] ${fname} (${bytes}B) \u2192 ${inp} tok \u2192 ${out} tok (${pct}% reduction, ${saved} tokens saved)\n\n${data.content || ''}`;
+process.stdout.write(JSON.stringify({additionalContext: msg}));
 "#;
 
 fn main() {

@@ -31,8 +31,8 @@ fn print_hook_script_stdout_contains_shebang() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("#!/usr/bin/env bash"),
-        "expected shebang in output, got:\n{stdout}"
+        stdout.contains("#!/usr/bin/env node"),
+        "expected node shebang in output, got:\n{stdout}"
     );
 }
 
