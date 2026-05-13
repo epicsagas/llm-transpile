@@ -131,6 +131,19 @@ fn strip_pua(input: &str) -> std::borrow::Cow<'_, str> {
 /// across all body text nodes (Para, Header, List items). Short terms (< 3 chars for ASCII,
 /// < 2 chars for non-ASCII) are excluded because they don't save enough tokens to justify
 /// the dictionary entry overhead.
+///
+/// ## ROI gate (P1a)
+///
+/// A term is only interned when the net token saving is positive:
+///
+/// ```text
+/// saving  = freq × (term_tokens - 1)    // replacing N tokens with 1 PUA token
+/// overhead = dict_entry_tokens            // "SymA=Term\n" line in the <D> block
+/// intern  iff saving > overhead
+/// ```
+///
+/// This prevents low-ROI substitutions (e.g. a 2-token word appearing 3 times) from
+/// inflating the `<D>` block more than they save in the body.
 fn auto_intern_frequent_terms(
     doc: &IRDocument,
     dict: &mut SymbolDict,
@@ -180,7 +193,25 @@ fn auto_intern_frequent_terms(
         .collect();
     candidates.sort_by_key(|b| std::cmp::Reverse(b.1));
 
-    for (term, _count) in candidates.into_iter().take(max_terms) {
+    for (term, count) in candidates.into_iter().take(max_terms) {
+        // ── ROI gate ────────────────────────────────────────────────────────
+        // Each term occurrence in the body uses `term_tokens` tokens.
+        // After substitution it becomes 1 PUA token — saving `term_tokens - 1` per
+        // occurrence.  The dictionary entry ("SymA=Term\n") costs `dict_entry_tokens`.
+        // Only intern when the total saving exceeds the overhead.
+        let term_tokens = stream::estimate_tokens(term);
+        if term_tokens <= 1 {
+            // Substituting a single-token word saves nothing; skip.
+            continue;
+        }
+        // "<PUA>=<term>\n" — PUA char is 1 token, "=" is ~0.25 tok (grouped with PUA
+        // by most tokenizers), "\n" is ~0.25 tok.  Approximate as term_tokens + 1.
+        let dict_entry_tokens = term_tokens + 1;
+        let saving = count.saturating_mul(term_tokens - 1);
+        if saving <= dict_entry_tokens {
+            // Net saving is zero or negative; skip.
+            continue;
+        }
         // Ignore overflow — we just stop interning if we run out of PUA symbols
         let _ = dict.intern(term);
     }
@@ -218,18 +249,11 @@ pub fn transpile(
     // 1. Parse → IR
     let mut doc = parser::parse(input, format, fidelity, budget).map_err(TranspileError::Parse)?;
 
-    // 2. Compress (only when a budget is provided)
+    // 2. Compress + hard-cap re-compression loop (only when a budget is provided)
     if let Some(b) = budget {
-        let compressor = AdaptiveCompressor::new();
-        let cfg = CompressionConfig {
-            budget: b,
-            // Note: token count is estimated from raw input before compression and symbol
-            // substitution. The actual output token count will typically be lower. This
-            // estimate drives compression stage selection and may cause slight over-compression.
-            current_tokens: stream::estimate_tokens(input),
-            fidelity,
-        };
-        doc.nodes = compressor.compress(std::mem::take(&mut doc.nodes), &cfg);
+        if fidelity != FidelityLevel::Lossless {
+            doc.nodes = compress_to_budget(std::mem::take(&mut doc.nodes), b, fidelity, input);
+        }
     }
 
     // 3. Auto-discover frequent terms for symbol substitution
@@ -239,6 +263,101 @@ pub fn transpile(
     // 4. Render
     let output = render_full(&doc, &mut dict);
     Ok(output)
+}
+
+/// Compresses `nodes` until the rendered output fits within `budget` tokens,
+/// or until further compression yields no improvement.
+///
+/// Strategy:
+/// 1. First pass uses `current_tokens` estimated from the raw input.
+/// 2. After rendering, if the output still exceeds `budget`, the actual
+///    token count is fed back as `current_tokens` and compression is retried
+///    at the next higher stage.
+/// 3. The loop terminates when either:
+///    - output fits within `budget`, or
+///    - two consecutive passes produce the same node count (compression
+///      saturated — further iterations would be identical).
+///
+/// Maximum iterations: 4 (one per `CompressionStage`).
+fn compress_to_budget(
+    nodes: Vec<DocNode>,
+    budget: usize,
+    fidelity: FidelityLevel,
+    raw_input: &str,
+) -> Vec<DocNode> {
+    use compressor::CompressionStage;
+
+    let compressor = AdaptiveCompressor::new();
+
+    // Stages in ascending order — we walk up from the initial estimate.
+    const STAGES: &[CompressionStage] = &[
+        CompressionStage::StopwordOnly,
+        CompressionStage::PruneLowImportance,
+        CompressionStage::DeduplicateAndLinearize,
+        CompressionStage::MaxCompression,
+    ];
+
+    // Initial compression: use raw-input token estimate (same as before).
+    let initial_tokens = stream::estimate_tokens(raw_input);
+    let cfg = CompressionConfig {
+        budget,
+        current_tokens: initial_tokens,
+        fidelity,
+    };
+    let mut current_nodes = compressor.compress(nodes, &cfg);
+    let mut prev_node_count = usize::MAX;
+
+    for &stage in STAGES {
+        // Render to measure actual output tokens.
+        // We use a temporary empty dict here — symbol substitution happens later
+        // in the main flow and only saves ~1% tokens, so it does not affect the
+        // hard-cap decision materially.
+        let tmp_output = {
+            let mut tmp_dict = SymbolDict::new();
+            let mut tmp_doc = ir::IRDocument::new(fidelity, Some(budget));
+            tmp_doc.nodes = current_nodes.clone();
+            renderer::render_full(&tmp_doc, &mut tmp_dict)
+        };
+        let actual_tokens = stream::estimate_tokens(&tmp_output);
+
+        // Within budget — done.
+        if actual_tokens <= budget {
+            break;
+        }
+
+        // Saturated — further compression would be a no-op.
+        if current_nodes.len() == prev_node_count {
+            break;
+        }
+        prev_node_count = current_nodes.len();
+
+        // Skip stages that are at or below what the compressor already applied.
+        let effective_stage = {
+            let ratio = actual_tokens as f64 / budget as f64;
+            let auto_stage = match ratio {
+                r if r < 0.60 => CompressionStage::StopwordOnly,
+                r if r < 0.80 => CompressionStage::PruneLowImportance,
+                r if r < 0.95 => CompressionStage::DeduplicateAndLinearize,
+                _ => CompressionStage::MaxCompression,
+            };
+            auto_stage.max(stage)
+        };
+
+        if effective_stage < stage {
+            continue;
+        }
+
+        // Re-compress at the actual measured token count.
+        let retry_cfg = CompressionConfig {
+            budget,
+            current_tokens: actual_tokens,
+            fidelity,
+        };
+        let retry_nodes = compressor.compress(current_nodes.clone(), &retry_cfg);
+        current_nodes = retry_nodes;
+    }
+
+    current_nodes
 }
 
 /// Converts a document into a **Tokio stream**.
