@@ -8,7 +8,7 @@ cargo-dist-version = "0.31.0"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
-installers = ["homebrew", "msi"]
+installers = ["shell", "powershell", "homebrew", "msi"]
 # Homebrew tap repository
 tap = "epicsagas/homebrew-tap"
 # Target platforms to build apps for (Rust target-triple syntax)
