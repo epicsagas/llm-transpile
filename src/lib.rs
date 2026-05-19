@@ -250,10 +250,10 @@ pub fn transpile(
     let mut doc = parser::parse(input, format, fidelity, budget).map_err(TranspileError::Parse)?;
 
     // 2. Compress + hard-cap re-compression loop (only when a budget is provided)
-    if let Some(b) = budget {
-        if fidelity != FidelityLevel::Lossless {
-            doc.nodes = compress_to_budget(std::mem::take(&mut doc.nodes), b, fidelity, input);
-        }
+    if let Some(b) = budget
+        && fidelity != FidelityLevel::Lossless
+    {
+        doc.nodes = compress_to_budget(std::mem::take(&mut doc.nodes), b, fidelity, input);
     }
 
     // 3. Auto-discover frequent terms for symbol substitution
