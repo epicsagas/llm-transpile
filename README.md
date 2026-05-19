@@ -141,6 +141,14 @@ transpile uninstall --dry-run      # preview removals
 
 Auto-installs the binary and seeds the PostToolUse hook on next session start — no additional setup required.
 
+**Codex CLI**
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+Skills are available immediately — no further steps needed.
+
 Or from source:
 
 ```bash
