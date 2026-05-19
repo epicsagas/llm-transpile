@@ -111,6 +111,7 @@ function seed() {
 
 async function main() {
   const pluginVersion = getPluginVersion();
+  const isPlugin = !!process.env.CLAUDE_PLUGIN_ROOT;
 
   // 1. Binary not found — fresh install
   if (!hasCommand(BINARY)) {
@@ -122,7 +123,8 @@ async function main() {
       log(`Install manually: https://github.com/${REPO}#installation`);
       process.exit(0);
     }
-    if (hasCommand(BINARY)) seed();
+    // Plugin mode: hook auto-registered from plugin cache, skip manual seeding
+    if (hasCommand(BINARY) && !isPlugin) seed();
     return;
   }
 
@@ -142,8 +144,8 @@ async function main() {
     }
   }
 
-  // 3. Seed Claude Code hook script
-  seed();
+  // 3. Seed Claude Code hook script (standalone installs only)
+  if (!isPlugin) seed();
 }
 
 main().catch((e) => {
