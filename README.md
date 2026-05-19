@@ -1,5 +1,5 @@
 <div align="center">
-# llm-transpile
+<h1>llm-transpile</h1> 
 
 <p align="center">
   <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
