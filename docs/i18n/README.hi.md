@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
-**LLM पाइपलाइन के लिए टोकन-अनुकूलित दस्तावेज़ ट्रांसपाइलर**
+**LLM पाइपलाइनों के लिए टोकन-अनुकूलित दस्तावेज़ ट्रांसपाइलर**
+
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+
+</div>
 
 कच्चे दस्तावेज़ (Markdown, HTML, सादा टेक्स्ट) → संरचित ब्रिज फॉर्मेट `<D>?<H><B>` — टोकन बजट में रहने वाले अनुकूली संपीड़न के साथ।
-
-```
-<H>
-t: सॉफ़्टवेयर लाइसेंस अनुबंध
-s: लाइसेंसर और लाइसेंसी के बीच वार्षिक लाइसेंस शर्तें
-k: [लाइसेंस, अनुबंध, सॉफ़्टवेयर]
-</H>
-<B>
-# अनुबंध पक्ष
-यह अनुबंध लाइसेंसर और लाइसेंसी के बीच संपन्न होता है।
-...
-</B>
-```
 
 ---
 
@@ -40,7 +40,8 @@ k: [लाइसेंस, अनुबंध, सॉफ़्टवेयर]
 - [त्रुटि प्रबंधन](#त्रुटि-प्रबंधन)
 - [प्रदर्शन](#प्रदर्शन)
 - [योगदान](#योगदान)
-- [लाइसेंस](#लाइसेंस)
+- [लाइसेंस](#लाइसेंस)- [बेंचमार्किंग](#बेंचमार्किंग)
+
 </details>
 
 ---
@@ -147,6 +148,28 @@ cargo install --path .
 transpile install
 ```
 
+### बेंचमार्किंग
+
+
+```bash
+# परीक्षण फ़ाइलों की निर्देशिका के विरुद्ध बेंचमार्क चलाएँ
+transpile bench run --dataset ./eval                    # JSONL लॉग जेनरेट करता है
+transpile bench run --dataset ./eval --report           # चलाएँ + HTML रिपोर्ट खोलें
+transpile bench report                                  # लॉग से रिपोर्ट फिर से बनाएँ
+```
+
+HTML बेंचमार्क रिपोर्ट में शामिल हैं:
+
+- **KPI कार्ड** — semantic कमी, compressed कमी, थ्रूपुट (tok/ms), शब्द कवरेज, कुल इनपुट टोकन, रन काउंट
+- **7 चार्ट** — समय के साथ कमी प्रवृत्ति, प्रति रन थ्रूपुट, semantic बनाम थ्रूपुट स्कैटर, प्रारूप द्वारा बॉक्स प्लॉट, प्रारूप वितरण, टोकन आकार हिस्टोग्राम, शब्द कवरेज डोनट
+- **रन टेबल** — एकत्रित मेट्रिक्स के साथ प्रति-रन सारांश
+- **रिकॉर्ड टेबल** — प्रारूप, रन और फ़ाइल नाम फ़िल्टर के साथ प्रति-फ़ाइल विवरण
+- **थीम टॉगल** — डार्क / लाइट मोड लगातार प्राथमिकता के साथ
+- **द्विभाषी** — कोरियाई लोकेल का स्वतः पता लगाता है; मैनुअल KO/EN टॉगल
+
+
+---
+
 ---
 
 ## अपडेट करना
@@ -238,6 +261,28 @@ transpile stats — अंतिम 7 दिन
   कुल                      7     19 765       14 372      5 393    27.3%
 ```
 
+**इंटरएक्टिव HTML डैशबोर्ड**
+
+
+```bash
+transpile stats report                 # ब्राउज़र में खोलें (डिफ़ॉल्ट: पिछले 7 दिन)
+transpile stats report --days 30       # पिछले 30 दिन
+transpile stats report --no-open       # बिना खोले केवल जेनरेट करें
+transpile stats report --out /tmp/custom.html
+```
+
+> रिपोर्ट डिफ़ॉल्ट रूप से `~/.agents/transpile/reports/` में उत्पन्न होती हैं। `--out` के साथ ओवरराइड करें।
+
+डैशबोर्ड में शामिल हैं:
+
+- **KPI कार्ड** — कुल कॉल, बचाए गए टोकन, औसत कमी, अद्वितीय फ़ाइलें, एजेंट, सक्रिय दिन
+- **6 चार्ट** — दैनिक टोकन उपयोग, फ़िडेलिटी ब्रेकडाउन, इनपुट बनाम आउटपुट प्रवृत्ति, एजेंट वितरण, प्रति घंटा पैटर्न, कमी वितरण
+- **तिथि सीमा प्रीसेट** — एक-क्लिक फ़िल्टरिंग: `आज` · `1सप्ताह` · `2सप्ताह` · `1महीना` · `90दिन` (डिफ़ॉल्ट: 1 सप्ताह)
+- **फ़िल्टर** — CSV निर्यात के साथ प्रोजेक्ट, एजेंट, और फ़ाइल टेक्स्ट फ़िल्टर
+- **थीम टॉगल** — डार्क / लाइट मोड लगातार प्राथमिकता के साथ
+- **द्विभाषी** — कोरियाई लोकेल का स्वतः पता लगाता है; मैनुअल KO/EN टॉगल
+
+
 **JSONL रिकॉर्ड फ़ील्ड**
 
 | फ़ील्ड | प्रकार | विवरण |
@@ -267,7 +312,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### समकालिक
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -287,7 +332,7 @@ println!("{}", output);
 ### स्ट्रीमिंग (Tokio)
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -302,7 +347,7 @@ while let Some(chunk) = stream.next().await {
 ### टोकन गिनती अनुमान
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -367,7 +412,7 @@ k: [कीवर्ड1, कीवर्ड2]
 ## त्रुटि प्रबंधन
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* आउटपुट उपयोग करें */ }

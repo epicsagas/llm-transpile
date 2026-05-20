@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
 **LLMパイプライン向けトークン最適化ドキュメントトランスパイラー**
 
-生ドキュメント（Markdown、HTML、プレーンテキスト）→ 構造化ブリッジフォーマット `<D>?<H><B>` — トークン予算内に収める適応型圧縮付き。
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
 
-```
-<H>
-t: ソフトウェアライセンス契約
-s: ライセンサーとライセンシー間の年間ライセンス条件
-k: [ライセンス, 契約, ソフトウェア]
-</H>
-<B>
-# 契約当事者
-本契約はライセンサーとライセンシーの間で締結されます。
-...
-</B>
-```
+</div>
+
+生ドキュメント（Markdown、HTML、プレーンテキスト）→ 構造化ブリッジフォーマット `<D>?<H><B>` — トークン予算内に収める適応型圧縮付き。
 
 ---
 
@@ -40,7 +40,8 @@ k: [ライセンス, 契約, ソフトウェア]
 - [エラー処理](#エラー処理)
 - [パフォーマンス](#パフォーマンス)
 - [コントリビュート](#コントリビュート)
-- [ライセンス](#ライセンス)
+- [ライセンス](#ライセンス)- [ベンチマーキング](#ベンチマーキング)
+
 </details>
 
 ---
@@ -236,6 +237,28 @@ transpile stats — 過去7日間
   合計                         7      19 765       14 372   5 393      27.3%
 ```
 
+**インタラクティブな HTML ダッシュボード**
+
+
+```bash
+transpile stats report                 # ブラウザで開く（デフォルト: 過去7日間）
+transpile stats report --days 30       # 過去30日間
+transpile stats report --no-open       # 開かずに生成のみ
+transpile stats report --out /tmp/custom.html
+```
+
+> レポートはデフォルトで `~/.agents/transpile/reports/` に生成されます。 `--out` で上書きできます。
+
+ダッシュボードに含まれる内容：
+
+- **KPIカード** — 総呼び出し数、節約されたトークン、平均削減率、一意のファイル、エージェント、アクティブ日数
+- **6つのチャート** — 日次トークン使用量、忠実度の内訳、入力と出力の傾向、エージェント分布、時間帯別パターン、削減率の分布
+- **日付範囲プリセット** — ワンクリックでフィルタリング： `今日` · `1週間` · `2週間` · `1ヶ月` · `90日間`（デフォルト: 1週間）
+- **フィルター** — プロジェクト、エージェント、ファイルテキストフィルター、CSVエクスポート
+- **テーマ切り替え** — ダーク/ライトモードの永続的な設定
+- **バイリンガル** — 韓国語ロケールの自動検出、手動での 韓/EN 切り替え
+
+
 **JSONLレコードフィールド**
 
 | フィールド | 型 | 説明 |
@@ -258,6 +281,28 @@ transpile stats — 過去7日間
 TRANSPILE_AGENT=claude transpile --input doc.md
 ```
 
+### ベンチマーキング
+
+
+```bash
+# テストファイルのディレクトリに対してベンチマークを実行
+transpile bench run --dataset ./eval                    # JSONL ログを生成
+transpile bench run --dataset ./eval --report           # 実行 + HTML レポートを開く
+transpile bench report                                  # ログからレポートを再生成
+```
+
+HTML ベンチマークレポートに含まれる内容：
+
+- **KPIカード** — semantic 削減率、compressed 削減率、スループット (tok/ms)、単語カバレッジ、総入力トークン、実行回数
+- **7つのチャート** — 時間経過に伴う削減傾向、実行ごとのスループット、semantic 対 スループットの散布図、フォーマット別の箱ひげ図、フォーマット分布、トークンサイズのヒストグラム、単語カバレッジのドーナツグラフ
+- **実行テーブル** — 集計指標を含む実行ごとのサマリー
+- **レコードテーブル** — フォーマット、実行、ファイル名フィルター付きのファイルごとの詳細
+- **テーマ切り替え** — ダーク/ライトモードの永続的な設定
+- **バイリンガル** — 韓国語ロケールの自動検出、手動での 韓/EN 切り替え
+
+
+---
+
 ---
 
 ## ライブラリ使用法
@@ -265,7 +310,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### 同期処理
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -285,7 +330,7 @@ println!("{}", output);
 ### ストリーミング（Tokio）
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -300,7 +345,7 @@ while let Some(chunk) = stream.next().await {
 ### トークン数の推定
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -365,7 +410,7 @@ k: [キーワード1, キーワード2]
 ## エラー処理
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* 出力を使用 */ }
@@ -407,4 +452,4 @@ cargo run --release --example eval
 
 ## ライセンス
 
-Apache-2.0 — [LICENSE](LICENSE)を参照。
+Apache-2.0 — [LICENSE](../../LICENSE)を参照。

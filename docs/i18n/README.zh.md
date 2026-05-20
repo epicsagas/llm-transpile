@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
-**面向 LLM 流水线的令牌优化文档转译器**
+**为 LLM 流水线优化的 Token 文档转译器**
+
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+
+</div>
 
 原始文档（Markdown、HTML、纯文本）→ 结构化桥接格式 `<D>?<H><B>` — 支持自适应压缩以控制令牌预算。
-
-```
-<H>
-t: 软件许可协议
-s: 许可方与被许可方之间的年度许可条款
-k: [许可证, 合同, 软件]
-</H>
-<B>
-# 合同当事方
-本协议由许可方与被许可方签订。
-...
-</B>
-```
 
 ---
 
@@ -41,7 +41,8 @@ k: [许可证, 合同, 软件]
 - [错误处理](#错误处理)
 - [性能](#性能)
 - [贡献](#贡献)
-- [许可证](#许可证)
+- [许可证](#许可证)- [基准测试](#基准测试)
+
 </details>
 
 ---
@@ -148,6 +149,28 @@ cargo install --path .
 transpile install
 ```
 
+### 基准测试
+
+
+```bash
+# 针对测试文件目录运行基准测试
+transpile bench run --dataset ./eval                    # 生成 JSONL 日志
+transpile bench run --dataset ./eval --report           # 运行 + 打开 HTML 报告
+transpile bench report                                  # 从日志重新生成报告
+```
+
+HTML 基准测试报告内容包括：
+
+- **KPI 卡片** — semantic 减少率、compressed 减少率、吞吐量 (tok/ms)、单词覆盖率、总输入 token、运行次数
+- **7 个图表** — 随时间变化的减少趋势、每次运行的吞吐量、semantic 与吞吐量的散点图、按格式的箱线图、格式分布、token 大小直方图、单词覆盖率圆环图
+- **运行表** — 包含聚合指标的每次运行摘要
+- **记录表** — 包含格式、运行和文件名过滤器的每个文件详细信息
+- **主题切换** — 深色/浅色模式，持久化首选项
+- **双语** — 自动检测韩语区域设置；手动 韩/EN 切换
+
+
+---
+
 ---
 
 ## 更新
@@ -239,6 +262,28 @@ transpile stats — 最近 7 天
   合计                       7      19 765       14 372   5 393      27.3%
 ```
 
+**交互式 HTML 仪表板**
+
+
+```bash
+transpile stats report                 # 在浏览器中打开（默认：过去7天）
+transpile stats report --days 30       # 过去30天
+transpile stats report --no-open       # 仅生成不打开
+transpile stats report --out /tmp/custom.html
+```
+
+> 报告默认生成在 `~/.agents/transpile/reports/`。使用 `--out` 覆盖。
+
+仪表板内容包括：
+
+- **KPI 卡片** — 总调用次数、节省的 token、平均减少率、唯一文件、代理、活跃天数
+- **6 个图表** — 每日 token 使用量、保真度分类、输入与输出趋势、代理分布、每小时模式、减少率分布
+- **日期范围预设** — 一键过滤：`今天` · `1周` · `2周` · `1个月` · `90天`（默认：1周）
+- **过滤器** — 项目、代理和文件文本过滤器及 CSV 导出
+- **主题切换** — 深色/浅色模式，持久化首选项
+- **双语** — 自动检测韩语区域设置；手动 韩/EN 切换
+
+
 **JSONL 记录字段**
 
 | 字段 | 类型 | 说明 |
@@ -268,7 +313,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### 同步
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -288,7 +333,7 @@ println!("{}", output);
 ### 流式（Tokio）
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -303,7 +348,7 @@ while let Some(chunk) = stream.next().await {
 ### 令牌数估算
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -368,7 +413,7 @@ k: [关键词1, 关键词2]
 ## 错误处理
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* 使用输出 */ }
@@ -410,4 +455,4 @@ cargo run --release --example eval
 
 ## 许可证
 
-Apache-2.0 — 参见 [LICENSE](LICENSE)。
+Apache-2.0 — 参见 [LICENSE](../../LICENSE)。

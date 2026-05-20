@@ -1,37 +1,39 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
 **LLM 파이프라인을 위한 토큰 최적화 문서 트랜스파일러**
 
-원본 문서(Markdown, HTML, 일반 텍스트) → 구조화된 브리지 포맷 `<D>?<H><B>` — 토큰 예산 내에 맞추는 적응형 압축 지원.
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
 
-```
-<H>
-t: 소프트웨어 라이선스 계약
-s: 라이선서와 라이선시 간의 연간 라이선스 조건
-k: [라이선스, 계약, 소프트웨어]
-</H>
-<B>
-# 계약 당사자
-본 계약은 갑(라이선서)과 을(라이선시) 사이에 체결됩니다.
-...
-</B>
-```
+</div>
+
+원본 문서(Markdown, HTML, 일반 텍스트) → 구조화된 브리지 포맷 `<D>?<H><B>` — 토큰 예산 내에 맞추는 적응형 압축 지원.
 
 ---
 
 <details>
 <summary>목차</summary>
+
 - [왜 사용하는가](#왜-사용하는가)
 - [설치](#설치)
 - [업데이트](#업데이트)
 - [CLI 사용법](#cli-사용법)
 - [사용 통계](#사용-통계)
+- [벤치마킹](#벤치마킹)
 - [라이브러리 사용법](#라이브러리-사용법)
 - [출력 포맷](#출력-포맷)
 - [충실도 수준](#충실도-수준)
@@ -41,6 +43,7 @@ k: [라이선스, 계약, 소프트웨어]
 - [성능](#성능)
 - [기여](#기여)
 - [라이선스](#라이선스)
+
 </details>
 
 ---
@@ -238,6 +241,26 @@ transpile stats — 최근 7일
   Total                    7     19 765       14 372   5 393     27.3%
 ```
 
+**대화형 HTML 대시보드**
+
+```bash
+transpile stats report                 # 브라우저에서 열기 (기본값: 최근 7일)
+transpile stats report --days 30       # 최근 30일
+transpile stats report --no-open       # 열지 않고 생성만 하기
+transpile stats report --out /tmp/custom.html
+```
+
+> 리포트는 기본적으로 `~/.agents/transpile/reports/`에 생성됩니다. `--out`으로 덮어쓸 수 있습니다.
+
+대시보드 포함 내용:
+
+- **KPI 카드** — 총 호출, 절약된 토큰, 평균 축소율, 고유 파일, 에이전트, 활성 일수
+- **6개 차트** — 일별 토큰 사용량, 충실도 비율, 입출력 추세, 에이전트 분포, 시간대별 패턴, 축소율 분포
+- **날짜 범위 프리셋** — 원클릭 필터링: `오늘` · `1주` · `2주` · `1개월` · `90일` (기본값: 1주)
+- **필터** — 프로젝트, 에이전트, 파일 텍스트 필터 및 CSV 내보내기
+- **테마 토글** — 지속성 있는 다크 / 라이트 모드 설정
+- **이중 언어** — 한국어 로캘 자동 감지; 수동 한/EN 토글
+
 **JSONL 레코드 필드**
 
 | 필드 | 타입 | 설명 |
@@ -260,6 +283,24 @@ transpile stats — 최근 7일
 TRANSPILE_AGENT=claude transpile --input doc.md
 ```
 
+### 벤치마킹
+
+```bash
+# 테스트 파일 디렉토리에 대해 벤치마크 실행
+transpile bench run --dataset ./eval                    # JSONL 로그 생성
+transpile bench run --dataset ./eval --report           # 실행 + HTML 리포트 열기
+transpile bench report                                  # 로그에서 리포트 재생성
+```
+
+HTML 벤치마크 리포트 포함 내용:
+
+- **KPI 카드** — semantic 축소율, compressed 축소율, 처리량 (tok/ms), 단어 커버리지, 총 입력 토큰, 실행 횟수
+- **7개 차트** — 시간에 따른 축소율 추세, 실행별 처리량, semantic 대비 처리량 산점도, 포맷별 박스 플롯, 포맷 분포, 토큰 크기 히스토그램, 단어 커버리지 도넛
+- **실행 테이블** — 집계 지표가 포함된 실행별 요약
+- **레코드 테이블** — 포맷, 실행, 파일명 필터가 있는 파일별 상세 정보
+- **테마 토글** — 지속성 있는 다크 / 라이트 모드 설정
+- **이중 언어** — 한국어 로캘 자동 감지; 수동 한/EN 토글
+
 ---
 
 ## 라이브러리 사용법
@@ -267,7 +308,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### 동기식
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -287,7 +328,7 @@ println!("{}", output);
 ### 스트리밍 (Tokio)
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -409,4 +450,4 @@ cargo run --release --example eval
 
 ## 라이선스
 
-Apache-2.0 — [LICENSE](LICENSE) 참조.
+Apache-2.0 — [LICENSE](../../LICENSE) 참조.

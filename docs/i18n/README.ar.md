@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
-**محوّل وثائق مُحسَّن للرموز في مسارات LLM**
+**مترجم مستندات محسن للرموز (Tokens) في خطوط أنابيب نماذج اللغة الكبيرة (LLMs)**
+
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+
+</div>
 
 الوثائق الخام (Markdown وHTML والنص العادي) ← تنسيق جسري منظم `<D>?<H><B>` — مع ضغط تكيّفي يحافظ على ميزانية الرموز.
-
-```
-<H>
-t: اتفاقية ترخيص البرمجيات
-s: شروط الترخيص السنوية بين المرخِّص والمرخَّص له
-k: [ترخيص, عقد, برمجيات]
-</H>
-<B>
-# أطراف العقد
-تُبرم هذه الاتفاقية بين المرخِّص والمرخَّص له.
-...
-</B>
-```
 
 ---
 
@@ -40,7 +40,8 @@ k: [ترخيص, عقد, برمجيات]
 - [معالجة الأخطاء](#معالجة-الأخطاء)
 - [الأداء](#الأداء)
 - [المساهمة](#المساهمة)
-- [الرخصة](#الرخصة)
+- [الرخصة](#الرخصة)- [قياس الأداء](#قياس-الأداء-benchmarking)
+
 </details>
 
 ---
@@ -146,6 +147,28 @@ cd llm-transpile
 cargo install --path .
 transpile install
 ```
+
+### قياس الأداء (Benchmarking)
+
+
+```bash
+# تشغيل القياس على مجلد ملفات تجريبية
+transpile bench run --dataset ./eval                    # إنشاء سجل JSONL
+transpile bench run --dataset ./eval --report           # تشغيل + فتح تقرير HTML
+transpile bench report                                  # إعادة إنشاء تقرير من السجلات
+```
+
+يتضمن تقرير HTML الخاص بالقياس:
+
+- **بطاقات الأداء (KPIs)** — تخفيض الدلالة (semantic)، التخفيض المضغوط (compressed)، الإنتاجية (tok/ms)، تغطية الكلمات، إجمالي رموز الإدخال، وعدد التشغيلات
+- **7 رسوم بيانية** — اتجاه التخفيض، الإنتاجية لكل تشغيل، التشتت، الصندوق المخطط (Box plot)، توزيع التنسيقات، والمدرج التكراري للرموز
+- **جدول التشغيلات** — ملخص لكل تشغيل مع مقاييس مجمعة
+- **جدول السجلات** — تفاصيل لكل ملف مع الفلاتر
+- **السمة (Theme)** — الوضع الداكن/الفاتح مع حفظ التفضيل
+- **ثنائية اللغة** — اكتشاف تلقائي للغة الكورية؛ تبديل يدوي بين الكورية والإنجليزية
+
+
+---
 
 ---
 
@@ -267,7 +290,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### متزامن
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -287,7 +310,7 @@ println!("{}", output);
 ### متدفق (Tokio)
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -302,7 +325,7 @@ while let Some(chunk) = stream.next().await {
 ### تقدير عدد الرموز
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -367,7 +390,7 @@ k: [كلمة_مفتاحية1, كلمة_مفتاحية2]
 ## معالجة الأخطاء
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* استخدام الإخراج */ }

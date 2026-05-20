@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
-**Token-optimierter Dokument-Transpiler für LLM-Pipelines**
+**Token-optimierter Dokumenten-Transpiler für LLM-Pipelines**
+
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+
+</div>
 
 Rohdokumente (Markdown, HTML, Klartext) → strukturiertes Brückenformat `<D>?<H><B>` — mit adaptiver Komprimierung, die das Token-Budget einhält.
-
-```
-<H>
-t: Softwarelizenzvertrag
-s: Jährliche Lizenzbedingungen zwischen Lizenzgeber und Lizenznehmer
-k: [Lizenz, Vertrag, Software]
-</H>
-<B>
-# Vertragsparteien
-Dieser Vertrag wird zwischen dem Lizenzgeber und dem Lizenznehmer geschlossen.
-...
-</B>
-```
 
 ---
 
@@ -42,6 +42,7 @@ Dieser Vertrag wird zwischen dem Lizenzgeber und dem Lizenznehmer geschlossen.
 - [Leistung](#leistung)
 - [Mitwirken](#mitwirken)
 - [Lizenz](#lizenz)
+- [Benchmarking](#benchmarking)
 
 </details>
 
@@ -149,6 +150,28 @@ cargo install --path .
 transpile install
 ```
 
+### Benchmarking
+
+
+```bash
+# Benchmarks für ein Verzeichnis von Testdateien ausführen
+transpile bench run --dataset ./eval                    # generiert JSONL-Protokoll
+transpile bench run --dataset ./eval --report           # Ausführen + HTML-Bericht öffnen
+transpile bench report                                  # Bericht aus Protokollen neu generieren
+```
+
+Der HTML-Benchmark-Bericht enthält:
+
+- **KPI-Karten** — semantische Reduzierung, komprimierte Reduzierung, Durchsatz (tok/ms), Wortabdeckung, Gesamteingabetokens, Laufanzahl
+- **7 Diagramme** — Reduzierungstrend, Durchsatz pro Lauf, semantisch vs Durchsatz Streudiagramm, Boxplot nach Format, Formatverteilung, Token-Größenhistogramm, Wortabdeckungs-Donut
+- **Läufe-Tabelle** — Zusammenfassung pro Lauf mit aggregierten Metriken
+- **Datensatz-Tabelle** — Dateidetails mit Format-, Lauf- und Dateinamenfilter
+- **Theme-Toggle** — Dunkel/Hell-Modus mit dauerhafter Einstellung
+- **Zweisprachig** — Automatische Erkennung des koreanischen Gebietsschemas; manueller KO/EN-Schalter
+
+
+---
+
 ---
 
 ## Aktualisierung
@@ -240,6 +263,28 @@ transpile stats — last 7 days
   Total                       7      19 765       14 372   5 393      27.3%
 ```
 
+**Interaktives HTML-Dashboard**
+
+
+```bash
+transpile stats report                 # im Browser öffnen (Standard: letzte 7 Tage)
+transpile stats report --days 30       # letzte 30 Tage
+transpile stats report --no-open       # nur generieren, nicht öffnen
+transpile stats report --out /tmp/custom.html
+```
+
+> Berichte werden standardmäßig unter `~/.agents/transpile/reports/` generiert. Mit `--out` überschreiben.
+
+Das Dashboard beinhaltet:
+
+- **KPI-Karten** — Gesamtaufrufe, gesparte Tokens, durchschn. Reduzierung, eindeutige Dateien, Agenten, aktive Tage
+- **6 Diagramme** — tägliche Token-Nutzung, Fidelity-Aufschlüsselung, Eingangs/Ausgangs-Trend, Agenten-Verteilung, stündliches Muster, Reduzierungsverteilung
+- **Datumsbereich-Presets** — Ein-Klick-Filter: `Heute` · `1W` · `2W` · `1M` · `90T` (Standard: 1 Woche)
+- **Filter** — Projekt-, Agenten- und Dateitext-Filter mit CSV-Export
+- **Theme-Toggle** — Dunkel/Hell-Modus mit dauerhafter Einstellung
+- **Zweisprachig** — Automatische Erkennung des koreanischen Gebietsschemas; manueller KO/EN-Schalter
+
+
 **JSONL-Datensatzfelder**
 
 | Feld | Typ | Beschreibung |
@@ -269,7 +314,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### Synchron
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -289,7 +334,7 @@ println!("{}", output);
 ### Streaming (Tokio)
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -304,7 +349,7 @@ while let Some(chunk) = stream.next().await {
 ### Token-Anzahl schätzen
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -369,7 +414,7 @@ Beim Streaming werden verbleibende Knoten automatisch in den `Compressed`-Modus 
 ## Fehlerbehandlung
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* Ausgabe verwenden */ }
@@ -411,4 +456,4 @@ Siehe [CONTRIBUTING.md](../../CONTRIBUTING.md) für vollständige Richtlinien. P
 
 ## Lizenz
 
-Apache-2.0 — siehe [LICENSE](LICENSE).
+Apache-2.0 — siehe [LICENSE](../../LICENSE).

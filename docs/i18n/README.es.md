@@ -1,27 +1,27 @@
-# llm-transpile
+<div align="center">
+<h1>llm-transpile</h1> 
 
-[![Crates.io](https://img.shields.io/crates/v/llm-transpile.svg)](https://crates.io/crates/llm-transpile)
-[![docs.rs](https://docs.rs/llm-transpile/badge.svg)](https://docs.rs/llm-transpile)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.92+](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/llm-transpile/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/llm-transpile/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/llm-transpile?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/llm-transpile"><img alt="Crates.io" src="https://img.shields.io/crates/v/llm-transpile?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="https://docs.rs/llm-transpile"><img alt="docs.rs" src="https://img.shields.io/docsrs/llm-transpile?style=for-the-badge&labelColor=0d1117&color=8e44ad&logo=docsdotrs&logoColor=white" /></a>
+  <a href="../../LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.92+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
-**Transpilador de documentos optimizado para tokens en pipelines LLM**
+**Transpilador de documentos optimizado para tokens en pipelines de LLM**
+
+[English](../../README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Português](README.pt.md) · [Русский](README.ru.md) · [العربية](README.ar.md) · [हिन्दी](README.hi.md)
+
+</div>
 
 Documentos en bruto (Markdown, HTML, texto plano) → formato puente estructurado `<D>?<H><B>` — con compresión adaptativa que mantiene el presupuesto de tokens.
-
-```
-<H>
-t: Contrato de Licencia de Software
-s: Términos de licencia anuales entre licenciante y licenciatario
-k: [licencia, contrato, software]
-</H>
-<B>
-# Partes Contratantes
-Este acuerdo se celebra entre el Licenciante y el Licenciatario.
-...
-</B>
-```
 
 ---
 
@@ -40,7 +40,8 @@ Este acuerdo se celebra entre el Licenciante y el Licenciatario.
 - [Manejo de errores](#manejo-de-errores)
 - [Rendimiento](#rendimiento)
 - [Contribuir](#contribuir)
-- [Licencia](#licencia)
+- [Licencia](#licencia)- [Pruebas de rendimiento](#pruebas-de-rendimiento-benchmarking)
+
 </details>
 
 ---
@@ -146,6 +147,28 @@ cd llm-transpile
 cargo install --path .
 transpile install
 ```
+
+### Pruebas de rendimiento (Benchmarking)
+
+
+```bash
+# Ejecutar pruebas contra un directorio de archivos
+transpile bench run --dataset ./eval                    # genera un registro JSONL
+transpile bench run --dataset ./eval --report           # ejecutar + abrir informe HTML
+transpile bench report                                  # regenerar informe desde los registros
+```
+
+El informe HTML incluye:
+
+- **Tarjetas KPI** — reducción semántica, reducción comprimida, rendimiento (tok/ms), cobertura de palabras, total de tokens de entrada, número de ejecuciones
+- **7 gráficos** — tendencia de reducción, rendimiento por ejecución, dispersión semántica vs rendimiento, diagrama de caja por formato, distribución de formatos, histograma de tamaño de token, anillo de cobertura de palabras
+- **Tabla de ejecuciones** — resumen con métricas agregadas
+- **Tabla de registros** — detalle por archivo con filtro de formato, ejecución y nombre
+- **Tema** — modo oscuro/claro con preferencia persistente
+- **Bilingüe** — autodetecta configuración regional coreana; interruptor manual KO/EN
+
+
+---
 
 ---
 
@@ -267,7 +290,7 @@ TRANSPILE_AGENT=claude transpile --input doc.md
 ### Síncrono
 
 ```rust
-use llm_transpile::{transpile, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile, FidelityLevel, InputFormat};
 
 let md = r#"
 # Software License Agreement
@@ -287,7 +310,7 @@ println!("{}", output);
 ### Streaming (Tokio)
 
 ```rust
-use llm_transpile::{transpile_stream, FidelityLevel, InputFormat};
+use llm_transpiler::{transpile_stream, FidelityLevel, InputFormat};
 use futures::StreamExt;
 
 let mut stream = transpile_stream(input, InputFormat::Markdown, FidelityLevel::Semantic, 4096).await;
@@ -302,7 +325,7 @@ while let Some(chunk) = stream.next().await {
 ### Estimación de recuento de tokens
 
 ```rust
-let n = llm_transpile::token_count("Hello, world!");
+let n = llm_transpiler::token_count("Hello, world!");
 ```
 
 ---
@@ -367,7 +390,7 @@ Durante el streaming, cuando el uso del presupuesto supera el 80%, los nodos res
 ## Manejo de errores
 
 ```rust
-use llm_transpile::TranspileError;
+use llm_transpiler::TranspileError;
 
 match transpile(input, format, fidelity, budget) {
     Ok(output) => { /* usar output */ }
@@ -409,4 +432,4 @@ Consulta [CONTRIBUTING.md](../../CONTRIBUTING.md) para las directrices completas
 
 ## Licencia
 
-Apache-2.0 — ver [LICENSE](LICENSE).
+Apache-2.0 — ver [LICENSE](../../LICENSE).
