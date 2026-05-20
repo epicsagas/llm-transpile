@@ -131,8 +131,7 @@ fn strip_pua(input: &str) -> std::borrow::Cow<'_, str> {
 /// across all body text nodes (Para, Header, List items). Short terms (< 3 chars for ASCII,
 /// < 2 chars for non-ASCII) are excluded because they don't save enough tokens to justify
 /// the dictionary entry overhead.
-///
-/// ## ROI gate (P1a)
+////// ## ROI gate (P1a)
 ///
 /// A term is only interned when the net token saving is positive:
 ///

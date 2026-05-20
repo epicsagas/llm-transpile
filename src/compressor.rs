@@ -1191,7 +1191,6 @@ mod tests {
             "at least 60% of paragraphs must survive the cap, got {remaining}/10"
         );
     }
-
     // ── P2: Compressed-only stage tests ──────────────────────────────────
 
     #[test]
