@@ -1203,9 +1203,15 @@ mod tests {
         let result = collapse_lists_to_inline(nodes);
         assert_eq!(result.len(), 1);
         if let DocNode::Para { text, .. } = &result[0] {
-            assert!(text.contains("Alpha"), "Alpha must appear in collapsed text");
+            assert!(
+                text.contains("Alpha"),
+                "Alpha must appear in collapsed text"
+            );
             assert!(text.contains("Beta"), "Beta must appear in collapsed text");
-            assert!(text.contains("Gamma"), "Gamma must appear in collapsed text");
+            assert!(
+                text.contains("Gamma"),
+                "Gamma must appear in collapsed text"
+            );
         } else {
             panic!("expected Para node after list collapse");
         }
@@ -1224,7 +1230,10 @@ mod tests {
                 text.contains("rust"),
                 "summary must mention language: got '{text}'"
             );
-            assert!(text.contains('L'), "summary must mention line count: got '{text}'");
+            assert!(
+                text.contains('L'),
+                "summary must mention line count: got '{text}'"
+            );
         } else {
             panic!("expected Para node after code summarization");
         }
