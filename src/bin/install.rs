@@ -96,12 +96,12 @@ static INTEGRATIONS: &[Integration] = &[
         uninstall: uninstall_claude,
     },
     Integration {
-        id: "gemini",
-        label: "Gemini CLI",
-        detect: detect_gemini,
-        artifact: gemini_artifact,
-        install: install_gemini,
-        uninstall: uninstall_gemini,
+        id: "antigravity",
+        label: "Google Antigravity",
+        detect: detect_antigravity,
+        artifact: antigravity_artifact,
+        install: install_antigravity,
+        uninstall: uninstall_antigravity,
     },
     Integration {
         id: "codex",
@@ -145,8 +145,8 @@ fn find_integration(id: &str) -> Option<&'static Integration> {
 fn detect_claude() -> bool {
     cmd_exists("claude") || dir_exists("~/.claude")
 }
-fn detect_gemini() -> bool {
-    cmd_exists("gemini")
+fn detect_antigravity() -> bool {
+    cmd_exists("antigravity") || dir_exists("~/.gemini/config")
 }
 fn detect_codex() -> bool {
     cmd_exists("codex")
@@ -164,8 +164,8 @@ fn claude_artifact() -> PathBuf {
         .join(".claude")
         .join("transpile-hook.js")
 }
-fn gemini_artifact() -> PathBuf {
-    skill_path("gemini")
+fn antigravity_artifact() -> PathBuf {
+    skill_path("antigravity")
 }
 fn codex_artifact() -> PathBuf {
     skill_path("codex")
@@ -231,10 +231,10 @@ fn uninstall_claude(dry_run: bool) -> Vec<SyncResult> {
     out
 }
 
-fn install_gemini(dry_run: bool) -> Vec<SyncResult> {
+fn install_antigravity(dry_run: bool) -> Vec<SyncResult> {
     vec![sync_file(
-        &gemini_artifact(),
-        &transpile_skill("gemini"),
+        &antigravity_artifact(),
+        &transpile_skill("antigravity"),
         false,
         dry_run,
     )]
@@ -264,8 +264,8 @@ fn install_cursor(dry_run: bool) -> Vec<SyncResult> {
     )]
 }
 
-fn uninstall_gemini(dry_run: bool) -> Vec<SyncResult> {
-    vec![remove_file(&gemini_artifact(), dry_run)]
+fn uninstall_antigravity(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&antigravity_artifact(), dry_run)]
 }
 fn uninstall_codex(dry_run: bool) -> Vec<SyncResult> {
     vec![remove_file(&codex_artifact(), dry_run)]
@@ -617,8 +617,11 @@ TRANSPILE_AGENT={agent} transpile --input <file> --fidelity semantic --quiet
 fn skill_path(tool: &str) -> PathBuf {
     let h = home();
     match tool {
-        "gemini" => PathBuf::from(&h)
+        "antigravity" => PathBuf::from(&h)
             .join(".gemini")
+            .join("config")
+            .join("plugins")
+            .join("llm-transpile")
             .join("skills")
             .join("transpile")
             .join("SKILL.md"),
@@ -979,11 +982,11 @@ mod tests {
     use super::transpile_skill;
 
     #[test]
-    fn skill_gemini_contains_agent_env() {
-        let content = transpile_skill("gemini");
+    fn skill_antigravity_contains_agent_env() {
+        let content = transpile_skill("antigravity");
         assert!(
-            content.contains("TRANSPILE_AGENT=gemini transpile"),
-            "gemini skill must include TRANSPILE_AGENT=gemini in usage command"
+            content.contains("TRANSPILE_AGENT=antigravity transpile"),
+            "antigravity skill must include TRANSPILE_AGENT=antigravity in usage command"
         );
     }
 
@@ -1016,7 +1019,7 @@ mod tests {
 
     #[test]
     fn skill_preserves_rest_of_content() {
-        for agent in &["gemini", "codex", "opencode", "cursor"] {
+        for agent in &["antigravity", "codex", "opencode", "cursor"] {
             let content = transpile_skill(agent);
             assert!(
                 content.contains("name: transpile"),

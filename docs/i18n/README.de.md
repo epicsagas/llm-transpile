@@ -112,7 +112,7 @@ transpile install
 | Tool | Integrationsmethode | Funktion |
 |------|---------------------|---------|
 | **Claude Code** | PostToolUse-Hook | Komprimiert `.md/.html/.txt`-Dateien beim Lesen automatisch |
-| **Gemini CLI** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
+| **Antigravity** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
 | **Codex CLI** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
 | **Cursor** | `.mdc`-Regel (`alwaysApply`) | Löst `transpile` vor dem Lesen von Dokumentdateien aus |
 | **OpenCode** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |

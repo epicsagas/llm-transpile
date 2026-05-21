@@ -111,7 +111,7 @@ transpile install
 | 工具 | 集成方式 | 功能 |
 |------|---------|------|
 | **Claude Code** | PostToolUse 钩子 | Read 时自动压缩 `.md/.html/.txt` 文件 |
-| **Gemini CLI** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
+| **Antigravity** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
 | **Codex CLI** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
 | **Cursor** | `.mdc` 规则（`alwaysApply`） | 读取文档文件前触发 `transpile` |
 | **OpenCode** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |

@@ -111,7 +111,7 @@ transpile install
 | Инструмент | Метод интеграции | Функция |
 |------------|-----------------|---------|
 | **Claude Code** | Хук PostToolUse | Автоматически сжимает `.md/.html/.txt` при чтении |
-| **Gemini CLI** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
+| **Antigravity** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
 | **Codex CLI** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
 | **Cursor** | Правило `.mdc` (`alwaysApply`) | Запускает `transpile` перед чтением документов |
 | **OpenCode** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |

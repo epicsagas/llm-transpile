@@ -110,7 +110,7 @@ transpile install
 | टूल | इंटीग्रेशन विधि | कार्य |
 |-----|----------------|-------|
 | **Claude Code** | PostToolUse हुक | Read पर `.md/.html/.txt` फ़ाइलें स्वचालित संपीड़ित |
-| **Gemini CLI** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
+| **Antigravity** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
 | **Codex CLI** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
 | **Cursor** | `.mdc` नियम (`alwaysApply`) | दस्तावेज़ फ़ाइलें पढ़ने से पहले `transpile` ट्रिगर करता है |
 | **OpenCode** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |

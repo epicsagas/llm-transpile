@@ -27,7 +27,7 @@ use std::process;
 #[command(
     name = "transpile",
     about = "Convert documents to LLM-optimized bridge format",
-    long_about = "Convert documents to LLM-optimized bridge format.\n\nRun `transpile install` to configure integrations with Claude Code, Gemini CLI, Codex, Cursor, and OpenCode.",
+    long_about = "Convert documents to LLM-optimized bridge format.\n\nRun `transpile install` to configure integrations with Claude Code, Antigravity, Codex, Cursor, and OpenCode.",
     version
 )]
 struct Cli {
@@ -79,6 +79,7 @@ enum Command {
     ///   transpile stats show              # last 1 day, ASCII table
     ///   transpile stats show --days 7     # last 7 days
     ///   transpile stats show --agent claude
+    ///   transpile stats show --agent antigravity
     ///   transpile stats report            # HTML dashboard, last 7 days
     ///   transpile stats report --days 30  # last 30 days
     ///   transpile stats report --no-open  # don't open browser
@@ -91,7 +92,7 @@ enum Command {
     /// Examples:
     ///   transpile install              # interactive — pick tools from menu
     ///   transpile install claude       # install only Claude Code
-    ///   transpile install gemini codex # install specific tools
+    ///   transpile install antigravity codex # install specific tools
     ///   transpile install --all        # install every detected tool
     ///   transpile install --list       # show available integrations + status
     ///   transpile install --dry-run    # preview without writing files
@@ -145,7 +146,7 @@ enum StatsCmd {
         /// Number of days to look back (default: 1)
         #[arg(long, default_value = "1")]
         days: u32,
-        /// Filter by agent name (claude, gemini, codex, opencode)
+        /// Filter by agent name (claude, antigravity, codex, opencode)
         #[arg(long)]
         agent: Option<String>,
     },
@@ -752,7 +753,7 @@ mod tests {
         let lines = [
             r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
             r#"{"ts":"2026-04-13T08:00:00Z","agent":"claude","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
-            r#"{"ts":"2026-04-13T09:00:00Z","agent":"gemini","file":"c.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1500,"reduction_pct":25.0,"saved":500}"#,
+            r#"{"ts":"2026-04-13T09:00:00Z","agent":"antigravity","file":"c.rs","format":"markdown","fidelity":"semantic","input_tok":2000,"output_tok":1500,"reduction_pct":25.0,"saved":500}"#,
         ];
         let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, None);
@@ -764,16 +765,16 @@ mod tests {
         assert_eq!(claude.output_tok, 1200);
         assert_eq!(claude.saved, 300);
 
-        let gemini = rows.iter().find(|r| r.agent == "gemini").unwrap();
-        assert_eq!(gemini.calls, 1);
-        assert_eq!(gemini.input_tok, 2000);
+        let antigravity = rows.iter().find(|r| r.agent == "antigravity").unwrap();
+        assert_eq!(antigravity.calls, 1);
+        assert_eq!(antigravity.input_tok, 2000);
     }
 
     #[test]
     fn aggregate_agent_filter() {
         let lines = [
             r#"{"ts":"2026-04-13T07:00:00Z","agent":"claude","file":"a.rs","format":"markdown","fidelity":"semantic","input_tok":1000,"output_tok":800,"reduction_pct":20.0,"saved":200}"#,
-            r#"{"ts":"2026-04-13T08:00:00Z","agent":"gemini","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
+            r#"{"ts":"2026-04-13T08:00:00Z","agent":"antigravity","file":"b.rs","format":"markdown","fidelity":"semantic","input_tok":500,"output_tok":400,"reduction_pct":20.0,"saved":100}"#,
         ];
         let borrowed: Vec<&str> = lines.to_vec();
         let rows = aggregate_lines(&borrowed, Some("claude"));

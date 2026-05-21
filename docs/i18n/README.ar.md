@@ -110,7 +110,7 @@ transpile install
 | الأداة | طريقة التكامل | الوظيفة |
 |--------|--------------|---------|
 | **Claude Code** | خطاف PostToolUse | ضغط تلقائي لملفات `.md/.html/.txt` عند القراءة |
-| **Gemini CLI** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
+| **Antigravity** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
 | **Codex CLI** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
 | **Cursor** | قاعدة `.mdc` (`alwaysApply`) | يُشغّل `transpile` قبل قراءة ملفات الوثائق |
 | **OpenCode** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |

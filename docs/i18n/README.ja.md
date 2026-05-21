@@ -110,7 +110,7 @@ transpile install
 | ツール | 連携方法 | 動作 |
 |--------|---------|------|
 | **Claude Code** | PostToolUseフック | Read時に`.md/.html/.txt`ファイルを自動圧縮 |
-| **Gemini CLI** | `SKILL.md` | LLMがドキュメント拡張子で`transpile`を自動実行 |
+| **Antigravity** | `SKILL.md` | LLMがドキュメント拡張子で`transpile`を自動実行 |
 | **Codex CLI** | `SKILL.md` | LLMがドキュメント拡張子で`transpile`を自動実行 |
 | **Cursor** | `.mdc`ルール（`alwaysApply`） | ドキュメントファイル読み込み前に`transpile`を実行 |
 | **OpenCode** | `SKILL.md` | LLMがドキュメント拡張子で`transpile`を自動実行 |

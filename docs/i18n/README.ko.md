@@ -112,7 +112,7 @@ transpile install
 | 도구 | 연동 방식 | 동작 |
 |------|-----------|------|
 | **Claude Code** | PostToolUse 훅 | Read 시 `.md/.html/.txt` 파일 자동 압축 |
-| **Gemini CLI** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
+| **Antigravity** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
 | **Codex CLI** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
 | **Cursor** | `.mdc` 규칙 (`alwaysApply`) | 문서 파일 읽기 전 `transpile` 실행 |
 | **OpenCode** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
