@@ -127,6 +127,14 @@ static INTEGRATIONS: &[Integration] = &[
         install: install_cursor,
         uninstall: uninstall_cursor,
     },
+    Integration {
+        id: "cline",
+        label: "Cline (VS Code)",
+        detect: detect_cline,
+        artifact: cline_artifact,
+        install: install_cline,
+        uninstall: uninstall_cline,
+    },
 ];
 
 fn integration_names() -> String {
@@ -157,6 +165,10 @@ fn detect_opencode() -> bool {
 fn detect_cursor() -> bool {
     cmd_exists("cursor") || dir_exists("~/.cursor")
 }
+fn detect_cline() -> bool {
+    dir_exists("~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev")
+        || dir_exists("~/.config/Code/User/globalStorage/saoudrizwan.claude-dev")
+}
 
 // ── Artifact paths (canonical installed-status marker) ─────────────────────────
 fn claude_artifact() -> PathBuf {
@@ -175,6 +187,13 @@ fn opencode_artifact() -> PathBuf {
 }
 fn cursor_artifact() -> PathBuf {
     skill_path("cursor")
+}
+fn cline_artifact() -> PathBuf {
+    PathBuf::from(home())
+        .join("Documents")
+        .join("Cline")
+        .join("Rules")
+        .join("transpile.md")
 }
 
 // ── Per-integration install fns ────────────────────────────────────────────────
@@ -275,6 +294,18 @@ fn uninstall_opencode(dry_run: bool) -> Vec<SyncResult> {
 }
 fn uninstall_cursor(dry_run: bool) -> Vec<SyncResult> {
     vec![remove_file(&cursor_artifact(), dry_run)]
+}
+
+fn install_cline(dry_run: bool) -> Vec<SyncResult> {
+    vec![sync_file(
+        &cline_artifact(),
+        &transpile_skill("cline"),
+        false,
+        dry_run,
+    )]
+}
+fn uninstall_cline(dry_run: bool) -> Vec<SyncResult> {
+    vec![remove_file(&cline_artifact(), dry_run)]
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1018,8 +1049,17 @@ mod tests {
     }
 
     #[test]
+    fn skill_cline_contains_agent_env() {
+        let content = transpile_skill("cline");
+        assert!(
+            content.contains("TRANSPILE_AGENT=cline transpile"),
+            "cline skill must include TRANSPILE_AGENT=cline in usage command"
+        );
+    }
+
+    #[test]
     fn skill_preserves_rest_of_content() {
-        for agent in &["antigravity", "codex", "opencode", "cursor"] {
+        for agent in &["antigravity", "codex", "opencode", "cursor", "cline"] {
             let content = transpile_skill(agent);
             assert!(
                 content.contains("name: transpile"),
