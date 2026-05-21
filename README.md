@@ -122,7 +122,7 @@ All non-Claude tools use a skill file that teaches the LLM to run `TRANSPILE_AGE
 **Selective install / uninstall**
 
 ```bash
-transpile install claude gemini    # specific tools only
+transpile install claude antigravity    # specific tools only
 transpile install --all            # everything at once
 transpile install --dry-run        # preview what would change
 transpile install --list           # show status of all integrations
@@ -244,7 +244,7 @@ transpile stats — last 7 days
   Date        Agent       Calls   Input tok   Output tok   Saved    Reduction
   ──────────────────────────────────────────────────────────────────────────
   2026-04-13  claude          5      14 965       10 872   4 093      27.3%
-  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  2026-04-13  antigravity     2       4 800        3 500   1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────
   Total                       7      19 765       14 372   5 393      27.3%
 ```
@@ -274,7 +274,7 @@ The dashboard includes:
 | Field | Type | Description |
 |-------|------|-------------|
 | `ts` | ISO 8601 | Timestamp of the invocation |
-| `agent` | string | Tool that triggered the call (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | string | Tool that triggered the call (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | string | Input file path (empty when reading from stdin) |
 | `format` | string | `markdown`, `html`, or `plaintext` |
 | `fidelity` | string | `lossless`, `semantic`, or `compressed` |
@@ -285,7 +285,7 @@ The dashboard includes:
 
 **`TRANSPILE_AGENT` environment variable**
 
-The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. Each integration sets this automatically (`claude`, `gemini`, `codex`, `opencode`, `cursor`). You can also set it manually:
+The `agent` field is populated from the `TRANSPILE_AGENT` environment variable. Each integration sets this automatically (`claude`, `antigravity`, `codex`, `opencode`, `cursor`). You can also set it manually:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md
