@@ -64,18 +64,24 @@ LLMs perform better when context is clean and dense. This library handles the me
 
 ## Installation
 
-### Library (Rust crate)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-Requires **Rust 1.92+**.
+Auto-installs the binary and seeds the PostToolUse hook on next session start — no additional setup required.
 
-### CLI binary + tool integration
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+The PostToolUse hook is registered automatically — no further steps needed.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -88,20 +94,22 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Via Rust toolchain**
+### Via Rust toolchain
 
 ```bash
 cargo binstall llm-transpile   # pre-built binary (fast)
 cargo install llm-transpile    # build from source
 ```
 
-Then configure tool integrations:
+### After installing
+
+Configure tool integrations:
 
 ```bash
 transpile install
@@ -132,31 +140,14 @@ transpile uninstall --all          # remove everything
 transpile uninstall --dry-run      # preview removals
 ```
 
-**Claude Code plugin**
+### Library (Rust crate)
 
-```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
-
-Auto-installs the binary and seeds the PostToolUse hook on next session start — no additional setup required.
-
-**Codex CLI**
-
-```bash
-codex plugin marketplace add epicsagas/plugins
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
 
-Skills are available immediately — no further steps needed.
-
-Or from source:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+Requires **Rust 1.92+**.
 
 ---
 

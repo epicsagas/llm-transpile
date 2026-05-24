@@ -38,15 +38,17 @@ function getBinaryVersion() {
 }
 
 function getPluginVersion() {
-  try {
-    const manifestPath = join(
-      process.env.CLAUDE_PLUGIN_ROOT || "",
-      ".claude-plugin",
-      "plugin.json"
-    );
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    return manifest.version || null;
-  } catch (_) {}
+  const root = process.env.CLAUDE_PLUGIN_ROOT || "";
+  const candidates = [
+    join(root, ".claude-plugin", "plugin.json"),
+    join(root, ".codex-plugin", "plugin.json"),
+  ];
+  for (const manifestPath of candidates) {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      return manifest.version || null;
+    } catch (_) {}
+  }
   return null;
 }
 
