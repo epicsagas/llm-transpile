@@ -26,19 +26,17 @@ enum SyncResult {
     Updated(PathBuf),
     Unchanged(PathBuf),
     Removed(PathBuf),
-    Skipped(PathBuf),     // would remove but file absent
-    Configured(String),   // non-file change (e.g. settings.json merge)
-    Deconfigured(String), // non-file removal
-    DryRun(String),       // what would happen
+    Skipped(PathBuf), // would remove but file absent
+    DryRun(String),   // what would happen
 }
 
 impl SyncResult {
     fn symbol(&self) -> &'static str {
         match self {
-            Self::Added(_) | Self::Configured(_) => "✓",
+            Self::Added(_) => "✓",
             Self::Updated(_) => "~",
             Self::Unchanged(_) | Self::Skipped(_) => "·",
-            Self::Removed(_) | Self::Deconfigured(_) => "✗",
+            Self::Removed(_) => "✗",
             Self::DryRun(_) => "?",
         }
     }
@@ -49,8 +47,6 @@ impl SyncResult {
             Self::Unchanged(_) => "unchanged ",
             Self::Removed(_) => "removed   ",
             Self::Skipped(_) => "skipped   ",
-            Self::Configured(_) => "configured",
-            Self::Deconfigured(_) => "removed   ",
             Self::DryRun(_) => "dry-run   ",
         }
     }
@@ -61,7 +57,7 @@ impl SyncResult {
             | Self::Unchanged(p)
             | Self::Removed(p)
             | Self::Skipped(p) => shorten_path(p),
-            Self::Configured(s) | Self::Deconfigured(s) | Self::DryRun(s) => s.clone(),
+            Self::DryRun(s) => s.clone(),
         }
     }
 }
@@ -88,28 +84,12 @@ struct Integration {
 
 static INTEGRATIONS: &[Integration] = &[
     Integration {
-        id: "claude",
-        label: "Claude Code",
-        detect: detect_claude,
-        artifact: claude_artifact,
-        install: install_claude,
-        uninstall: uninstall_claude,
-    },
-    Integration {
         id: "antigravity",
         label: "Google Antigravity",
         detect: detect_antigravity,
         artifact: antigravity_artifact,
         install: install_antigravity,
         uninstall: uninstall_antigravity,
-    },
-    Integration {
-        id: "codex",
-        label: "Codex CLI",
-        detect: detect_codex,
-        artifact: codex_artifact,
-        install: install_codex,
-        uninstall: uninstall_codex,
     },
     Integration {
         id: "opencode",
@@ -150,14 +130,8 @@ fn find_integration(id: &str) -> Option<&'static Integration> {
 }
 
 // ── Detectors ──────────────────────────────────────────────────────────────────
-fn detect_claude() -> bool {
-    cmd_exists("claude") || dir_exists("~/.claude")
-}
 fn detect_antigravity() -> bool {
     cmd_exists("antigravity") || dir_exists("~/.gemini/config")
-}
-fn detect_codex() -> bool {
-    cmd_exists("codex")
 }
 fn detect_opencode() -> bool {
     cmd_exists("opencode")
@@ -171,16 +145,8 @@ fn detect_cline() -> bool {
 }
 
 // ── Artifact paths (canonical installed-status marker) ─────────────────────────
-fn claude_artifact() -> PathBuf {
-    PathBuf::from(home())
-        .join(".claude")
-        .join("transpile-hook.js")
-}
 fn antigravity_artifact() -> PathBuf {
     skill_path("antigravity")
-}
-fn codex_artifact() -> PathBuf {
-    skill_path("codex")
 }
 fn opencode_artifact() -> PathBuf {
     skill_path("opencode")
@@ -197,71 +163,10 @@ fn cline_artifact() -> PathBuf {
 }
 
 // ── Per-integration install fns ────────────────────────────────────────────────
-fn install_claude(dry_run: bool) -> Vec<SyncResult> {
-    let mut out = Vec::new();
-
-    // 1) Hook script
-    let hook = claude_artifact();
-    out.push(sync_file(&hook, CLAUDE_HOOK_SCRIPT, true, dry_run));
-
-    // 2) settings.json PostToolUse entry
-    let settings = PathBuf::from(home()).join(".claude").join("settings.json");
-    if dry_run {
-        out.push(SyncResult::DryRun(format!(
-            "merge PostToolUse hook → {}",
-            shorten_path(&settings)
-        )));
-    } else {
-        out.push(merge_claude_hook(&hook, &settings));
-    }
-
-    out
-}
-
-fn uninstall_claude(dry_run: bool) -> Vec<SyncResult> {
-    let mut out = Vec::new();
-
-    // 1) Hook script
-    let hook = claude_artifact();
-    out.push(remove_file(&hook, dry_run));
-
-    // 2) settings.json entry
-    let settings = PathBuf::from(home()).join(".claude").join("settings.json");
-    if dry_run {
-        out.push(SyncResult::DryRun(format!(
-            "remove PostToolUse hook from {}",
-            shorten_path(&settings)
-        )));
-    } else {
-        out.push(strip_claude_hook(&settings));
-    }
-
-    // 3) Legacy command file (silent)
-    if !dry_run {
-        let legacy = PathBuf::from(home())
-            .join(".claude")
-            .join("commands")
-            .join("transpile.md");
-        if legacy.exists() {
-            std::fs::remove_file(legacy).ok();
-        }
-    }
-
-    out
-}
-
 fn install_antigravity(dry_run: bool) -> Vec<SyncResult> {
     vec![sync_file(
         &antigravity_artifact(),
         &transpile_skill("antigravity"),
-        false,
-        dry_run,
-    )]
-}
-fn install_codex(dry_run: bool) -> Vec<SyncResult> {
-    vec![sync_file(
-        &codex_artifact(),
-        &transpile_skill("codex"),
         false,
         dry_run,
     )]
@@ -285,9 +190,6 @@ fn install_cursor(dry_run: bool) -> Vec<SyncResult> {
 
 fn uninstall_antigravity(dry_run: bool) -> Vec<SyncResult> {
     vec![remove_file(&antigravity_artifact(), dry_run)]
-}
-fn uninstall_codex(dry_run: bool) -> Vec<SyncResult> {
-    vec![remove_file(&codex_artifact(), dry_run)]
 }
 fn uninstall_opencode(dry_run: bool) -> Vec<SyncResult> {
     vec![remove_file(&opencode_artifact(), dry_run)]
@@ -507,103 +409,6 @@ fn remove_file(path: &PathBuf, dry_run: bool) -> SyncResult {
         let _ = std::fs::remove_dir(parent); // no-op if non-empty
     }
     SyncResult::Removed(path.clone())
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Claude Code — hook script + settings.json merge
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const CLAUDE_HOOK_SCRIPT: &str = r#"#!/usr/bin/env node
-// Auto-generated by `transpile install`. Re-run to update.
-// PostToolUse hook: auto-compress large files read by Claude Code.
-// Outputs {"additionalContext": "..."} so Claude prefers the token-efficient version.
-'use strict';
-const {execSync} = require('child_process');
-const fs = require('fs');
-const path = require('path');
-
-const THRESHOLD = parseInt(process.env.TRANSPILE_THRESHOLD || '8192', 10);
-
-let input;
-try { input = JSON.parse(require('fs').readFileSync(0, 'utf8')); } catch { process.exit(0); }
-
-const file = (input.tool_input || {}).file_path || '';
-if (!file) process.exit(0);
-
-let bytes;
-try { bytes = fs.statSync(file).size; } catch { process.exit(0); }
-if (bytes < THRESHOLD) process.exit(0);
-
-const project = input.cwd ? path.basename(input.cwd.replace(/[/\\]+$/, '')) : '';
-if (project) process.env.TRANSPILE_PROJECT = project;
-
-let compressed;
-try { compressed = execSync(`transpile --input "${file}" --fidelity semantic --quiet`, {encoding: 'utf8', stdio: ['pipe','pipe','pipe']}); } catch { process.exit(0); }
-if (!compressed) process.exit(0);
-
-const fname = path.basename(file);
-const msg = `[llm-transpile] ${fname} is ${bytes}B — token-compressed version below (prefer this over the raw content above):\n\n${compressed}`;
-process.stdout.write(JSON.stringify({additionalContext: msg}));
-"#;
-
-fn merge_claude_hook(hook_script: &std::path::Path, settings_path: &std::path::Path) -> SyncResult {
-    if !settings_path.exists() {
-        std::fs::write(settings_path, "{}").ok();
-    }
-    let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
-
-    let hook = serde_json::json!({
-        "_id": "llm-transpile",
-        "matcher": "Read",
-        "hooks": [{ "type": "command", "command": format!("node \"{}\"", hook_script.display()) }]
-    });
-
-    if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
-        arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
-        arr.push(hook);
-    } else {
-        cfg["hooks"]["PostToolUse"] = serde_json::json!([hook]);
-    }
-
-    std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
-
-    let label = format!("PostToolUse hook → {}", shorten_path(settings_path));
-    SyncResult::Configured(label)
-}
-
-fn strip_claude_hook(settings_path: &std::path::Path) -> SyncResult {
-    if !settings_path.exists() {
-        return SyncResult::Skipped(settings_path.to_path_buf());
-    }
-    let raw = std::fs::read_to_string(settings_path).unwrap_or_else(|_| "{}".into());
-    let mut cfg: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::json!({}));
-
-    if let Some(arr) = cfg["hooks"]["PostToolUse"].as_array_mut() {
-        arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some("llm-transpile"));
-    }
-    // Prune empty containers
-    if cfg["hooks"]["PostToolUse"]
-        .as_array()
-        .map(|a| a.is_empty())
-        .unwrap_or(false)
-    {
-        cfg["hooks"]
-            .as_object_mut()
-            .map(|o| o.remove("PostToolUse"));
-    }
-    if cfg["hooks"]
-        .as_object()
-        .map(|o| o.is_empty())
-        .unwrap_or(false)
-    {
-        cfg.as_object_mut().map(|o| o.remove("hooks"));
-    }
-    std::fs::write(settings_path, serde_json::to_string_pretty(&cfg).unwrap()).ok();
-    SyncResult::Deconfigured(format!(
-        "PostToolUse hook removed from {}",
-        shorten_path(settings_path)
-    ))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

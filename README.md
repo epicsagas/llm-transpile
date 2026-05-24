@@ -119,21 +119,20 @@ transpile install
 
 | Tool | Integration method | What it does |
 |------|--------------------|--------------|
-| **Claude Code** | PostToolUse hook | Auto-compresses `.md/.html/.txt` files on Read |
 | **Antigravity** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
-| **Codex CLI** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
 | **Cursor** | `.mdc` rule (`alwaysApply`) | Triggers `transpile` before reading document files |
 | **OpenCode** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
+| **Cline** | `SKILL.md` | LLM auto-invokes `transpile` on document file extensions |
 
-All non-Claude tools use a skill file that teaches the LLM to run `TRANSPILE_AGENT=<agent> transpile --input <file>` automatically — no size check needed, extension alone triggers it.
+All tools use a skill file that teaches the LLM to run `TRANSPILE_AGENT=<agent> transpile --input <file>` automatically — no size check needed, extension alone triggers it.
 
 **Selective install / uninstall**
 
 ```bash
-transpile install claude antigravity    # specific tools only
-transpile install --all            # everything at once
-transpile install --dry-run        # preview what would change
-transpile install --list           # show status of all integrations
+transpile install antigravity cursor    # specific tools only
+transpile install --all                 # everything at once
+transpile install --dry-run             # preview what would change
+transpile install --list                # show status of all integrations
 
 transpile uninstall cursor         # remove one
 transpile uninstall --all          # remove everything
@@ -219,12 +218,14 @@ transpile --input article.md --fidelity compressed --budget 512
 
 ## Usage Statistics
 
-Every `transpile` invocation automatically appends a record to `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. The `transpile stats` subcommand reads those files and prints a summary table.
+Every `transpile` invocation automatically appends a record to `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`.
 
-```
-transpile stats                # today
-transpile stats --days 7       # last N days
-transpile stats --agent claude # filter by agent
+### ASCII table
+
+```bash
+transpile stats show                # today
+transpile stats show --days 7       # last N days
+transpile stats show --agent claude # filter by agent
 ```
 
 Example output:
@@ -232,15 +233,20 @@ Example output:
 ```
 transpile stats — last 7 days
 
-  Date        Agent       Calls   Input tok   Output tok   Saved    Reduction
+  Date          Agent         Calls   Input tok  Output tok    Saved  Reduction
   ──────────────────────────────────────────────────────────────────────────
-  2026-04-13  claude          5      14 965       10 872   4 093      27.3%
-  2026-04-13  antigravity     2       4 800        3 500   1 300      27.1%
+  2026-05-18                    238   4 999 355   4 248 769  750 586      15.0%
+  2026-05-19                    390   1 577 739   1 463 504  114 235       7.2%
+  2026-05-20                    288   2 148 207   1 836 916  311 291      14.5%
+  2026-05-21                     99     635 313     544 709   90 604      14.3%
+  2026-05-22                    299   8 328 530   7 732 860  595 670       7.2%
+  2026-05-23                    418  15 939 148  13 501 134  2 438 014      15.3%
+  2026-05-24                    186   3 313 950   2 782 467  531 483      16.0%
   ──────────────────────────────────────────────────────────────────────────
-  Total                       7      19 765       14 372   5 393      27.3%
+  Total                        1919  36 942 242  32 110 359  4 831 883      13.1%
 ```
 
-**Interactive HTML dashboard**
+### HTML dashboard
 
 ```bash
 transpile stats report                 # opens in browser (default: last 7 days)
@@ -250,15 +256,6 @@ transpile stats report --out /tmp/custom.html
 ```
 
 > Reports are generated at `~/.agents/transpile/reports/` by default. Override with `--out`.
-
-The dashboard includes:
-
-- **KPI cards** — total calls, tokens saved, avg reduction, unique files, agents, active days
-- **6 charts** — daily token usage, fidelity breakdown, input vs output trend, agent distribution, hourly pattern, reduction distribution
-- **Date range presets** — one-click filtering: `Today` · `1W` · `2W` · `1M` · `90D` (default: 1 week)
-- **Filters** — project, agent, and file-text filters with CSV export
-- **Theme toggle** — dark / light mode with persistent preference
-- **Bilingual** — auto-detects Korean locale; manual 한/EN toggle
 
 **JSONL record fields**
 
