@@ -261,12 +261,16 @@ const fs = require('fs');
 const path = require('path');
 
 const THRESHOLD = parseInt(process.env.TRANSPILE_THRESHOLD || '8192', 10);
+const DOC_EXTS = new Set(['.md','.markdown','.mdx','.html','.htm','.txt','.rst','.adoc','.org']);
 
 let input;
 try { input = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { process.exit(0); }
 
 const file = (input.tool_input || {}).file_path || '';
 if (!file) process.exit(0);
+
+const ext = path.extname(file).toLowerCase();
+if (!DOC_EXTS.has(ext)) process.exit(0);
 
 let bytes;
 try { bytes = fs.statSync(file).size; } catch { process.exit(0); }
