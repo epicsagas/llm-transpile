@@ -62,18 +62,24 @@ LLM तब बेहतर काम करते हैं जब संदर�
 
 ## स्थापना
 
-### लाइब्रेरी (Rust क्रेट)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-**Rust 1.92+** आवश्यक।
+अगले सेशन स्टार्ट पर बाइनरी और PostToolUse हुक स्वचालित रूप से इंस्टॉल हो जाते हैं — कोई अतिरिक्त सेटअप आवश्यक नहीं।
 
-### CLI बाइनरी + टूल इंटीग्रेशन
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+PostToolUse हुक स्वचालित रूप से पंजीकृत होता है — कोई अतिरिक्त चरण आवश्यक नहीं।
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -86,18 +92,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Rust टूलचेन के माध्यम से**
+### Rust टूलचेन के माध्यम से
 
 ```bash
 cargo binstall llm-transpile   # पूर्व-निर्मित बाइनरी (तेज़)
 cargo install llm-transpile    # सोर्स से बिल्ड
 ```
+
+### इंस्टॉल के बाद
 
 टूल इंटीग्रेशन कॉन्फ़िगर करें:
 
@@ -109,18 +117,17 @@ transpile install
 
 | टूल | इंटीग्रेशन विधि | कार्य |
 |-----|----------------|-------|
-| **Claude Code** | PostToolUse हुक | Read पर `.md/.html/.txt` फ़ाइलें स्वचालित संपीड़ित |
 | **Antigravity** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
-| **Codex CLI** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
 | **Cursor** | `.mdc` नियम (`alwaysApply`) | दस्तावेज़ फ़ाइलें पढ़ने से पहले `transpile` ट्रिगर करता है |
 | **OpenCode** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
+| **Cline** | `SKILL.md` | LLM दस्तावेज़ एक्सटेंशन पर `transpile` स्वचालित चलाता है |
 
-Claude को छोड़कर सभी टूल एक स्किल फ़ाइल का उपयोग करते हैं जो LLM को `TRANSPILE_AGENT=<agent> transpile --input <file>` स्वचालित रूप से चलाना सिखाती है — साइज़ जांच की आवश्यकता नहीं, केवल एक्सटेंशन पर्याप्त है।
+सभी टूल एक स्किल फ़ाइल का उपयोग करते हैं जो LLM को `TRANSPILE_AGENT=<agent> transpile --input <file>` स्वचालित रूप से चलाना सिखाती है — साइज़ जांच की आवश्यकता नहीं, केवल एक्सटेंशन पर्याप्त है।
 
 **चयनात्मक इंस्टॉल / अनइंस्टॉल**
 
 ```bash
-transpile install claude gemini    # केवल विशिष्ट टूल
+transpile install antigravity cursor    # केवल विशिष्ट टूल
 transpile install --all            # सब एक साथ
 transpile install --dry-run        # बदलावों का पूर्वावलोकन
 transpile install --list           # सभी इंटीग्रेशन की स्थिति देखें
@@ -130,23 +137,14 @@ transpile uninstall --all          # सब हटाएं
 transpile uninstall --dry-run      # हटाने का पूर्वावलोकन
 ```
 
-**Claude Code प्लगइन**
+### लाइब्रेरी (Rust क्रेट)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-अगले सेशन स्टार्ट पर बाइनरी और PostToolUse हुक स्वचालित रूप से इंस्टॉल हो जाते हैं — कोई अतिरिक्त सेटअप आवश्यक नहीं।
-
-सोर्स से:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+**Rust 1.92+** आवश्यक।
 
 ### बेंचमार्किंग
 
@@ -243,9 +241,9 @@ transpile --input article.md --fidelity compressed --budget 512
 प्रत्येक `transpile` कॉल स्वचालित रूप से `~/.agents/transpile/stats/YYYY-MM-DD.jsonl` में एक रिकॉर्ड जोड़ता है। `transpile stats` सबकमांड उन फ़ाइलों को पढ़ता है और एक सारांश तालिका प्रिंट करता है।
 
 ```
-transpile stats                # आज
-transpile stats --days 7       # अंतिम N दिन
-transpile stats --agent claude # एजेंट के अनुसार फ़िल्टर
+transpile stats show                # आज
+transpile stats show --days 7       # अंतिम N दिन
+transpile stats show --agent claude # एजेंट के अनुसार फ़िल्टर
 ```
 
 आउटपुट उदाहरण:

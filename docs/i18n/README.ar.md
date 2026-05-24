@@ -62,18 +62,24 @@
 
 ## التثبيت
 
-### المكتبة (حزمة Rust)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-يتطلب **Rust 1.92+**.
+يُثبّت الملف الثنائي ويهيّئ خطاف PostToolUse تلقائياً عند بدء الجلسة التالية — لا حاجة لإعداد إضافي.
 
-### ملف CLI الثنائي + تكامل الأدوات
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+يُسجّل خطاف PostToolUse تلقائياً — لا حاجة لخطوات إضافية.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -86,18 +92,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**عبر سلسلة أدوات Rust**
+### عبر سلسلة أدوات Rust
 
 ```bash
 cargo binstall llm-transpile   # ملف ثنائي جاهز (أسرع)
 cargo install llm-transpile    # بناء من المصدر
 ```
+
+### بعد التثبيت
 
 تهيئة تكاملات الأدوات:
 
@@ -109,18 +117,17 @@ transpile install
 
 | الأداة | طريقة التكامل | الوظيفة |
 |--------|--------------|---------|
-| **Claude Code** | خطاف PostToolUse | ضغط تلقائي لملفات `.md/.html/.txt` عند القراءة |
 | **Antigravity** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
-| **Codex CLI** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
 | **Cursor** | قاعدة `.mdc` (`alwaysApply`) | يُشغّل `transpile` قبل قراءة ملفات الوثائق |
 | **OpenCode** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
+| **Cline** | `SKILL.md` | يستدعي النموذج `transpile` تلقائياً على امتدادات الملفات |
 
-جميع الأدوات غير Claude تستخدم ملف مهارة يُعلّم النموذج تشغيل `TRANSPILE_AGENT=<agent> transpile --input <file>` تلقائياً — لا حاجة لفحص الحجم، الامتداد وحده يُفعّله.
+جميع الأدوات تستخدم ملف مهارة يُعلّم النموذج تشغيل `TRANSPILE_AGENT=<agent> transpile --input <file>` تلقائياً — لا حاجة لفحص الحجم، الامتداد وحده يُفعّله.
 
 **التثبيت / إلغاء التثبيت الانتقائي**
 
 ```bash
-transpile install claude gemini    # أدوات محددة فقط
+transpile install antigravity cursor    # أدوات محددة فقط
 transpile install --all            # كل شيء دفعة واحدة
 transpile install --dry-run        # معاينة التغييرات
 transpile install --list           # عرض حالة التكاملات
@@ -130,23 +137,14 @@ transpile uninstall --all          # إزالة الكل
 transpile uninstall --dry-run      # معاينة الإزالات
 ```
 
-**إضافة Claude Code**
+### المكتبة (حزمة Rust)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-يُثبّت الملف الثنائي ويهيّئ خطاف PostToolUse تلقائياً عند بدء الجلسة التالية — لا حاجة لإعداد إضافي.
-
-من الكود المصدري:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+يتطلب **Rust 1.92+**.
 
 ### قياس الأداء (Benchmarking)
 
@@ -243,9 +241,9 @@ transpile --input article.md --fidelity compressed --budget 512
 كل استدعاء لـ `transpile` يُضيف تلقائياً سجلاً إلى `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. تقرأ الأوامر الفرعية `transpile stats` هذه الملفات وتطبع جدولاً ملخصاً.
 
 ```
-transpile stats                # اليوم
-transpile stats --days 7       # آخر N أيام
-transpile stats --agent claude # تصفية حسب الأداة
+transpile stats show                # اليوم
+transpile stats show --days 7       # آخر N أيام
+transpile stats show --agent claude # تصفية حسب الأداة
 ```
 
 مثال على الإخراج:

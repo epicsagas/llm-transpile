@@ -63,18 +63,24 @@ LLM работают лучше, когда контекст чистый и п�
 
 ## Установка
 
-### Библиотека (Rust-крейт)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-Требуется **Rust 1.92+**.
+Бинарник и хук PostToolUse автоматически устанавливаются при следующем запуске сессии — дополнительная настройка не требуется.
 
-### CLI-бинарник + интеграция инструментов
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+Хук PostToolUse регистрируется автоматически — дальнейшие действия не требуются.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -87,18 +93,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Через инструментальный цепочку Rust**
+### Через инструментальный цепочку Rust
 
 ```bash
 cargo binstall llm-transpile   # готовый бинарник (быстро)
 cargo install llm-transpile    # сборка из исходного кода
 ```
+
+### После установки
 
 Настройка интеграций:
 
@@ -110,18 +118,17 @@ transpile install
 
 | Инструмент | Метод интеграции | Функция |
 |------------|-----------------|---------|
-| **Claude Code** | Хук PostToolUse | Автоматически сжимает `.md/.html/.txt` при чтении |
 | **Antigravity** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
-| **Codex CLI** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
 | **Cursor** | Правило `.mdc` (`alwaysApply`) | Запускает `transpile` перед чтением документов |
 | **OpenCode** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
+| **Cline** | `SKILL.md` | LLM автоматически вызывает `transpile` для документов |
 
-Все инструменты, кроме Claude, используют файл навыка, который обучает LLM автоматически выполнять `TRANSPILE_AGENT=<agent> transpile --input <file>` — проверка размера не требуется, одного расширения файла достаточно для активации.
+Все инструменты используют файл навыка, который обучает LLM автоматически выполнять `TRANSPILE_AGENT=<agent> transpile --input <file>` — проверка размера не требуется, одного расширения файла достаточно для активации.
 
 **Выборочная установка / удаление**
 
 ```bash
-transpile install claude gemini    # только конкретные инструменты
+transpile install antigravity cursor    # только конкретные инструменты
 transpile install --all            # всё сразу
 transpile install --dry-run        # предварительный просмотр изменений
 transpile install --list           # статус интеграций
@@ -131,23 +138,14 @@ transpile uninstall --all          # удалить всё
 transpile uninstall --dry-run      # предварительный просмотр удаления
 ```
 
-**Плагин Claude Code**
+### Библиотека (Rust-крейт)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-Бинарник и хук PostToolUse автоматически устанавливаются при следующем запуске сессии — дополнительная настройка не требуется.
-
-Из исходного кода:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+Требуется **Rust 1.92+**.
 
 ### Бенчмаркинг
 
@@ -244,9 +242,9 @@ transpile --input article.md --fidelity compressed --budget 512
 Каждый вызов `transpile` автоматически добавляет запись в `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. Подкоманда `transpile stats` считывает эти файлы и выводит сводную таблицу.
 
 ```
-transpile stats                # за сегодня
-transpile stats --days 7       # за последние N дней
-transpile stats --agent claude # фильтр по агенту
+transpile stats show                # за сегодня
+transpile stats show --days 7       # за последние N дней
+transpile stats show --agent claude # фильтр по агенту
 ```
 
 Пример вывода:

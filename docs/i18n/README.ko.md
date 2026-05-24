@@ -64,18 +64,24 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 
 ## 설치
 
-### 라이브러리 (Rust 크레이트)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-**Rust 1.92+** 필요.
+바이너리를 자동 설치하고 PostToolUse 훅을 다음 세션 시작 시 구성합니다 — 추가 설정이 필요 없습니다.
 
-### CLI 바이너리 + 도구 연동
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+PostToolUse 훅이 자동으로 등록됩니다 — 추가 단계가 필요 없습니다.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -88,18 +94,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Rust 도구 체인**
+### Rust 도구 체인
 
 ```bash
 cargo binstall llm-transpile   # 사전 빌드 바이너리 (빠름)
 cargo install llm-transpile    # 소스에서 빌드
 ```
+
+### 설치 후
 
 도구 연동 설정:
 
@@ -111,18 +119,17 @@ transpile install
 
 | 도구 | 연동 방식 | 동작 |
 |------|-----------|------|
-| **Claude Code** | PostToolUse 훅 | Read 시 `.md/.html/.txt` 파일 자동 압축 |
 | **Antigravity** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
-| **Codex CLI** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
 | **Cursor** | `.mdc` 규칙 (`alwaysApply`) | 문서 파일 읽기 전 `transpile` 실행 |
 | **OpenCode** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
+| **Cline** | `SKILL.md` | LLM이 문서 파일 확장자에 `transpile` 자동 실행 |
 
-Claude Code가 아닌 모든 도구는 LLM이 `TRANSPILE_AGENT=<agent> transpile --input <file>`을 자동으로 실행하도록 가이드하는 스킬 파일을 사용합니다. 크기 검사가 필요 없으며, 확장자만으로 트리거됩니다.
+모든 도구는 LLM이 `TRANSPILE_AGENT=<agent> transpile --input <file>`을 자동으로 실행하도록 가이드하는 스킬 파일을 사용합니다. 크기 검사가 필요 없으며, 확장자만으로 트리거됩니다.
 
 **선택적 설치 / 제거**
 
 ```bash
-transpile install claude gemini    # 특정 도구만
+transpile install antigravity cursor    # 특정 도구만
 transpile install --all            # 전체 설치
 transpile install --dry-run        # 미리보기
 transpile install --list           # 연동 상태 확인
@@ -132,23 +139,14 @@ transpile uninstall --all          # 전체 제거
 transpile uninstall --dry-run      # 제거 미리보기
 ```
 
-**Claude Code 플러그인**
+### 라이브러리 (Rust 크레이트)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-다음 세션 시작 시 바이너리를 자동 설치하고 PostToolUse 훅을 구성합니다 — 추가 설정이 필요 없습니다.
-
-소스에서 설치:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+**Rust 1.92+** 필요.
 
 ---
 
@@ -223,9 +221,9 @@ transpile --input article.md --fidelity compressed --budget 512
 `transpile`을 실행할 때마다 `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`에 레코드가 자동으로 추가됩니다. `transpile stats` 서브커맨드로 해당 파일을 읽어 요약 테이블을 출력합니다.
 
 ```
-transpile stats                # 오늘
-transpile stats --days 7       # 최근 N일
-transpile stats --agent claude # 에이전트별 필터
+transpile stats show                # 오늘
+transpile stats show --days 7       # 최근 N일
+transpile stats show --agent claude # 에이전트별 필터
 ```
 
 출력 예시:

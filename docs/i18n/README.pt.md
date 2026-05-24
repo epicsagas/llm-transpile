@@ -64,18 +64,24 @@ LLMs funcionam melhor quando o contexto é limpo e denso. Esta biblioteca cuida 
 
 ## Instalação
 
-### Biblioteca (crate Rust)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-Requer **Rust 1.92+**.
+Instala automaticamente o binário e configura o hook PostToolUse no próximo início de sessão — nenhuma configuração adicional necessária.
 
-### Binário CLI + integração de ferramentas
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+O hook PostToolUse é registrado automaticamente — nenhuma etapa adicional necessária.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -88,18 +94,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Via toolchain Rust**
+### Via toolchain Rust
 
 ```bash
 cargo binstall llm-transpile   # binário pré-compilado (rápido)
 cargo install llm-transpile    # compilar do código-fonte
 ```
+
+### Após instalar
 
 Configurar integrações de ferramentas:
 
@@ -111,18 +119,17 @@ transpile install
 
 | Ferramenta | Método de integração | Função |
 |------------|---------------------|--------|
-| **Claude Code** | Hook PostToolUse | Auto-comprime arquivos `.md/.html/.txt` ao ler |
 | **Antigravity** | `SKILL.md` | LLM invoca automaticamente `transpile` em extensões de arquivo |
-| **Codex CLI** | `SKILL.md` | LLM invoca automaticamente `transpile` em extensões de arquivo |
 | **Cursor** | Regra `.mdc` (`alwaysApply`) | Aciona `transpile` antes de ler arquivos de documento |
 | **OpenCode** | `SKILL.md` | LLM invoca automaticamente `transpile` em extensões de arquivo |
+| **Cline** | `SKILL.md` | LLM invoca automaticamente `transpile` em extensões de arquivo |
 
-Todas as ferramentas que não são Claude usam um arquivo de skill que instrui o LLM a executar `TRANSPILE_AGENT=<agent> transpile --input <file>` automaticamente — nenhuma verificação de tamanho necessária, a extensão por si só já aciona.
+Todas as ferramentas usam um arquivo de skill que instrui o LLM a executar `TRANSPILE_AGENT=<agent> transpile --input <file>` automaticamente — nenhuma verificação de tamanho necessária, a extensão por si só já aciona.
 
 **Instalação / desinstalação seletiva**
 
 ```bash
-transpile install claude gemini    # ferramentas específicas apenas
+transpile install antigravity cursor    # ferramentas específicas apenas
 transpile install --all            # tudo de uma vez
 transpile install --dry-run        # visualizar o que mudaria
 transpile install --list           # ver status das integrações
@@ -132,23 +139,14 @@ transpile uninstall --all          # remover tudo
 transpile uninstall --dry-run      # visualizar remoções
 ```
 
-**Plugin do Claude Code**
+### Biblioteca (crate Rust)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-Instala automaticamente o binário e configura o hook PostToolUse no próximo início de sessão — nenhuma configuração adicional necessária.
-
-Do código-fonte:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+Requer **Rust 1.92+**.
 
 ### Benchmarking
 
@@ -245,9 +243,9 @@ transpile --input article.md --fidelity compressed --budget 512
 Cada invocação de `transpile` adiciona automaticamente um registro ao `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`. O subcomando `transpile stats` lê esses arquivos e exibe uma tabela resumida.
 
 ```
-transpile stats                # hoje
-transpile stats --days 7       # últimos N dias
-transpile stats --agent claude # filtrar por agente
+transpile stats show                # hoje
+transpile stats show --days 7       # últimos N dias
+transpile stats show --agent claude # filtrar por agente
 ```
 
 Exemplo de saída:

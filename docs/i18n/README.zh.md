@@ -63,18 +63,24 @@
 
 ## 安装
 
-### 库（Rust crate）
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-需要 **Rust 1.92+**。
+下次会话启动时自动安装二进制文件并配置 PostToolUse 钩子 — 无需额外设置。
 
-### CLI 二进制文件 + 工具集成
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+PostToolUse 钩子会自动注册 — 无需进一步操作。
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -87,20 +93,22 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**通过 Rust 工具链**
+### 通过 Rust 工具链
 
 ```bash
 cargo binstall llm-transpile   # 预构建二进制文件（更快）
 cargo install llm-transpile    # 从源码构建
 ```
 
-然后配置工具集成：
+### 安装后
+
+配置工具集成：
 
 ```bash
 transpile install
@@ -110,18 +118,17 @@ transpile install
 
 | 工具 | 集成方式 | 功能 |
 |------|---------|------|
-| **Claude Code** | PostToolUse 钩子 | Read 时自动压缩 `.md/.html/.txt` 文件 |
 | **Antigravity** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
-| **Codex CLI** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
 | **Cursor** | `.mdc` 规则（`alwaysApply`） | 读取文档文件前触发 `transpile` |
 | **OpenCode** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
+| **Cline** | `SKILL.md` | LLM 自动对文档扩展名调用 `transpile` |
 
-所有非 Claude 工具均使用技能文件，教导 LLM 自动运行 `TRANSPILE_AGENT=<agent> transpile --input <file>` — 无需大小检查，仅凭扩展名即可触发。
+所有工具均使用技能文件，教导 LLM 自动运行 `TRANSPILE_AGENT=<agent> transpile --input <file>` — 无需大小检查，仅凭扩展名即可触发。
 
 **选择性安装 / 卸载**
 
 ```bash
-transpile install claude gemini    # 仅特定工具
+transpile install antigravity cursor    # 仅特定工具
 transpile install --all            # 全部安装
 transpile install --dry-run        # 预览变更
 transpile install --list           # 查看集成状态
@@ -131,23 +138,14 @@ transpile uninstall --all          # 移除全部
 transpile uninstall --dry-run      # 预览移除
 ```
 
-**Claude Code 插件**
+### 库（Rust crate）
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-下次会话启动时自动安装二进制文件并配置 PostToolUse 钩子 — 无需额外设置。
-
-从源码安装：
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+需要 **Rust 1.92+**。
 
 ### 基准测试
 
@@ -244,9 +242,9 @@ transpile --input article.md --fidelity compressed --budget 512
 每次 `transpile` 调用都会自动追加一条记录到 `~/.agents/transpile/stats/YYYY-MM-DD.jsonl`。`transpile stats` 子命令读取这些文件并打印汇总表。
 
 ```
-transpile stats                # 今天
-transpile stats --days 7       # 最近 N 天
-transpile stats --agent claude # 按代理筛选
+transpile stats show                # 今天
+transpile stats show --days 7       # 最近 N 天
+transpile stats show --agent claude # 按代理筛选
 ```
 
 示例输出：

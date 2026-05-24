@@ -64,18 +64,24 @@ LLMs arbeiten besser, wenn der Kontext sauber und kompakt ist. Diese Bibliothek 
 
 ## Installation
 
-### Bibliothek (Rust-Crate)
+### Claude Code
 
-```toml
-[dependencies]
-llm-transpile = "0.1"
+```
+/plugin marketplace add epicsagas/plugins
+/plugin install transpile@epicsagas
 ```
 
-Erfordert **Rust 1.92+**.
+Installiert die Binärdatei automatisch und richtet den PostToolUse-Hook beim nächsten Sitzungsstart ein — keine zusätzliche Einrichtung erforderlich.
 
-### CLI-Binärdatei + Tool-Integration
+### Codex CLI
 
-**macOS / Linux**
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+Der PostToolUse-Hook wird automatisch registriert — keine weiteren Schritte erforderlich.
+
+### macOS / Linux
 
 ```bash
 brew install epicsagas/tap/llm-transpile
@@ -88,18 +94,20 @@ curl --proto '=https' --tlsv1.2 -LsSf \
   https://github.com/epicsagas/llm-transpile/releases/latest/download/install.sh | sh
 ```
 
-**Windows**
+### Windows
 
 ```powershell
 irm https://github.com/epicsagas/llm-transpile/releases/latest/download/install.ps1 | iex
 ```
 
-**Über Rust-Toolchain**
+### Über Rust-Toolchain
 
 ```bash
 cargo binstall llm-transpile   # vorgefertigte Binärdatei (schnell)
 cargo install llm-transpile    # aus dem Quellcode kompilieren
 ```
+
+### Nach der Installation
 
 Tool-Integrationen konfigurieren:
 
@@ -111,18 +119,17 @@ transpile install
 
 | Tool | Integrationsmethode | Funktion |
 |------|---------------------|---------|
-| **Claude Code** | PostToolUse-Hook | Komprimiert `.md/.html/.txt`-Dateien beim Lesen automatisch |
 | **Antigravity** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
-| **Codex CLI** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
 | **Cursor** | `.mdc`-Regel (`alwaysApply`) | Löst `transpile` vor dem Lesen von Dokumentdateien aus |
 | **OpenCode** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
+| **Cline** | `SKILL.md` | LLM ruft `transpile` bei Dokumentdateiendungen automatisch auf |
 
-Alle Nicht-Claude-Tools verwenden eine Skill-Datei, die den LLM anweist, `TRANSPILE_AGENT=<agent> transpile --input <file>` automatisch auszuführen — keine Größenprüfung erforderlich, allein die Dateiendung löst es aus.
+Alle Tools verwenden eine Skill-Datei, die den LLM anweist, `TRANSPILE_AGENT=<agent> transpile --input <file>` automatisch auszuführen — keine Größenprüfung erforderlich, allein die Dateiendung löst es aus.
 
 **Selektive Installation / Deinstallation**
 
 ```bash
-transpile install claude gemini    # nur bestimmte Tools
+transpile install antigravity cursor    # nur bestimmte Tools
 transpile install --all            # alles auf einmal
 transpile install --dry-run        # Vorschau der Änderungen
 transpile install --list           # Integrationsstatus anzeigen
@@ -132,23 +139,14 @@ transpile uninstall --all          # alles entfernen
 transpile uninstall --dry-run      # Vorschau der Entfernungen
 ```
 
-**Claude Code-Plugin**
+### Bibliothek (Rust-Crate)
 
+```toml
+[dependencies]
+llm-transpile = "0.1"
 ```
-/plugin marketplace add epicsagas/plugins
-/plugin install transpile@epicsagas
-```
 
-Installiert die Binärdatei automatisch und richtet den PostToolUse-Hook beim nächsten Sitzungsstart ein — keine zusätzliche Einrichtung erforderlich.
-
-Aus dem Quellcode:
-
-```bash
-git clone https://github.com/epicsagas/llm-transpile
-cd llm-transpile
-cargo install --path .
-transpile install
-```
+Erfordert **Rust 1.92+**.
 
 ### Benchmarking
 
@@ -245,9 +243,9 @@ transpile --input article.md --fidelity compressed --budget 512
 Jeder `transpile`-Aufruf hängt automatisch einen Datensatz an `~/.agents/transpile/stats/YYYY-MM-DD.jsonl` an. Der Unterbefehl `transpile stats` liest diese Dateien und gibt eine Zusammenfassungstabelle aus.
 
 ```
-transpile stats                # heute
-transpile stats --days 7       # letzte N Tage
-transpile stats --agent claude # nach Agent filtern
+transpile stats show                # heute
+transpile stats show --days 7       # letzte N Tage
+transpile stats show --agent claude # nach Agent filtern
 ```
 
 Beispielausgabe:
