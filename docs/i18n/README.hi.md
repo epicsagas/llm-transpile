@@ -58,6 +58,20 @@ LLM तब बेहतर काम करते हैं जब संदर�
 | 📊 | **तालिका रैखिकीकरण** | Markdown तालिकाएं → संक्षिप्त `Key:Val` अनुक्रम (≤5 पंक्तियां) या बड़ी तालिकाओं के लिए pipe-विभाजित पंक्तियां |
 | 🌊 | **स्ट्रीमिंग आउटपुट** | Tokio स्ट्रीम TTFT को न्यूनतम करते हुए पहला chunk तुरंत देता है |
 
+### बेंचमार्क
+
+37 दस्तावेज़, 4 प्रारूप, 5 भाषाएं — Apple M-series, `--release` बिल्ड। पूरी रिपोर्ट: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> HTML में कमी नेविगेशन/स्क्रिप्ट/स्टाइल मार्कअप ओवरहेड हटाने को दर्शाती है, केवल पाठ संपीड़न नहीं।
+
 ---
 
 ## स्थापना
@@ -441,6 +455,8 @@ match transpile(input, format, fidelity, budget) {
 ```bash
 cargo run --release --example eval
 ```
+
+प्रति-फ़ाइल विवरण, पद्धति और ज्ञात सीमाएं: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 

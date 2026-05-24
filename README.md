@@ -60,6 +60,20 @@ LLMs perform better when context is clean and dense. This library handles the me
 | 📊 | **Table linearization** | Markdown tables → compact `Key:Val` (≤5 rows) or pipe-separated rows for larger tables |
 | 🌊 | **Streaming output** | Tokio stream delivers the first chunk immediately, minimizing TTFT |
 
+### Benchmarks
+
+37 documents, 4 formats, 5 languages — Apple M-series, `--release` build. Full report: [`eval/EVAL_REPORT.md`](eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> HTML reduction reflects markup overhead removal (nav, scripts, styles), not prose compression alone.
+
 ---
 
 ## Installation
@@ -435,6 +449,8 @@ Run the evaluation suite yourself:
 ```bash
 cargo run --release --example eval
 ```
+
+Full per-file breakdown, methodology, and known limitations: [`eval/EVAL_REPORT.md`](eval/EVAL_REPORT.md)
 
 ---
 

@@ -60,6 +60,20 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 | 📊 | **표 선형화** | Markdown 표 → 간결한 `Key:Val`(≤5행) 또는 파이프 구분 행으로 변환 |
 | 🌊 | **스트리밍 출력** | Tokio 스트림이 첫 번째 청크를 즉시 전달해 TTFT 최소화 |
 
+### 벤치마크
+
+문서 37개, 포맷 4종, 언어 5개 — Apple M 시리즈, `--release` 빌드. 전체 리포트: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> HTML 축소율은 네비게이션/스크립트/스타일 마크업 오버헤드 제거를 반영하며, 본문 압축만을 나타내지 않습니다.
+
 ---
 
 ## 설치
@@ -437,6 +451,8 @@ match transpile(input, format, fidelity, budget) {
 ```bash
 cargo run --release --example eval
 ```
+
+파일별 상세 내역, 측정 방법론 및 알려진 제한 사항: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 

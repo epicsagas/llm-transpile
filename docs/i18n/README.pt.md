@@ -60,6 +60,20 @@ LLMs funcionam melhor quando o contexto é limpo e denso. Esta biblioteca cuida 
 | 📊 | **Linearização de tabelas** | Tabelas Markdown → sequências compactas `Key:Val` (≤5 linhas) ou linhas separadas por pipes para tabelas maiores |
 | 🌊 | **Saída em streaming** | O stream Tokio entrega o primeiro bloco imediatamente, minimizando o TTFT |
 
+### Benchmarks
+
+37 documentos, 4 formatos, 5 idiomas — Apple M-series, build `--release`. Relatório completo: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> A redução HTML reflete a remoção do overhead de marcação (nav, scripts, estilos), não apenas a compressão do texto.
+
 ---
 
 ## Instalação
@@ -421,6 +435,8 @@ Execute a suite de avaliação você mesmo:
 ```bash
 cargo run --release --example eval
 ```
+
+Detalhamento por arquivo, metodologia e limitações conhecidas: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 

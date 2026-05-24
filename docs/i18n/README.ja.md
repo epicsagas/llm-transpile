@@ -58,6 +58,20 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 | 📊 | **表の線形化** | Markdown表 → コンパクトな`Key:Val`（≤5行）または大きな表はパイプ区切り行 |
 | 🌊 | **ストリーミング出力** | TokioストリームがTTFTを最小化するために最初のチャンクを即座に配信 |
 
+### ベンチマーク
+
+37ドキュメント、4フォーマット、5言語 — Apple Mシリーズ、`--release`ビルド。完全レポート: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> HTML削減率はナビ/スクリプト/スタイルのマークアップオーバーヘッド除去を反映しており、本文の圧縮のみを示すものではありません。
+
 ---
 
 ## インストール
@@ -441,6 +455,8 @@ match transpile(input, format, fidelity, budget) {
 ```bash
 cargo run --release --example eval
 ```
+
+ファイルごとの内訳、手法、および既知の制限: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 

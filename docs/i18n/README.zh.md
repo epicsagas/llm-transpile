@@ -59,6 +59,20 @@
 | 📊 | **表格线性化** | Markdown 表格 → 紧凑的 `Key:Val` 序列（≤5 行）或管道分隔行 |
 | 🌊 | **流式输出** | Tokio 流立即交付第一个块，最小化 TTFT |
 
+### 基准测试
+
+37 个文档、4 种格式、5 种语言 — Apple M 系列，`--release` 构建。完整报告: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> HTML 缩减率反映的是导航/脚本/样式标记开销的移除，而非单纯的正文压缩。
+
 ---
 
 ## 安装
@@ -442,6 +456,8 @@ match transpile(input, format, fidelity, budget) {
 ```bash
 cargo run --release --example eval
 ```
+
+逐文件明细、方法论及已知限制: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 

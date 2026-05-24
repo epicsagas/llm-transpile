@@ -58,6 +58,20 @@
 | 📊 | **تحويل الجداول إلى خطي** | جداول Markdown ← تسلسلات `Key:Val` مضغوطة (≤5 صفوف) أو صفوف مفصولة بـ pipe للجداول الكبيرة |
 | 🌊 | **الإخراج المتدفق** | يُسلّم دفق Tokio أول قطعة فوراً، مما يُقلّص TTFT |
 
+### قياسات الأداء
+
+37 وثيقة، 4 تنسيقات، 5 لغات — Apple M-series، بناء `--release`. التقرير الكامل: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+
+| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+|--------|-------------------:|--------------------:|----------------------:|-----------:|
+| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
+| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
+| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
+| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
+| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+
+> نسبة تخفيض HTML تعكس إزالة التكلفة الإضافية للترميز (التنقل والسكريبتات والأنماط)، وليس ضغط النص فحسب.
+
 ---
 
 ## التثبيت
@@ -419,6 +433,8 @@ match transpile(input, format, fidelity, budget) {
 ```bash
 cargo run --release --example eval
 ```
+
+تفصيل كل ملف، المنهجية، والقيود المعروفة: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
 
 ---
 
