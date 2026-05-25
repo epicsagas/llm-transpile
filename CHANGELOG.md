@@ -5,6 +5,101 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-25
+
+### Fixed
+
+- Add document extension filter to PostToolUse hook — skip non-document files
+
+## [0.3.0] - 2026-05-25
+
+### Added
+
+- Shell and PowerShell installers for standalone setup
+- Cline integration in `transpile install`
+- Antigravity (formerly gemini-cli) integration
+- Benchmark summary in README
+
+### Changed
+
+- Remove claude and codex from `transpile install` — now managed via plugins
+- Add hooks to codex manifest, sync versions across manifests
+- Sync all README translations with install restructure and stats fix
+
+## [0.2.5] - 2026-05-21
+
+### Added
+
+- 8 token efficiency improvements across compression pipeline
+
+### Fixed
+
+- Prevent "us" pronoun from being treated as abbreviation
+
+### Changed
+
+- Update README translations for 10 languages
+
+## [0.2.4] - 2026-05-19
+
+### Added
+
+- Codex CLI plugin manifest and marketplace integration
+- Codex CLI installation instructions in README
+
+### Fixed
+
+- Skip manual seed when running as Claude Code plugin
+- Clippy warning: collapse nested if
+
+### Changed
+
+- Upgrade README badges to for-the-badge style with GitHub stats row
+- Bump GitHub Actions: upload-artifact 7, download-artifact 8, checkout 6, attest-build-provenance 4
+- Bump tokio 1.52.3, clap 4.6.1
+
+## [0.2.3] - 2026-05-13
+
+### Fixed
+
+- Correct codex skill path from `~/.agents` to `~/.codex`
+
+### Changed
+
+- Rewrite PostToolUse hook from bash to Node.js for Windows support
+
+## [0.2.2] - 2026-05-12
+
+### Added
+
+- Stats dashboard with date range picker, project tracking and security hardening
+- Auto-update binary when plugin version is newer
+
+### Fixed
+
+- Upload install scripts via release.yml instead of broken extra-artifacts config
+
+## [0.2.1] - 2026-05-12
+
+### Added
+
+- cargo-binstall metadata for pre-built binary discovery
+- Release pipeline migrated to cargo-dist with macOS code signing
+- Release profile, Scoop channel, and Windows ARM64 target
+- Cross-platform Node.js installer replacing bash bootstrap in plugin hooks
+
+### Fixed
+
+- CI: unify ci.yml with check/test/audit/sbom jobs
+- CI: add rust-toolchain.toml and crates.io publish job
+- CI: allow dirty Cargo.lock in cargo publish
+- Plugin hooks path added to manifest
+
+### Changed
+
+- Remove macOS notarization (cargo-dist 0.31.0 limitation)
+- Sync all README translations
+
 ## [0.2.0] - 2026-05-09
 
 ### Added
@@ -96,6 +191,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Evaluation suite with 37 documents across 15 languages
 - Apache-2.0 license
 
+[0.3.1]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.1
+[0.3.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.0
+[0.2.5]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.5
+[0.2.4]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.4
+[0.2.3]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.3
+[0.2.2]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.2
+[0.2.1]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.1
 [0.2.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.0
 [0.1.5]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.1.5
 [0.1.4]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.1.4
