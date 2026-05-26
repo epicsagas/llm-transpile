@@ -1,6 +1,6 @@
 {
   "name": "transpile",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Auto-compress .md, .html, .txt files read by coding agents via PostToolUse hook.",
   "author": {
     "name": "epicsagas",
