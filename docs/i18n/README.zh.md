@@ -161,6 +161,15 @@ llm-transpile = "0.1"
 
 需要 **Rust 1.92+**。
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+自动安装插件（钩子）并在下次会话启动时注册。
+
+
 ### 基准测试
 
 
@@ -269,7 +278,7 @@ transpile stats — 最近 7 天
   日期       代理       调用次数   输入令牌   输出令牌   节省    缩减率
   ──────────────────────────────────────────────────────────────────────────
   2026-04-13  claude          5      14 965       10 872   4 093      27.3%
-  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  2026-04-13  antigravity          2       4 800        3 500   1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────
   合计                       7      19 765       14 372   5 393      27.3%
 ```
@@ -301,7 +310,7 @@ transpile stats report --out /tmp/custom.html
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `ts` | ISO 8601 | 调用时间戳 |
-| `agent` | 字符串 | 触发调用的工具（`claude`、`gemini`、`codex`、`opencode`） |
+| `agent` | 字符串 | 触发调用的工具（`claude`、`antigravity`、`codex`、`opencode`） |
 | `file` | 字符串 | 输入文件路径（从 stdin 读取时为空） |
 | `format` | 字符串 | `markdown`、`html` 或 `plaintext` |
 | `fidelity` | 字符串 | `lossless`、`semantic` 或 `compressed` |
@@ -312,7 +321,7 @@ transpile stats report --out /tmp/custom.html
 
 **`TRANSPILE_AGENT` 环境变量**
 
-`agent` 字段从 `TRANSPILE_AGENT` 环境变量中获取。每个集成会自动设置此变量（`claude`、`gemini`、`codex`、`opencode`、`cursor`）。您也可以手动设置：
+`agent` 字段从 `TRANSPILE_AGENT` 环境变量中获取。每个集成会自动设置此变量（`claude`、`antigravity`、`codex`、`opencode`、`cursor`）。您也可以手动设置：
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

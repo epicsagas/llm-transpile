@@ -246,7 +246,7 @@ transpile stats — 過去7日間
   日付        エージェント  呼び出し  入力tok    出力tok    削減    削減率
   ──────────────────────────────────────────────────────────────────────────
   2026-04-13  claude          5      14 965       10 872   4 093      27.3%
-  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  2026-04-13  antigravity          2       4 800        3 500   1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────
   合計                         7      19 765       14 372   5 393      27.3%
 ```
@@ -278,7 +278,7 @@ transpile stats report --out /tmp/custom.html
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | `ts` | ISO 8601 | 呼び出しのタイムスタンプ |
-| `agent` | 文字列 | 呼び出しをトリガーしたツール（`claude`、`gemini`、`codex`、`opencode`） |
+| `agent` | 文字列 | 呼び出しをトリガーしたツール（`claude`、`antigravity`、`codex`、`opencode`） |
 | `file` | 文字列 | 入力ファイルパス（stdin読み込み時は空） |
 | `format` | 文字列 | `markdown`、`html`、`plaintext`のいずれか |
 | `fidelity` | 文字列 | `lossless`、`semantic`、`compressed`のいずれか |
@@ -289,7 +289,7 @@ transpile stats report --out /tmp/custom.html
 
 **`TRANSPILE_AGENT`環境変数**
 
-`agent`フィールドは`TRANSPILE_AGENT`環境変数から取得されます。各連携ツールはこれを自動的に設定します（`claude`、`gemini`、`codex`、`opencode`、`cursor`）。手動で設定することも可能です:
+`agent`フィールドは`TRANSPILE_AGENT`環境変数から取得されます。各連携ツールはこれを自動的に設定します（`claude`、`antigravity`、`codex`、`opencode`、`cursor`）。手動で設定することも可能です:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

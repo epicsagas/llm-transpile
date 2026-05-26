@@ -162,6 +162,15 @@ llm-transpile = "0.1"
 
 Requer **Rust 1.92+**.
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+Instala automaticamente o plugin (hooks) e o registra na próxima inicialização de sessão.
+
+
 ### Benchmarking
 
 
@@ -270,7 +279,7 @@ transpile stats — last 7 days
   Date        Agent       Calls   Input tok   Output tok   Saved    Reduction
   ──────────────────────────────────────────────────────────────────────────
   2026-04-13  claude          5      14 965       10 872   4 093      27.3%
-  2026-04-13  gemini          2       4 800        3 500   1 300      27.1%
+  2026-04-13  antigravity          2       4 800        3 500   1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────
   Total                       7      19 765       14 372   5 393      27.3%
 ```
@@ -280,7 +289,7 @@ transpile stats — last 7 days
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
 | `ts` | ISO 8601 | Timestamp da invocação |
-| `agent` | string | Ferramenta que acionou a chamada (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | string | Ferramenta que acionou a chamada (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | string | Caminho do arquivo de entrada (vazio ao ler do stdin) |
 | `format` | string | `markdown`, `html` ou `plaintext` |
 | `fidelity` | string | `lossless`, `semantic` ou `compressed` |
@@ -291,7 +300,7 @@ transpile stats — last 7 days
 
 **Variável de ambiente `TRANSPILE_AGENT`**
 
-O campo `agent` é preenchido pela variável de ambiente `TRANSPILE_AGENT`. Cada integração define isso automaticamente (`claude`, `gemini`, `codex`, `opencode`, `cursor`). Também pode ser definido manualmente:
+O campo `agent` é preenchido pela variável de ambiente `TRANSPILE_AGENT`. Cada integração define isso automaticamente (`claude`, `antigravity`, `codex`, `opencode`, `cursor`). Também pode ser definido manualmente:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

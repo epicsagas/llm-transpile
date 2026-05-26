@@ -248,7 +248,7 @@ transpile stats — 최근 7일
   날짜       에이전트    호출   입력 tok   출력 tok   절약    축소율
   ──────────────────────────────────────────────────────────────────
   2026-04-13  claude       5     14 965      10 872   4 093     27.3%
-  2026-04-13  gemini       2      4 800       3 500   1 300     27.1%
+  2026-04-13  antigravity       2      4 800       3 500   1 300     27.1%
   ──────────────────────────────────────────────────────────────────
   Total                    7     19 765       14 372   5 393     27.3%
 ```
@@ -278,7 +278,7 @@ transpile stats report --out /tmp/custom.html
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `ts` | ISO 8601 | 실행 타임스탬프 |
-| `agent` | 문자열 | 호출을 트리거한 도구 (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | 문자열 | 호출을 트리거한 도구 (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | 문자열 | 입력 파일 경로 (stdin 읽기 시 빈 값) |
 | `format` | 문자열 | `markdown`, `html`, 또는 `plaintext` |
 | `fidelity` | 문자열 | `lossless`, `semantic`, 또는 `compressed` |
@@ -289,7 +289,7 @@ transpile stats report --out /tmp/custom.html
 
 **`TRANSPILE_AGENT` 환경변수**
 
-`agent` 필드는 `TRANSPILE_AGENT` 환경변수에서 가져옵니다. 각 연동 도구가 자동으로 설정합니다(`claude`, `gemini`, `codex`, `opencode`, `cursor`). 수동으로 설정할 수도 있습니다:
+`agent` 필드는 `TRANSPILE_AGENT` 환경변수에서 가져옵니다. 각 연동 도구가 자동으로 설정합니다(`claude`, `antigravity`, `codex`, `opencode`, `cursor`). 수동으로 설정할 수도 있습니다:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

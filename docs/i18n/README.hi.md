@@ -160,6 +160,15 @@ llm-transpile = "0.1"
 
 **Rust 1.92+** आवश्यक।
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+प्लगइन (हुक) स्वचालित रूप से इंस्टॉल करता है और अगले सेशन शुरू होने पर पंजीकृत करता है।
+
+
 ### बेंचमार्किंग
 
 
@@ -268,7 +277,7 @@ transpile stats — अंतिम 7 दिन
   दिनांक      एजेंट     कॉल   इनपुट टोकन  आउटपुट टोकन  बचत    कमी
   ──────────────────────────────────────────────────────────────────────────
   2026-04-13  claude        5     14 965       10 872      4 093    27.3%
-  2026-04-13  gemini        2      4 800        3 500      1 300    27.1%
+  2026-04-13  antigravity        2      4 800        3 500      1 300    27.1%
   ──────────────────────────────────────────────────────────────────────────
   कुल                      7     19 765       14 372      5 393    27.3%
 ```
@@ -300,7 +309,7 @@ transpile stats report --out /tmp/custom.html
 | फ़ील्ड | प्रकार | विवरण |
 |--------|--------|--------|
 | `ts` | ISO 8601 | कॉल का टाइमस्टैम्प |
-| `agent` | स्ट्रिंग | कॉल शुरू करने वाला टूल (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | स्ट्रिंग | कॉल शुरू करने वाला टूल (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | स्ट्रिंग | इनपुट फ़ाइल पथ (stdin से पढ़ने पर रिक्त) |
 | `format` | स्ट्रिंग | `markdown`, `html`, या `plaintext` |
 | `fidelity` | स्ट्रिंग | `lossless`, `semantic`, या `compressed` |
@@ -311,7 +320,7 @@ transpile stats report --out /tmp/custom.html
 
 **`TRANSPILE_AGENT` पर्यावरण चर**
 
-`agent` फ़ील्ड `TRANSPILE_AGENT` पर्यावरण चर से भरा जाता है। प्रत्येक इंटीग्रेशन इसे स्वचालित रूप से सेट करता है (`claude`, `gemini`, `codex`, `opencode`, `cursor`)। आप इसे मैन्युअल रूप से भी सेट कर सकते हैं:
+`agent` फ़ील्ड `TRANSPILE_AGENT` पर्यावरण चर से भरा जाता है। प्रत्येक इंटीग्रेशन इसे स्वचालित रूप से सेट करता है (`claude`, `antigravity`, `codex`, `opencode`, `cursor`)। आप इसे मैन्युअल रूप से भी सेट कर सकते हैं:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

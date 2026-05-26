@@ -160,6 +160,15 @@ llm-transpile = "0.1"
 
 Requiert **Rust 1.92+**.
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+Installe automatiquement le plugin (hooks) et l'enregistre au prochain démarrage de session.
+
+
 ### Analyse de performance (Benchmarking)
 
 
@@ -268,7 +277,7 @@ transpile stats — 7 derniers jours
   Date        Agent      Appels  Tokens entrée  Tokens sortie  Économisés  Réduction
   ──────────────────────────────────────────────────────────────────────────────────
   2026-04-13  claude        5      14 965          10 872       4 093      27.3%
-  2026-04-13  gemini        2       4 800           3 500       1 300      27.1%
+  2026-04-13  antigravity        2       4 800           3 500       1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────────────
   Total                     7      19 765          14 372       5 393      27.3%
 ```
@@ -278,7 +287,7 @@ transpile stats — 7 derniers jours
 | Champ | Type | Description |
 |-------|------|-------------|
 | `ts` | ISO 8601 | Horodatage de l'invocation |
-| `agent` | string | Outil ayant déclenché l'appel (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | string | Outil ayant déclenché l'appel (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | string | Chemin du fichier d'entrée (vide si lecture depuis stdin) |
 | `format` | string | `markdown`, `html`, ou `plaintext` |
 | `fidelity` | string | `lossless`, `semantic`, ou `compressed` |
@@ -289,7 +298,7 @@ transpile stats — 7 derniers jours
 
 **Variable d'environnement `TRANSPILE_AGENT`**
 
-Le champ `agent` est renseigné depuis la variable d'environnement `TRANSPILE_AGENT`. Chaque intégration la définit automatiquement (`claude`, `gemini`, `codex`, `opencode`, `cursor`). Vous pouvez aussi la définir manuellement :
+Le champ `agent` est renseigné depuis la variable d'environnement `TRANSPILE_AGENT`. Chaque intégration la définit automatiquement (`claude`, `antigravity`, `codex`, `opencode`, `cursor`). Vous pouvez aussi la définir manuellement :
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

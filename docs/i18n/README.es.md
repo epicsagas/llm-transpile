@@ -160,6 +160,15 @@ llm-transpile = "0.1"
 
 Requiere **Rust 1.92+**.
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+Instala automáticamente el plugin (hooks) y lo registra al iniciar la próxima sesión.
+
+
 ### Pruebas de rendimiento (Benchmarking)
 
 
@@ -268,7 +277,7 @@ transpile stats — últimos 7 días
   Fecha       Agente     Llamadas  Tokens entrada  Tokens salida  Ahorrados  Reducción
   ──────────────────────────────────────────────────────────────────────────────────
   2026-04-13  claude          5      14 965           10 872       4 093      27.3%
-  2026-04-13  gemini          2       4 800            3 500       1 300      27.1%
+  2026-04-13  antigravity          2       4 800            3 500       1 300      27.1%
   ──────────────────────────────────────────────────────────────────────────────────
   Total                       7      19 765           14 372       5 393      27.3%
 ```
@@ -278,7 +287,7 @@ transpile stats — últimos 7 días
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `ts` | ISO 8601 | Marca de tiempo de la invocación |
-| `agent` | string | Herramienta que activó la llamada (`claude`, `gemini`, `codex`, `opencode`) |
+| `agent` | string | Herramienta que activó la llamada (`claude`, `antigravity`, `codex`, `opencode`) |
 | `file` | string | Ruta del archivo de entrada (vacío al leer desde stdin) |
 | `format` | string | `markdown`, `html`, o `plaintext` |
 | `fidelity` | string | `lossless`, `semantic`, o `compressed` |
@@ -289,7 +298,7 @@ transpile stats — últimos 7 días
 
 **Variable de entorno `TRANSPILE_AGENT`**
 
-El campo `agent` se completa desde la variable de entorno `TRANSPILE_AGENT`. Cada integración la configura automáticamente (`claude`, `gemini`, `codex`, `opencode`, `cursor`). También puedes configurarla manualmente:
+El campo `agent` se completa desde la variable de entorno `TRANSPILE_AGENT`. Cada integración la configura automáticamente (`claude`, `antigravity`, `codex`, `opencode`, `cursor`). También puedes configurarla manualmente:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md

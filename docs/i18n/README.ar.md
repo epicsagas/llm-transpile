@@ -160,6 +160,15 @@ llm-transpile = "0.1"
 
 يتطلب **Rust 1.92+**.
 
+### Antigravity (Gemini CLI)
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+يثبّت البرنامج المساعد (الخطافات) تلقائياً ويسجّله عند بدء الجلسة التالية.
+
+
 ### قياس الأداء (Benchmarking)
 
 
@@ -268,7 +277,7 @@ transpile stats — آخر 7 أيام
   التاريخ     الأداة     الاستدعاءات  رموز الإدخال  رموز الإخراج  الموفّرة  النسبة
   ──────────────────────────────────────────────────────────────────────────────────
   2026-04-13  claude         5        14 965        10 872       4 093     27.3%
-  2026-04-13  gemini         2         4 800         3 500       1 300     27.1%
+  2026-04-13  antigravity         2         4 800         3 500       1 300     27.1%
   ──────────────────────────────────────────────────────────────────────────────────
   الإجمالي                  7        19 765        14 372       5 393     27.3%
 ```
@@ -278,7 +287,7 @@ transpile stats — آخر 7 أيام
 | الحقل | النوع | الوصف |
 |-------|-------|-------|
 | `ts` | ISO 8601 | الطابع الزمني للاستدعاء |
-| `agent` | نص | الأداة التي بدأت الاستدعاء (`claude`، `gemini`، `codex`، `opencode`) |
+| `agent` | نص | الأداة التي بدأت الاستدعاء (`claude`، `antigravity`، `codex`، `opencode`) |
 | `file` | نص | مسار ملف الإدخال (فارغ عند القراءة من stdin) |
 | `format` | نص | `markdown` أو `html` أو `plaintext` |
 | `fidelity` | نص | `lossless` أو `semantic` أو `compressed` |
@@ -289,7 +298,7 @@ transpile stats — آخر 7 أيام
 
 **متغير البيئة `TRANSPILE_AGENT`**
 
-يُملأ حقل `agent` من متغير البيئة `TRANSPILE_AGENT`. تعيّن كل تكامل هذه القيمة تلقائياً (`claude`، `gemini`، `codex`، `opencode`، `cursor`). يمكن أيضاً تعيينها يدوياً:
+يُملأ حقل `agent` من متغير البيئة `TRANSPILE_AGENT`. تعيّن كل تكامل هذه القيمة تلقائياً (`claude`، `antigravity`، `codex`، `opencode`، `cursor`). يمكن أيضاً تعيينها يدوياً:
 
 ```bash
 TRANSPILE_AGENT=claude transpile --input doc.md
