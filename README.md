@@ -149,6 +149,14 @@ codex plugin marketplace add epicsagas/plugins
 
 Skills are available immediately — no further steps needed.
 
+**Antigravity (Gemini CLI)**
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+Auto-installs the plugin (hooks) and registers it on next session start.
+
 Or from source:
 
 ```bash

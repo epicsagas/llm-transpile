@@ -1,0 +1,14 @@
+{
+  "transpile-bootstrap": {
+    "PreInvocation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.gemini/antigravity-cli/plugins/transpile/hooks/install.js"
+          }
+        ]
+      }
+    ]
+  }
+}
