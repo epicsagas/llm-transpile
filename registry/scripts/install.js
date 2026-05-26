@@ -38,7 +38,7 @@ function getBinaryVersion() {
 }
 
 function getPluginVersion() {
-  const root = process.env.CLAUDE_PLUGIN_ROOT || "";
+  const root = process.env.CLAUDE_PLUGIN_ROOT || process.env.PLUGIN_ROOT || "";
   const candidates = [
     join(root, ".claude-plugin", "plugin.json"),
     join(root, ".codex-plugin", "plugin.json"),
@@ -107,13 +107,9 @@ async function install() {
   }
 }
 
-function seed() {
-  spawnSync(BINARY, ["install", "claude"], { stdio: "inherit" });
-}
-
 async function main() {
   const pluginVersion = getPluginVersion();
-  const isPlugin = !!process.env.CLAUDE_PLUGIN_ROOT;
+  const isPlugin = !!(process.env.CLAUDE_PLUGIN_ROOT || process.env.PLUGIN_ROOT);
 
   // 1. Binary not found — fresh install
   if (!hasCommand(BINARY)) {
@@ -125,8 +121,6 @@ async function main() {
       log(`Install manually: https://github.com/${REPO}#installation`);
       process.exit(0);
     }
-    // Plugin mode: hook auto-registered from plugin cache, skip manual seeding
-    if (hasCommand(BINARY) && !isPlugin) seed();
     return;
   }
 
@@ -145,9 +139,6 @@ async function main() {
       }
     }
   }
-
-  // 3. Seed Claude Code hook script (standalone installs only)
-  if (!isPlugin) seed();
 }
 
 main().catch((e) => {

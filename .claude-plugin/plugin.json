@@ -16,8 +16,7 @@
     "context",
     "token"
   ],
-  "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
+  "hooks": "./.claude-plugin/hooks.json",
   "interface": {
     "displayName": "LLM Transpile",
     "shortDescription": "Token-optimized document reader — cuts context usage by up to 40%.",

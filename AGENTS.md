@@ -94,9 +94,10 @@ When creating a new release tag, update ALL of the following to the same version
 |------|-------|---------|
 | `Cargo.toml` | `version = "x.y.z"` | `0.1.6` |
 | `.claude-plugin/plugin.json` | `"version": "x.y.z"` | `0.1.6` |
+| `.codex-plugin/plugin.json` | `"version": "x.y.z"` | `0.1.6` |
 | Git tag | `vx.y.z` | `v0.1.6` |
 
-All three must match before tagging.
+All four must match before tagging.
 
 ## Release Success Route
 
