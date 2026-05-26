@@ -162,6 +162,14 @@ llm-transpile = "0.1"
 
 Requires **Rust 1.92+**.
 
+**Antigravity (Gemini CLI)**
+
+```bash
+agy plugins install https://github.com/epicsagas/llm-transpile
+```
+
+Auto-installs the plugin (hooks) and registers it on next session start.
+
 ---
 
 ## Updating
