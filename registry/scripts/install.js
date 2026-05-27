@@ -13,6 +13,7 @@ const os = require("os");
 
 const REPO = "epicsagas/llm-transpile";
 const BINARY = "transpile";
+const CARGO_PKG = "llm-transpile";
 const INSTALLER_SH = `https://github.com/${REPO}/releases/latest/download/install.sh`;
 const INSTALLER_PS1 = `https://github.com/${REPO}/releases/latest/download/install.ps1`;
 
@@ -87,6 +88,33 @@ function downloadFile(url, dest) {
 async function install() {
   const platform = os.platform();
 
+  // macOS: prefer Homebrew if available
+  if (platform === "darwin") {
+    const hasBrew = spawnSync("brew", ["--version"], { stdio: "pipe", shell: false }).status === 0;
+    if (hasBrew) {
+      log("Homebrew detected — installing via brew tap...");
+      const r = spawnSync("brew", ["install", "epicsagas/tap/llm-transpile"], {
+        stdio: "inherit",
+        shell: false,
+      });
+      if (r.status === 0) return;
+      log("Brew install failed, trying next method...");
+    }
+  }
+
+  // All platforms: try cargo-binstall (pre-built binary, fast)
+  const hasBinstall = spawnSync("cargo", ["binstall", "--version"], { stdio: "pipe", shell: false }).status === 0;
+  if (hasBinstall) {
+    log("cargo-binstall detected — installing...");
+    const r = spawnSync("cargo", ["binstall", CARGO_PKG, "--no-confirm"], {
+      stdio: "inherit",
+      shell: false,
+    });
+    if (r.status === 0) return;
+    log("cargo-binstall failed, falling back to installer script...");
+  }
+
+  // Fallback: download platform-specific installer
   if (platform === "win32") {
     const tmp = join(os.tmpdir(), "transpile-installer.ps1");
     log("Downloading Windows installer...");
