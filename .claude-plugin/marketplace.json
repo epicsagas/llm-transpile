@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "transpile",
+      "name": "llm-transpile",
       "source": "./",
       "description": "Auto-compress .md, .html, .txt files read by Claude Code via PostToolUse hook."
     }
