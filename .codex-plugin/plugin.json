@@ -1,5 +1,5 @@
 {
-  "name": "transpile",
+  "name": "llm-transpile",
   "version": "0.3.2",
   "description": "Auto-compress .md, .html, .txt files read by coding agents via PostToolUse hook.",
   "author": {
@@ -22,7 +22,7 @@
     "shortDescription": "Token-optimized document reader — cuts context usage by up to 40%.",
     "longDescription": "Silently compresses .md, .html, and .txt files on Read via PostToolUse hook, cutting context usage by up to 40% with zero workflow change.",
     "developerName": "epicsagas",
-    "category": "Productivity",
+    "category": "Performance",
     "capabilities": ["Read"],
     "websiteURL": "https://github.com/epicsagas/llm-transpile"
   }
