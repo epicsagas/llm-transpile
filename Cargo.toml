@@ -57,7 +57,7 @@ path = "src/lib.rs"
 pulldown-cmark = "0.13"
 
 # 토큰 카운팅 (optional — tiktoken feature)
-tiktoken-rs = { version = "0.11", optional = true }
+tiktoken-rs = { version = "0.12", optional = true }
 
 # 직렬화
 serde       = { version = "1", features = ["derive"] }
