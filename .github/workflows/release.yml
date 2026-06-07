@@ -276,6 +276,11 @@ jobs:
           rm -f artifacts/*-dist-manifest.json
       - name: Add install scripts to artifacts
         run: cp install.sh install.ps1 artifacts/
+      - name: Generate checksums for install scripts
+        run: |
+          cd artifacts
+          sha256sum install.sh > install.sh.sha256
+          sha256sum install.ps1 > install.ps1.sha256
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
