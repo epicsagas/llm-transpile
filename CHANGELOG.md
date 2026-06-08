@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Plugin renamed to `llm-transpile` across Claude and Codex manifests; category set to Performance
+- `composerIcon` field added to Codex plugin manifest; icon moved to `assets/`
+
+### Fixed
+
+- CI: SHA-256 checksums generated for install scripts on release
+- Hooks: `PostToolUse` replaced with `PreToolUse` (broken hook fixed)
+- Plugin: marketplace review feedback addressed
+- Funding: removed invalid GitHub Sponsors entry, kept Buy Me a Coffee
+
+### Changed
+
+- Install script consolidated to single file with brew + binstall cascade
+- Bump `tiktoken-rs` from 0.11.0 to 0.12.0
+- Bump `serde_json` from 1.0.149 to 1.0.150
+- Bump `pulldown-cmark` from 0.13.3 to 0.13.4
+
+## [0.3.2] — 2026-05-27
+
+### Added
+
+- Antigravity plugin package with install docs and i18n sync
+- Plugin folder structure aligned with `registry/` pattern
+
+### Changed
+
+- Bump `serde_json` from 1.0.149 to 1.0.150
+- Bump `pulldown-cmark` from 0.13.3 to 0.13.4
+
 ## [0.3.1] - 2026-05-25
 
 ### Fixed
