@@ -193,28 +193,57 @@ fn auto_intern_frequent_terms(
     candidates.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     for (term, count) in candidates.into_iter().take(max_terms) {
-        // ── ROI gate ────────────────────────────────────────────────────────
-        // Each term occurrence in the body uses `term_tokens` tokens.
-        // After substitution it becomes 1 PUA token — saving `term_tokens - 1` per
-        // occurrence.  The dictionary entry ("SymA=Term\n") costs `dict_entry_tokens`.
-        // Only intern when the total saving exceeds the overhead.
+        // ── ROI gate (BPE-honest) ───────────────────────────────────────────
+        // A substituted occurrence replaces `term_tokens` with one PUA char.
+        // Measured cl100k ground truth: a PUA char costs **3 tokens** (byte-fallback),
+        // NOT 1 — the old gate assumed 1 and so grossly over-interned, *increasing*
+        // token counts for ordinary words (most are already 1–2 tokens; see
+        // `pua_substitution_break_even_is_empirically_honest`).
+        //
+        // Net saving across the document:
+        //   body_saving  = count × (term_tokens − PUA_TOKEN_COST)   // each occurrence
+        //   dict_overhead = PUA_TOKEN_COST + term_tokens + ENTRY_OVERHEAD
+        //                  // the "<PUA>=<term>\n" line in the <D> block
+        // Intern iff body_saving > dict_overhead (strictly positive net).
         let term_tokens = stream::estimate_tokens(term);
-        if term_tokens <= 1 {
-            // Substituting a single-token word saves nothing; skip.
+        if term_tokens <= PUA_TOKEN_COST {
+            // Break-even bar: a term must cost MORE than a PUA char (i.e. 4+ tokens)
+            // for substitution to save anything at all per occurrence.
             continue;
         }
-        // "<PUA>=<term>\n" — PUA char is 1 token, "=" is ~0.25 tok (grouped with PUA
-        // by most tokenizers), "\n" is ~0.25 tok.  Approximate as term_tokens + 1.
-        let dict_entry_tokens = term_tokens + 1;
-        let saving = count.saturating_mul(term_tokens - 1);
-        if saving <= dict_entry_tokens {
-            // Net saving is zero or negative; skip.
+        let per_occurrence_saving = term_tokens - PUA_TOKEN_COST; // > 0 here
+        let body_saving = count.saturating_mul(per_occurrence_saving);
+        let dict_overhead = PUA_TOKEN_COST + term_tokens + DICT_ENTRY_OVERHEAD;
+        if body_saving <= dict_overhead {
+            // Dictionary overhead cancels the body saving; skip.
             continue;
         }
         // Ignore overflow — we just stop interning if we run out of PUA symbols
         let _ = dict.intern(term);
     }
 }
+
+/// Token cost of a single Unicode PUA character under a real BPE tokenizer.
+///
+/// Empirically measured against cl100k_base: PUA codepoints (U+E000–U+F8FF) are
+/// absent from the merge table, so each encodes via byte-fallback to **3 tokens**.
+/// This constant replaces the old "PUA = 1 token" assumption that inflated
+/// reduction claims and caused ROI-negative substitutions.
+///
+/// Used by [`auto_intern_frequent_terms`]' ROI gate and reported by the eval
+/// harness for transparency. Independent of the `tiktoken` feature because the
+/// real tokenizer's behavior does not change when the feature is off — only our
+/// *measurement* of it does.
+pub const PUA_TOKEN_COST: usize = 3;
+
+/// Approximate extra token overhead of a `<D>` dictionary entry beyond the PUA
+/// char and the term text itself — the `=`, the `\n`, and BPE boundary effects.
+///
+/// Measured entries: `"PUA=foo\n"` = 5 tokens (PUA 3 + "=foo"+newline ≈ 2),
+/// `"PUA=transformer\n"` = 7 tokens. The fixed non-term portion hovers around
+/// 3–4; we use a conservative 4 so the ROI bar errs toward *not* interning
+/// (the empirically safer default given PUA's high base cost).
+const DICT_ENTRY_OVERHEAD: usize = 4;
 
 // ────────────────────────────────────────────────
 // Public API
@@ -808,8 +837,11 @@ mod tests {
 
     #[test]
     fn transpile_auto_interns_frequent_terms() {
-        // A term appearing 5 times should be auto-interned — *if* substitution has
-        // positive ROI under the active tokenizer.
+        // The ROI gate compares a candidate term's token count against PUA_TOKEN_COST
+        // (3). "API endpoint" is well under the bar under BOTH tokenizers (it is a
+        // short, common phrase), so it must NOT be interned — substitution would add
+        // tokens. This holds regardless of the `tiktoken` feature now that the gate
+        // uses the measured PUA cost rather than the old "PUA = 1 token" assumption.
         let md = "# Test\n\nAPI endpoint API endpoint API endpoint API endpoint API endpoint.";
         let result = transpile(
             md,
@@ -818,27 +850,39 @@ mod tests {
             Some(4096),
         );
         let output = result.unwrap();
+        assert!(
+            !output.contains("<D>"),
+            "short common term 'API endpoint' (≤3 tokens) must not be PUA-substituted: {output}"
+        );
+    }
 
-        // Under the heuristic, PUA = 1 token, so "API endpoint" (≥2 heuristic tokens)
-        // substituted by a PUA char is ROI-positive → a <D> block is emitted.
+    /// A genuinely long, high-frequency term CAN cross the ROI bar. This test uses
+    /// a term long enough that even after the honest PUA cost (3) and dictionary
+    /// overhead, repeated occurrences save tokens. The intent is to verify the gate
+    /// *permits* substitution when it is truly profitable, not that it always blocks.
+    #[test]
+    fn transpile_interns_long_high_freq_term_under_heuristic() {
+        // 40+ chars → many heuristic tokens (≥10). Repeated 8×, the per-occurrence
+        // saving (term_tokens − 3) multiplied by 8 should exceed dict overhead.
+        // Under the heuristic tokenizer this is ROI-positive.
+        let term = "internationalization-localization-pipeline";
+        let md = format!("# Doc\n\n{term} {term} {term} {term} {term} {term} {term} {term}.");
+        let result = transpile(
+            &md,
+            InputFormat::Markdown,
+            FidelityLevel::Semantic,
+            Some(4096),
+        );
+        let output = result.unwrap();
+        // Under the heuristic this long term clears the bar. Under tiktoken it may
+        // or may not depending on its real token count — assert only the guarantee
+        // common to both: the output is well-formed.
+        assert!(output.contains("<B>"));
         #[cfg(not(feature = "tiktoken"))]
         {
             assert!(
                 output.contains("<D>"),
-                "output must contain <D> block when frequent terms exist: {output}"
-            );
-        }
-        // Under the real cl100k tokenizer, "API endpoint" = 2 tokens and a PUA char
-        // = 3 tokens, so substitution is ROI-*negative* (it would add tokens). The
-        // ROI gate therefore suppresses the <D> block — the honest behavior.
-        #[cfg(feature = "tiktoken")]
-        {
-            assert_eq!(bpe_token_count("API endpoint"), 2);
-            assert_eq!(bpe_token_count("\u{E000}"), 3);
-            assert!(
-                !output.contains("<D>"),
-                "under tiktoken, PUA-substituting a 2-token term (→3) is ROI-negative; \
-                 no <D> block expected: {output}"
+                "long high-freq term should clear the heuristic ROI bar: {output}"
             );
         }
     }
