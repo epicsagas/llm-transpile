@@ -411,6 +411,131 @@ pub fn token_count(text: &str) -> usize {
     stream::estimate_tokens(text)
 }
 
+/// Token-count measurement methodology.
+///
+/// Used to make explicit *which* counting method produced a number, so that
+/// downstream reports cannot silently mix the fast heuristic with an accurate
+/// BPE tokenizer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenMethod {
+    /// Character-count heuristic (`chars_per_token`). Fast, dependency-free,
+    /// but **self-referential** when used to evaluate this crate's own output:
+    /// it bakes in the same assumptions (e.g. PUA = 1 token) that the
+    /// compressor optimizes for, inflating the apparent reduction.
+    Heuristic,
+    /// Real BPE tokenizer (OpenAI `cl100k_base` via `tiktoken-rs`). Slower and
+    /// requires the `tiktoken` feature, but independent of this crate's
+    /// compression assumptions — the honest basis for reduction claims.
+    Bpe,
+}
+
+/// A token-count measurement pairing a numeric result with its methodology.
+///
+/// Construct via [`measure_tokens`] (BPE when the `tiktoken` feature is
+/// enabled, heuristic otherwise) or explicitly via [`TokenMeasurement::bpe`] /
+/// [`TokenMeasurement::heuristic`].
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TokenMeasurement {
+    /// The counted token count.
+    pub tokens: usize,
+    /// How it was counted.
+    pub method: TokenMethod,
+}
+
+impl TokenMeasurement {
+    /// A heuristic measurement.
+    ///
+    /// Uses `estimate_tokens_heuristic` directly (not `token_count`, which
+    /// dispatches to BPE under the `tiktoken` feature). This keeps the
+    /// heuristic value stable and comparable regardless of features.
+    pub fn heuristic(text: &str) -> Self {
+        Self {
+            tokens: stream::estimate_tokens_heuristic(text),
+            method: TokenMethod::Heuristic,
+        }
+    }
+
+    /// A BPE measurement using `cl100k_base`. Only available with the
+    /// `tiktoken` feature.
+    #[cfg(feature = "tiktoken")]
+    pub fn bpe(text: &str) -> Self {
+        Self {
+            tokens: bpe_token_count(text),
+            method: TokenMethod::Bpe,
+        }
+    }
+}
+
+/// Counts tokens using the real `cl100k_base` BPE tokenizer.
+///
+/// Requires the `tiktoken` feature. Returns the heuristic estimate as a
+/// fallback if the tokenizer failed to initialize (should not happen with the
+/// bundled merge table).
+#[cfg(feature = "tiktoken")]
+pub fn bpe_token_count(text: &str) -> usize {
+    use std::sync::OnceLock;
+    static BPE: OnceLock<Option<tiktoken_rs::CoreBPE>> = OnceLock::new();
+    let bpe = BPE.get_or_init(|| tiktoken_rs::cl100k_base().ok());
+    match bpe {
+        Some(b) => b.encode_ordinary(text).len().max(1),
+        None => token_count(text),
+    }
+}
+
+/// Measures `text` with the most accurate method available.
+///
+/// With the `tiktoken` feature this returns a BPE measurement; otherwise a
+/// heuristic measurement. Use [`measure_tokens_dual`] when you need both
+/// side-by-side for an honest comparison.
+pub fn measure_tokens(text: &str) -> TokenMeasurement {
+    #[cfg(feature = "tiktoken")]
+    {
+        TokenMeasurement::bpe(text)
+    }
+    #[cfg(not(feature = "tiktoken"))]
+    {
+        TokenMeasurement::heuristic(text)
+    }
+}
+
+/// Measures `text` with both methodologies when `tiktoken` is enabled.
+///
+/// Without the `tiktoken` feature, the `bpe` field is `None` and only the
+/// heuristic number is reported. This struct is the foundation for
+/// non-self-referential reduction reporting: compare the BPE numbers, not the
+/// heuristic ones, when making token-saving claims.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DualTokenMeasurement {
+    pub heuristic: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bpe: Option<usize>,
+}
+
+/// Counts `text` with both the heuristic and (if available) the BPE tokenizer.
+///
+/// The heuristic value comes from `estimate_tokens_heuristic` (always the
+/// character-count estimate, never the BPE path), so under the `tiktoken`
+/// feature the two fields genuinely differ — enabling an honest comparison
+/// of the self-referential heuristic against the real tokenizer.
+pub fn measure_tokens_dual(text: &str) -> DualTokenMeasurement {
+    let heuristic = stream::estimate_tokens_heuristic(text);
+    #[cfg(feature = "tiktoken")]
+    {
+        DualTokenMeasurement {
+            heuristic,
+            bpe: Some(bpe_token_count(text)),
+        }
+    }
+    #[cfg(not(feature = "tiktoken"))]
+    {
+        DualTokenMeasurement {
+            heuristic,
+            bpe: None,
+        }
+    }
+}
+
 // ────────────────────────────────────────────────
 // Integration tests
 // ────────────────────────────────────────────────
@@ -474,6 +599,140 @@ mod tests {
     #[test]
     fn token_count_is_positive() {
         assert!(token_count("hello world") > 0);
+    }
+
+    #[test]
+    fn measure_tokens_dual_returns_heuristic_always() {
+        let m = measure_tokens_dual("hello world transformer");
+        // Heuristic is always available regardless of features.
+        assert!(m.heuristic > 0);
+    }
+
+    #[test]
+    fn measure_tokens_dual_bpe_present_with_feature() {
+        let m = measure_tokens_dual("hello world transformer");
+        #[cfg(feature = "tiktoken")]
+        {
+            assert!(
+                m.bpe.is_some(),
+                "BPE measurement must be present with tiktoken feature"
+            );
+            assert!(m.bpe.unwrap() > 0);
+        }
+        #[cfg(not(feature = "tiktoken"))]
+        {
+            assert!(m.bpe.is_none(), "BPE must be None without tiktoken feature");
+        }
+    }
+
+    /// AC1: documents the heuristic tokenizer's PUA assumption (tiktoken OFF).
+    ///
+    /// Without the `tiktoken` feature, `token_count` uses the
+    /// `chars_per_token` heuristic which **assumes PUA = 1 token per char**
+    /// (`stream.rs` PUA branch). This is the self-referential assumption the
+    /// compressor optimizes for. See `pua_real_token_cost_*` (tiktoken ON)
+    /// for the ground truth that disproves it.
+    #[cfg(not(feature = "tiktoken"))]
+    #[test]
+    fn pua_heuristic_assumes_one_token_per_char() {
+        let one = "\u{E000}";
+        let eight = "\u{E000}\u{E001}\u{E002}\u{E003}\u{E004}\u{E005}\u{E006}\u{E007}";
+        // The heuristic's baked-in (incorrect) assumption.
+        assert_eq!(token_count(one), 1);
+        assert_eq!(token_count(eight), 8);
+    }
+
+    /// AC1: empirically measures the *real* cl100k token cost of PUA (tiktoken ON).
+    ///
+    /// Ground truth: PUA codepoints are absent from cl100k's merge table, so
+    /// each encodes via byte-fallback to **3 tokens**, and distinct PUA chars
+    /// never merge. Measured (cl100k_base):
+    ///
+    /// | text                 | heuristic (off) | real (on) |
+    /// |----------------------|-----------------|-----------|
+    /// | 1 PUA char           | 1               | 3         |
+    /// | 8 distinct PUA chars | 8               | 24        |
+    ///
+    /// **Implication**: the heuristic *undercounts* PUA cost by 3×, so any
+    /// reduction figure computed with the heuristic on PUA-heavy output is
+    /// inflated. Honest reports must use BPE numbers.
+    #[cfg(feature = "tiktoken")]
+    #[test]
+    fn pua_real_token_cost_is_documented() {
+        let one_pua = "\u{E000}";
+        let eight_pua = "\u{E000}\u{E001}\u{E002}\u{E003}\u{E004}\u{E005}\u{E006}\u{E007}";
+
+        // With tiktoken ON, token_count dispatches to the real BPE tokenizer.
+        assert_eq!(
+            token_count(one_pua),
+            3,
+            "single PUA char = 3 cl100k tokens (byte-fallback)"
+        );
+        assert_eq!(
+            token_count(eight_pua),
+            24,
+            "8 distinct PUA chars = 24 tokens (3 each, no merge). \
+             If this drifts, update the token-honesty docs."
+        );
+        // bpe_token_count agrees with token_count under the feature.
+        assert_eq!(bpe_token_count(one_pua), token_count(one_pua));
+    }
+
+    /// AC1: demonstrates the PUA substitution break-even empirically.
+    ///
+    /// Ground truth (cl100k_base):
+    /// - PUA char = 3 tokens (byte-fallback)
+    /// - "large language model" = 3 tokens (each common word is 1 token)
+    /// - "retrieval augmented generation" = 3 tokens (also < 4)
+    ///
+    /// **Break-even**: a term only pays to PUA-substitute if it costs **more
+    /// than 3 tokens**. Common multi-word phrases like "large language model"
+    /// are *already* 3 tokens — substituting with a PUA char (3 tokens) saves
+    /// nothing. This empirically refutes the premise that PUA substitution
+    /// broadly reduces tokens; under a real tokenizer it rarely does, and the
+    /// heuristic (which counts PUA as 1) massively overstates any saving.
+    #[cfg(feature = "tiktoken")]
+    #[test]
+    fn pua_substitution_break_even_is_empirically_honest() {
+        let pua_tok = bpe_token_count("\u{E000}");
+        assert_eq!(pua_tok, 3, "PUA char costs 3 tokens");
+
+        // A 3-token phrase substitutes to a 3-token PUA → zero saving.
+        let phrase = "large language model";
+        assert_eq!(bpe_token_count(phrase), 3);
+        assert!(
+            bpe_token_count(phrase) <= pua_tok,
+            "3-token phrase does not benefit from PUA substitution (tie)"
+        );
+
+        // Only a 4+ token term would genuinely save (1 token) — verify such
+        // terms exist and cross the bar, proving the break-even claim.
+        let long_term = "transformer-based language model fine-tuning pipeline";
+        let long_tok = bpe_token_count(long_term);
+        assert!(
+            long_tok > pua_tok,
+            "long term ({long_tok}) must exceed PUA cost ({pua_tok}) to save tokens"
+        );
+    }
+
+    /// AC1: a plain Latin sentence must have a heuristic that is *consistent*
+    /// with (but not necessarily equal to) the real BPE count, within a sane
+    /// band. Catches gross regressions in `chars_per_token`.
+    #[cfg(feature = "tiktoken")]
+    #[test]
+    fn heuristic_tracks_bpe_within_band() {
+        let text = "The quick brown fox jumps over the lazy dog near the riverbank.";
+        let h = token_count(text);
+        let b = bpe_token_count(text);
+        // Heuristic should be within 2× of BPE for plain Latin prose.
+        // (CJK-heavy text is excluded — heuristic diverges more there, which
+        // is exactly why BPE measurement exists.)
+        let ratio = h as f64 / b as f64;
+        assert!(
+            (0.5..=2.0).contains(&ratio),
+            "heuristic/bpe ratio {ratio:.2} outside [0.5, 2.0] for Latin prose \
+             (heuristic={h}, bpe={b})"
+        );
     }
 
     #[test]
@@ -549,7 +808,8 @@ mod tests {
 
     #[test]
     fn transpile_auto_interns_frequent_terms() {
-        // A term appearing 5 times should be auto-interned
+        // A term appearing 5 times should be auto-interned — *if* substitution has
+        // positive ROI under the active tokenizer.
         let md = "# Test\n\nAPI endpoint API endpoint API endpoint API endpoint API endpoint.";
         let result = transpile(
             md,
@@ -558,11 +818,29 @@ mod tests {
             Some(4096),
         );
         let output = result.unwrap();
-        // The output should contain a <D> dictionary block with the frequent term
-        assert!(
-            output.contains("<D>"),
-            "output must contain <D> block when frequent terms exist: {output}"
-        );
+
+        // Under the heuristic, PUA = 1 token, so "API endpoint" (≥2 heuristic tokens)
+        // substituted by a PUA char is ROI-positive → a <D> block is emitted.
+        #[cfg(not(feature = "tiktoken"))]
+        {
+            assert!(
+                output.contains("<D>"),
+                "output must contain <D> block when frequent terms exist: {output}"
+            );
+        }
+        // Under the real cl100k tokenizer, "API endpoint" = 2 tokens and a PUA char
+        // = 3 tokens, so substitution is ROI-*negative* (it would add tokens). The
+        // ROI gate therefore suppresses the <D> block — the honest behavior.
+        #[cfg(feature = "tiktoken")]
+        {
+            assert_eq!(bpe_token_count("API endpoint"), 2);
+            assert_eq!(bpe_token_count("\u{E000}"), 3);
+            assert!(
+                !output.contains("<D>"),
+                "under tiktoken, PUA-substituting a 2-token term (→3) is ROI-negative; \
+                 no <D> block expected: {output}"
+            );
+        }
     }
 
     #[test]

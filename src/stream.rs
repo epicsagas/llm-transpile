@@ -104,19 +104,31 @@ pub fn estimate_tokens(text: &str) -> usize {
 
     #[cfg(not(feature = "tiktoken"))]
     {
-        let mut total = 0.0f64;
-        for c in text.chars() {
-            let cpt = chars_per_token(c);
-            total += 1.0 / cpt as f64;
-        }
-        (total.ceil() as usize).max(1)
+        estimate_tokens_heuristic(text)
     }
+}
+
+/// The character-count heuristic estimate, computed independently of the
+/// `tiktoken` feature.
+///
+/// This is always available so that callers (e.g. `measure_tokens_dual`) can
+/// compare the heuristic against the real BPE count *even when the `tiktoken`
+/// feature is enabled* — which is the whole point of dual measurement.
+/// Without this, the heuristic path would be compiled out under `tiktoken`
+/// and "dual" would report the same number twice.
+pub fn estimate_tokens_heuristic(text: &str) -> usize {
+    let mut total = 0.0f64;
+    for c in text.chars() {
+        let cpt = chars_per_token(c);
+        total += 1.0 / cpt as f64;
+    }
+    (total.ceil() as usize).max(1)
 }
 
 /// Returns the chars-per-token value based on the Unicode codepoint range.
 ///
-/// Not used when the `tiktoken` feature is active.
-#[cfg(not(feature = "tiktoken"))]
+/// Always compiled (the heuristic must remain available alongside the BPE
+/// path so the two can be compared — see `estimate_tokens_heuristic`).
 fn chars_per_token(c: char) -> u32 {
     let cp = c as u32;
     match cp {

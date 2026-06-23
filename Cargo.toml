@@ -101,6 +101,11 @@ path = "src/bin/transpile.rs"
 [[example]]
 name = "eval"
 path = "eval/eval.rs"
+# The eval harness measures token reduction with the *real* cl100k BPE
+# tokenizer (the heuristic alone is self-referential — see src/lib.rs
+# `pua_real_token_cost_is_documented`). It therefore requires the tiktoken
+# feature. `make eval` runs `cargo run --example eval --features tiktoken`.
+required-features = ["tiktoken"]
 
 [[example]]
 name = "test_docs"
