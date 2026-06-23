@@ -60,15 +60,14 @@ Les LLM fonctionnent mieux lorsque le contexte est propre et dense. Cette biblio
 
 ### Benchmarks
 
-37 documents, 4 formats, 5 langues — Apple M-series, build `--release`. Rapport complet : [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+37 documents, 4 formats, 5 langues — Apple M-series, build `--release`. Rapport complet : [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
-| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
-| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
-| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
-| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
-| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+| Markdown | 27.4% | 69.4% | 99.0% | — |
+| HTML | 98.7% | 99.3% | 99.0% | — |
+| PlainText | -3.5% | 30.4% | 99.0% | — |
+| **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
 
 > La réduction HTML reflète la suppression du balisage superflu (nav, scripts, styles), et non uniquement la compression du texte.
 
@@ -443,7 +442,7 @@ Exécutez vous-même la suite d'évaluation :
 cargo run --release --example eval
 ```
 
-Détail par fichier, méthodologie et limitations connues : [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+Détail par fichier, méthodologie et limitations connues : [`docs/EVALUATION.md`](../EVALUATION.md)
 
 ---
 

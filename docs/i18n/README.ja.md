@@ -60,15 +60,14 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 
 ### ベンチマーク
 
-37ドキュメント、4フォーマット、5言語 — Apple Mシリーズ、`--release`ビルド。完全レポート: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+37ドキュメント、4フォーマット、5言語 — Apple Mシリーズ、`--release`ビルド。完全レポート: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
-| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
-| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
-| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
-| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
-| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+| Markdown | 27.4% | 69.4% | 99.0% | — |
+| HTML | 98.7% | 99.3% | 99.0% | — |
+| PlainText | -3.5% | 30.4% | 99.0% | — |
+| **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
 
 > HTML削減率はナビ/スクリプト/スタイルのマークアップオーバーヘッド除去を反映しており、本文の圧縮のみを示すものではありません。
 
@@ -456,7 +455,7 @@ match transpile(input, format, fidelity, budget) {
 cargo run --release --example eval
 ```
 
-ファイルごとの内訳、手法、および既知の制限: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+ファイルごとの内訳、手法、および既知の制限: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 ---
 

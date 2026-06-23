@@ -19,7 +19,7 @@
   "hooks": "./.claude-plugin/hooks.json",
   "interface": {
     "displayName": "LLM Transpile",
-    "shortDescription": "Token-optimized document reader — cuts context usage by up to 40%.",
+    "shortDescription": "Token-optimized document reader — reduces token usage up to 90% on HTML, ~27% on Markdown (cl100k-measured).",
     "longDescription": "Silently compresses .md, .html, and .txt files on Read via PostToolUse hook, cutting context usage by up to 40% with zero workflow change.",
     "developerName": "epicsagas",
     "category": "Performance",

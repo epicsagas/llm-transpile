@@ -62,15 +62,16 @@ LLMs perform better when context is clean and dense. This library handles the me
 
 ### Benchmarks
 
-37 documents, 4 formats, 5 languages — Apple M-series, `--release` build. Full report: [`eval/EVAL_REPORT.md`](eval/EVAL_REPORT.md)
+48 documents, 3 formats, 15 languages — Apple M-series, `--release` build. Numbers below are measured with the **real `cl100k` BPE tokenizer** (not the self-referential heuristic — see the analysis). Full methodology and token-honesty breakdown: [`docs/EVALUATION.md`](docs/EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
-| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
-| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
-| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
-| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
-| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+| Markdown | 27.4% | 69.4% | 99.0% | — |
+| HTML | 98.7% | 99.3% | 99.0% | — |
+| PlainText | −3.5% | 30.4% | 99.0% | — |
+| **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
+
+> ⚠️ The overall figure is dominated by HTML markup stripping. **Markdown 27.4% is the genuine compression rate.** PlainText is net-negative in Semantic mode due to structural overhead. See [`docs/EVALUATION.md`](docs/EVALUATION.md) for the per-format reality.
 
 > HTML reduction reflects markup overhead removal (nav, scripts, styles), not prose compression alone.
 
@@ -455,10 +456,11 @@ Measured on release build (`cargo build --release`), Apple M-series, 48 document
 Run the evaluation suite yourself:
 
 ```bash
-cargo run --release --example eval
+make eval          # structured JSON (BPE + heuristic; consumed by `epic eval`)
+make eval-report   # human-readable per-file table + summary
 ```
 
-Full per-file breakdown, methodology, and known limitations: [`eval/EVAL_REPORT.md`](eval/EVAL_REPORT.md)
+Full per-file breakdown, methodology, and the token-honesty analysis: [`docs/EVALUATION.md`](docs/EVALUATION.md) (한국어: [`docs/i18n/EVALUATION.ko.md`](docs/i18n/EVALUATION.ko.md))
 
 ---
 
