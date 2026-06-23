@@ -61,14 +61,16 @@
 
 ### 基准测试
 
-37 个文档、4 种格式、5 种语言 — Apple M 系列，`--release` 构建。完整报告: [`docs/EVALUATION.md`](../EVALUATION.md)
+48 个文档、3 种格式、15 种语言 — Apple M 系列，`--release` 构建。以下数字均使用**真实的 `cl100k` BPE 分词器**测量（而非自引用启发式方法 — 见分析）。完整方法论与令牌诚实度分析: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
 | Markdown | 27.4% | 69.4% | 99.0% | — |
 | HTML | 98.7% | 99.3% | 99.0% | — |
-| PlainText | -3.5% | 30.4% | 99.0% | — |
+| PlainText | −3.5% | 30.4% | 99.0% | — |
 | **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
+
+> ⚠️ 总体数字主要由 HTML 标记剥离主导。**Markdown 27.4% 才是真正的压缩率。** 由于结构性开销，PlainText 在 Semantic 模式下为净负值。各格式的真实情况见 [`docs/EVALUATION.md`](../EVALUATION.md)。
 
 > HTML 缩减率反映的是导航/脚本/样式标记开销的移除，而非单纯的正文压缩。
 
@@ -448,21 +450,23 @@ match transpile(input, format, fidelity, budget) {
 
 ## 性能
 
-发布构建（`cargo build --release`），Apple M 系列，48 个 Markdown/HTML/PlainText 文档测量：
+发布构建（`cargo build --release`），Apple M 系列，48 个 Markdown/HTML/PlainText 文档测量。所有缩减率均使用**真实的 `cl100k` BPE 分词器**测量（而非自引用启发式方法）。完整方法论与各格式明细见 [`docs/EVALUATION.md`](../EVALUATION.md)。
 
 | 指标 | 测量值 | 备注 |
 |------|--------|------|
-| 吞吐量 | **10,975 tok/ms** | 约为 Python 解析基线的 75 倍 |
-| Semantic 缩减率 | **33.9%**（Markdown） | 达成 15–30% 目标 |
-| Compressed 缩减率 | **39.7%**（Markdown） | 预算自适应，保证 ≥ PruneLowImportance |
-| Lossless 词汇覆盖率 | **98.8% 平均** | 覆盖所有格式和语言 |
-| HTML 缩减率 | **97.6%** | 移除导航/脚本/样式标记开销 |
-| 多语言支持 | 15 种语言已测试 | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 平均 99.4% 词汇覆盖率 |
+| 吞吐量（仅 Markdown 峰值） | **10,975 tok/ms** | 约为 Python 解析基线的 75 倍；单格式峰值 |
+| 吞吐量（数据集聚合） | **~1,070 tok/ms** | 按全部 48 个文档 / 3 种格式加权（BPE）— 见基准测试表 |
+| Semantic 缩减率 | **27.4%**（Markdown） | 真正的压缩率；处于 15–30% 目标区间内 |
+| Compressed 缩减率 | **69.4%**（Markdown） | 预算自适应，保证 ≥ PruneLowImportance |
+| Lossless 词汇覆盖率 | **99.0% 平均** | 覆盖所有格式和语言 |
+| HTML 缩减率 | **98.7%** | 反映导航/脚本/样式标记开销的移除 |
+| 多语言支持 | 15 种语言已测试 | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 平均 99.0% 词汇覆盖率 |
 
 自行运行评估套件：
 
 ```bash
-cargo run --release --example eval
+make eval          # 结构化 JSON（BPE + 启发式；供 `epic eval` 使用）
+make eval-report   # 人类可读的逐文件表 + 摘要
 ```
 
 逐文件明细、方法论及已知限制: [`docs/EVALUATION.md`](../EVALUATION.md)

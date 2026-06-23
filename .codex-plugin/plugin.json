@@ -20,8 +20,8 @@
   "scripts": "./registry/scripts",
   "interface": {
     "displayName": "LLM Transpile",
-    "shortDescription": "Token-optimized document reader — reduces token usage up to 90% on HTML, ~27% on Markdown (cl100k-measured).",
-    "longDescription": "Silently compresses .md, .html, and .txt files on Read via PreToolUse hook, cutting context usage by up to 40% with zero workflow change.",
+    "shortDescription": "Token-optimized document reader — ~27% Markdown compression (genuine), up to 90% on HTML markup stripping (cl100k-measured).",
+    "longDescription": "Silently compresses .md, .html, and .txt files on Read via PreToolUse hook, cutting context usage by ~27% on Markdown (cl100k-measured) with zero workflow change.",
     "developerName": "epicsagas",
     "category": "Performance",
     "capabilities": ["Read"],

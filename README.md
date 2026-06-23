@@ -442,16 +442,17 @@ match transpile(input, format, fidelity, budget) {
 
 ## Performance
 
-Measured on release build (`cargo build --release`), Apple M-series, 48 documents across Markdown / HTML / PlainText:
+Measured on release build (`cargo build --release`), Apple M-series, 48 documents across Markdown / HTML / PlainText. All reduction figures are measured with the **real `cl100k` BPE tokenizer** (not the self-referential heuristic). See [`docs/EVALUATION.md`](docs/EVALUATION.md) for the full methodology and per-format breakdown.
 
 | Metric | Measured | Notes |
 |--------|----------|-------|
-| Throughput | **10,975 tok/ms** | ≈75× faster than Python parsing baseline |
-| Semantic reduction | **33.9%** (Markdown) | 15–30% target met |
-| Compressed reduction | **39.7%** (Markdown) | Budget-adaptive, guaranteed ≥ PruneLowImportance |
-| Lossless word coverage | **98.8% avg** | Across all formats and languages |
-| HTML reduction | **97.6%** | Reflects markup overhead removal (nav/scripts/styles) |
-| Multilingual support | 15 languages tested | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.4% avg word coverage |
+| Throughput (Markdown-only peak) | **10,975 tok/ms** | ≈75× faster than Python parsing baseline; single-format peak |
+| Throughput (dataset aggregate) | **~1,070 tok/ms** | Weighted across all 48 docs / 3 formats (BPE) — see Benchmarks table |
+| Semantic reduction | **27.4%** (Markdown) | Genuine compression rate; within the 15–30% target band |
+| Compressed reduction | **69.4%** (Markdown) | Budget-adaptive, guaranteed ≥ PruneLowImportance |
+| Lossless word coverage | **99.0% avg** | Across all formats and languages |
+| HTML reduction | **98.7%** | Reflects markup overhead removal (nav/scripts/styles) |
+| Multilingual support | 15 languages tested | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.0% avg word coverage |
 
 Run the evaluation suite yourself:
 

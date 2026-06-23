@@ -60,14 +60,16 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 
 ### ベンチマーク
 
-37ドキュメント、4フォーマット、5言語 — Apple Mシリーズ、`--release`ビルド。完全レポート: [`docs/EVALUATION.md`](../EVALUATION.md)
+48ドキュメント、3フォーマット、15言語 — Apple Mシリーズ、`--release`ビルド。以下の数値は**実際の`cl100k` BPEトークナイザー**で測定したものです（自己言及ヒューリスティックではありません — 分析を参照）。完全な手法とトークンハネスト性の内訳: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
 | Markdown | 27.4% | 69.4% | 99.0% | — |
 | HTML | 98.7% | 99.3% | 99.0% | — |
-| PlainText | -3.5% | 30.4% | 99.0% | — |
+| PlainText | −3.5% | 30.4% | 99.0% | — |
 | **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
+
+> ⚠️ 全体の数値はHTMLマークアップ除去が大半を占めています。**Markdownの27.4%が真の圧縮率です。** PlainTextは構造的オーバーヘッドのためSemanticモードではネットマイナスになります。フォーマットごとの実態は[`docs/EVALUATION.md`](../EVALUATION.md)を参照してください。
 
 > HTML削減率はナビ/スクリプト/スタイルのマークアップオーバーヘッド除去を反映しており、本文の圧縮のみを示すものではありません。
 
@@ -438,21 +440,23 @@ match transpile(input, format, fidelity, budget) {
 
 ## パフォーマンス
 
-リリースビルド（`cargo build --release`）、Apple Mシリーズ、Markdown/HTML/PlainText 48ドキュメント測定:
+リリースビルド（`cargo build --release`）、Apple Mシリーズ、Markdown/HTML/PlainText 48ドキュメント測定。すべての削減率は**実際の`cl100k` BPEトークナイザー**で測定したものです（自己言及ヒューリスティックではありません）。完全な手法とフォーマットごとの内訳は[`docs/EVALUATION.md`](../EVALUATION.md)を参照してください。
 
 | 指標 | 測定値 | 備考 |
 |------|--------|------|
-| スループット | **10,975 tok/ms** | Pythonパーシングベースラインの≈75倍高速 |
-| Semantic削減率 | **33.9%**（Markdown） | 15–30%目標達成 |
-| Compressed削減率 | **39.7%**（Markdown） | 予算適応型、PruneLowImportance以上保証 |
-| Lossless単語カバレッジ | **98.8% 平均** | 全フォーマット・言語 |
-| HTML削減率 | **97.6%** | ナビ/スクリプト/スタイルのマークアップオーバーヘッド除去 |
-| 多言語サポート | 15言語テスト済み | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 平均99.4%単語カバレッジ |
+| スループット（Markdown単体ピーク） | **10,975 tok/ms** | Pythonパーシングベースラインの≈75倍高速、単一フォーマットのピーク |
+| スループット（データセット全体） | **~1,070 tok/ms** | 48ドキュメント/3フォーマット全体の加重平均（BPE） — ベンチマーク表を参照 |
+| Semantic削減率 | **27.4%**（Markdown） | 真の圧縮率、15–30%目標帯域内 |
+| Compressed削減率 | **69.4%**（Markdown） | 予算適応型、PruneLowImportance以上保証 |
+| Lossless単語カバレッジ | **99.0% 平均** | 全フォーマット・言語 |
+| HTML削減率 | **98.7%** | ナビ/スクリプト/スタイルのマークアップオーバーヘッド除去を反映 |
+| 多言語サポート | 15言語テスト済み | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 平均99.0%単語カバレッジ |
 
 評価スイートを自分で実行:
 
 ```bash
-cargo run --release --example eval
+make eval          # 構造化JSON（BPE + ヒューリスティック、`epic eval`が消費）
+make eval-report   # 人間が読めるファイル別テーブル + サマリー
 ```
 
 ファイルごとの内訳、手法、および既知の制限: [`docs/EVALUATION.md`](../EVALUATION.md)

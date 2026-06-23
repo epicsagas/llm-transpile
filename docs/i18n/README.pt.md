@@ -62,7 +62,7 @@ LLMs funcionam melhor quando o contexto é limpo e denso. Esta biblioteca cuida 
 
 ### Benchmarks
 
-37 documentos, 4 formatos, 5 idiomas — Apple M-series, build `--release`. Relatório completo: [`docs/EVALUATION.md`](../EVALUATION.md)
+48 documentos, 3 formatos, 15 idiomas — Apple M-series, build `--release`. Os números abaixo são medidos com o **tokenizador BPE `cl100k` real** (não a heurística autorreferencial — veja a análise). Metodologia completa e detalhamento de honestidade de tokens: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
@@ -71,6 +71,7 @@ LLMs funcionam melhor quando o contexto é limpo e denso. Esta biblioteca cuida 
 | PlainText | -3.5% | 30.4% | 99.0% | — |
 | **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
 
+> ⚠️ A figura geral é dominada pela remoção de marcação HTML. **27.4% no Markdown é a taxa de compressão genuína.** O PlainText é líquido negativo no modo Semantic devido ao overhead estrutural. Veja [`docs/EVALUATION.md`](../EVALUATION.md) para a realidade por formato.
 > A redução HTML reflete a remoção do overhead de marcação (nav, scripts, estilos), não apenas a compressão do texto.
 
 ---
@@ -427,21 +428,23 @@ match transpile(input, format, fidelity, budget) {
 
 ## Desempenho
 
-Medido em build release (`cargo build --release`), Apple M-series, 48 documentos Markdown/HTML/PlainText:
+Medido em build release (`cargo build --release`), Apple M-series, 48 documentos Markdown/HTML/PlainText. Todas as figuras de redução são medidas com o **tokenizador BPE `cl100k` real** (não a heurística autorreferencial). Veja [`docs/EVALUATION.md`](../EVALUATION.md):
 
 | Métrica | Medido | Notas |
 |---------|--------|-------|
-| Throughput | **10.975 tok/ms** | ≈75× mais rápido que a linha de base Python |
-| Redução Semantic | **33,9%** (Markdown) | Objetivo 15–30% atingido |
-| Redução Compressed | **39,7%** (Markdown) | Adaptativo ao orçamento, ≥ PruneLowImportance garantido |
-| Cobertura de palavras Lossless | **98,8% em média** | Em todos os formatos e idiomas |
-| Redução HTML | **97,6%** | Remoção de overhead de marcação nav/scripts/estilos |
-| Suporte multilíngue | 15 idiomas testados | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99,4% cobertura média |
+| Throughput (pico Markdown apenas) | **10.975 tok/ms** | ≈75× mais rápido que a linha de base de análise Python; pico de formato único |
+| Throughput (agregado do conjunto de dados) | **~1.070 tok/ms** | Ponderado em todos os 48 documentos / 3 formatos (BPE) — veja a tabela de Benchmarks |
+| Redução Semantic | **27.4%** (Markdown) | Taxa de compressão genuína; dentro da faixa-alvo de 15–30% |
+| Redução Compressed | **69.4%** (Markdown) | Adaptativo ao orçamento, ≥ PruneLowImportance garantido |
+| Cobertura de palavras Lossless | **99.0% em média** | Em todos os formatos e idiomas |
+| Redução HTML | **98.7%** | Reflete a remoção do overhead de marcação (nav/scripts/estilos) |
+| Suporte multilíngue | 15 idiomas testados | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.0% cobertura média de palavras |
 
 Execute a suite de avaliação você mesmo:
 
 ```bash
-cargo run --release --example eval
+make eval          # JSON estruturado (BPE + heurística; consumido por `epic eval`)
+make eval-report   # tabela por arquivo legível por humanos + resumo
 ```
 
 Detalhamento por arquivo, metodologia e limitações conhecidas: [`docs/EVALUATION.md`](../EVALUATION.md)

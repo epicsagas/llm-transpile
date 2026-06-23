@@ -350,14 +350,7 @@ impl JsonSummary {
         let cmp_red_bpe = pct(cmp_bpe, input_bpe);
         let cmp_red_h = pct(cmp_h, input_h);
 
-        let composite = composite_score(
-            sem_red_bpe,
-            cmp_red_bpe,
-            coverage,
-            throughput,
-            los_bpe,
-            input_bpe,
-        );
+        let composite = composite_score(sem_red_bpe, coverage, throughput, los_bpe, input_bpe);
 
         Self {
             documents: all.len(),
@@ -394,7 +387,6 @@ impl JsonSummary {
 /// Weights: reduction 0.40 · coverage 0.30 · throughput 0.15 · lossless 0.15.
 fn composite_score(
     sem_reduction_bpe_pct: f64,
-    _cmp_reduction_bpe_pct: f64,
     coverage_pct: f64,
     throughput_tok_per_ms: f64,
     lossless_tokens_bpe: usize,
@@ -402,7 +394,7 @@ fn composite_score(
 ) -> f64 {
     let reduction = (sem_reduction_bpe_pct / 40.0).clamp(0.0, 1.0);
     let coverage = (coverage_pct / 100.0).clamp(0.0, 1.0);
-    // log10-scaled throughput: 1 tok/ms → 0.0, 10 → 0.5, 1000 → 1.0 (saturated).
+    // log10-scaled throughput: 1 tok/ms → 0.0, 10 → 0.33, 100 → 0.67, 1000 → 1.0 (saturated).
     let throughput = if throughput_tok_per_ms > 0.0 {
         ((throughput_tok_per_ms).log10() / 3.0).clamp(0.0, 1.0)
     } else {
@@ -547,4 +539,80 @@ fn main() {
         "  • Composite score:          {:.3} / 1.0  (BPE-based)",
         summary.composite
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::composite_score;
+
+    /// AC (composite_score correctness): the weighted sum of normalized components
+    /// produces values in [0, 1] and the documented weights hold.
+    #[test]
+    fn composite_score_is_in_unit_range() {
+        // Worst case: zero reduction, zero coverage, zero throughput, max lossless
+        // overhead (ratio 2.0 → lossless clamped to 0.0).
+        let worst = composite_score(0.0, 0.0, 0.0, 10_000, 5_000);
+        assert!(
+            (0.0..=1.0).contains(&worst),
+            "composite must be in [0,1], got {worst}"
+        );
+        // Best case: reduction saturated (≥40%), full coverage, throughput saturated
+        // (≥1000 tok/ms), no lossless overhead (ratio 1.0 → lossless 1.0).
+        let best = composite_score(40.0, 100.0, 1000.0, 5_000, 5_000);
+        assert!(
+            (0.0..=1.0).contains(&best),
+            "composite must be in [0,1], got {best}"
+        );
+        assert!(
+            best > worst,
+            "best case ({best}) must beat worst case ({worst})"
+        );
+    }
+
+    /// AC (composite_score best case = 1.0): every component saturated → exactly 1.0.
+    #[test]
+    fn composite_score_full_marks_is_one() {
+        let score = composite_score(40.0, 100.0, 1000.0, 5_000, 5_000);
+        // 0.40*1 + 0.30*1 + 0.15*1 + 0.15*1 = 1.0
+        assert!(
+            (score - 1.0).abs() < 1e-9,
+            "all-components-saturated should be 1.0, got {score}"
+        );
+    }
+
+    /// AC (composite_score weights): reduction weight (0.40) dominates. Moving only
+    /// reduction from 0% to saturated (40%) with everything else floored raises the
+    /// score by exactly 0.40.
+    #[test]
+    fn composite_score_reduction_weight_is_04() {
+        let floor = composite_score(0.0, 0.0, 0.0, 10_000, 5_000); // lossless→0
+        let with_reduction = composite_score(40.0, 0.0, 0.0, 10_000, 5_000);
+        let delta = with_reduction - floor;
+        assert!(
+            (delta - 0.40).abs() < 1e-9,
+            "reduction component contributes 0.40, got delta {delta}"
+        );
+    }
+
+    /// AC (composite_score div-by-zero guard): zero throughput and zero input tokens
+    /// must not panic.
+    #[test]
+    fn composite_score_safe_on_zero_inputs() {
+        // throughput 0 → throughput component 0 (no log10 of 0). input_bpe 0 →
+        // lossless_ratio guarded to 1.0 (no div-by-zero).
+        let score = composite_score(20.0, 50.0, 0.0, 0, 0);
+        assert!((0.0..=1.0).contains(&score));
+    }
+
+    /// AC (composite_score throughput saturation): throughput ≥ 1000 tok/ms and
+    /// throughput = 1000 tok/ms yield the same throughput component (saturated).
+    #[test]
+    fn composite_score_throughput_saturates_at_1000() {
+        let at_bar = composite_score(0.0, 0.0, 1000.0, 10_000, 5_000);
+        let above_bar = composite_score(0.0, 0.0, 10_000.0, 10_000, 5_000);
+        assert!(
+            (at_bar - above_bar).abs() < 1e-9,
+            "throughput saturates at 1000 tok/ms: {at_bar} vs {above_bar}"
+        );
+    }
 }

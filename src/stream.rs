@@ -125,6 +125,25 @@ pub fn estimate_tokens_heuristic(text: &str) -> usize {
     (total.ceil() as usize).max(1)
 }
 
+/// Token cost of a single PUA codepoint (U+E000) under the **active** measurement.
+///
+/// This is what the ROI gate must compare `term_tokens` against: both quantities
+/// are measured by the same tokenizer, so the gate stays self-consistent regardless
+/// of feature flags.
+///
+/// - Under `tiktoken`: cl100k byte-fallback → **3 tokens** (the real ground truth).
+/// - Under the heuristic: [`chars_per_token`] returns `cpt = 1` for the PUA range → **1 token**.
+///
+/// Note: the heuristic's `1` is *itself* the self-referential assumption this crate's
+/// eval documents as inflated — it only matches reality when the real tokenizer is in
+/// use. [`crate::PUA_TOKEN_COST`] is the build-independent constant holding the measured
+/// cl100k value (3) for reporting/eval; the gate uses this function so its two sides
+/// are always in the same units.
+pub fn pua_token_cost() -> usize {
+    // A single PUA char, measured the same way term_tokens is measured.
+    estimate_tokens("\u{E000}")
+}
+
 /// Returns the chars-per-token value based on the Unicode codepoint range.
 ///
 /// Always compiled (the heuristic must remain available alongside the BPE
