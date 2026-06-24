@@ -104,19 +104,50 @@ pub fn estimate_tokens(text: &str) -> usize {
 
     #[cfg(not(feature = "tiktoken"))]
     {
-        let mut total = 0.0f64;
-        for c in text.chars() {
-            let cpt = chars_per_token(c);
-            total += 1.0 / cpt as f64;
-        }
-        (total.ceil() as usize).max(1)
+        estimate_tokens_heuristic(text)
     }
+}
+
+/// The character-count heuristic estimate, computed independently of the
+/// `tiktoken` feature.
+///
+/// This is always available so that callers (e.g. `measure_tokens_dual`) can
+/// compare the heuristic against the real BPE count *even when the `tiktoken`
+/// feature is enabled* — which is the whole point of dual measurement.
+/// Without this, the heuristic path would be compiled out under `tiktoken`
+/// and "dual" would report the same number twice.
+pub fn estimate_tokens_heuristic(text: &str) -> usize {
+    let mut total = 0.0f64;
+    for c in text.chars() {
+        let cpt = chars_per_token(c);
+        total += 1.0 / cpt as f64;
+    }
+    (total.ceil() as usize).max(1)
+}
+
+/// Token cost of a single PUA codepoint (U+E000) under the **active** measurement.
+///
+/// This is what the ROI gate must compare `term_tokens` against: both quantities
+/// are measured by the same tokenizer, so the gate stays self-consistent regardless
+/// of feature flags.
+///
+/// - Under `tiktoken`: cl100k byte-fallback → **3 tokens** (the real ground truth).
+/// - Under the heuristic: [`chars_per_token`] returns `cpt = 1` for the PUA range → **1 token**.
+///
+/// Note: the heuristic's `1` is *itself* the self-referential assumption this crate's
+/// eval documents as inflated — it only matches reality when the real tokenizer is in
+/// use. [`crate::PUA_TOKEN_COST`] is the build-independent constant holding the measured
+/// cl100k value (3) for reporting/eval; the gate uses this function so its two sides
+/// are always in the same units.
+pub fn pua_token_cost() -> usize {
+    // A single PUA char, measured the same way term_tokens is measured.
+    estimate_tokens("\u{E000}")
 }
 
 /// Returns the chars-per-token value based on the Unicode codepoint range.
 ///
-/// Not used when the `tiktoken` feature is active.
-#[cfg(not(feature = "tiktoken"))]
+/// Always compiled (the heuristic must remain available alongside the BPE
+/// path so the two can be compared — see `estimate_tokens_heuristic`).
 fn chars_per_token(c: char) -> u32 {
     let cp = c as u32;
     match cp {

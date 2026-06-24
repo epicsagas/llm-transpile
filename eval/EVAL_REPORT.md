@@ -1,5 +1,7 @@
 # llm-transpiler Quantitative Evaluation Report
 
+> ⚠️ **Superseded.** This report's reduction numbers were measured with this project's *own* heuristic tokenizer, which is self-referential for this crate's output (it bakes in "PUA = 1 token" while the real cl100k cost is 3). The current, BPE-honest evaluation lives at **[`docs/EVALUATION.md`](../docs/EVALUATION.md)** (한국어: [`docs/i18n/EVALUATION.ko.md`](../docs/i18n/EVALUATION.ko.md)). This file is kept for historical reference only.
+
 Evaluation date: 2026-04-11
 Version: v0.1.0
 Build: `--release`

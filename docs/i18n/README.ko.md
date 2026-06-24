@@ -62,17 +62,16 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 
 ### 벤치마크
 
-문서 37개, 포맷 4종, 언어 5개 — Apple M 시리즈, `--release` 빌드. 전체 리포트: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+문서 48개, 포맷 3종, 언어 15개 — Apple M 시리즈, `--release` 빌드. 아래 수치는 **실제 `cl100k` BPE 토크나이저**로 측정(자기참조적 휴리스틱 아님 — 분석 참고). 전체 방법론과 토큰 정직성 분석: [`docs/i18n/EVALUATION.ko.md`](EVALUATION.ko.md)
 
-| Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
+| Format | Semantic 절감 | Compressed 절감 | Lossless 단어 보존 | 속도 |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
-| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
-| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
-| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
-| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
-| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+| Markdown | 27.4% | 69.4% | 99.0% | — |
+| HTML | 98.7% | 99.3% | 99.0% | — |
+| PlainText | −3.5% | 30.4% | 99.0% | — |
+| **전체 (BPE)** | **81.5%** | **91.8%** | **99.0%** | **약 1,070 tok/ms** |
 
-> HTML 축소율은 네비게이션/스크립트/스타일 마크업 오버헤드 제거를 반영하며, 본문 압축만을 나타내지 않습니다.
+> ⚠️ 전체 수치는 HTML 마크업 제거가 지배합니다. **Markdown 27.4%가 진짜 압축률**입니다. PlainText는 Semantic 모드에서 구조 오버헤드로 인해 순음수입니다. 형식별 실상은 [`docs/i18n/EVALUATION.ko.md`](EVALUATION.ko.md)를 보세요.
 
 ---
 
@@ -435,24 +434,26 @@ match transpile(input, format, fidelity, budget) {
 
 ## 성능
 
-릴리스 빌드(`cargo build --release`), Apple M 시리즈, Markdown/HTML/PlainText 48개 문서 기준:
+릴리스 빌드(`cargo build --release`), Apple M 시리즈, Markdown/HTML/PlainText 48개 문서 기준입니다. 모든 축소율 수치는 **실제 `cl100k` BPE 토크나이저**로 측정했습니다 (자기참조적 휴리스틱 아님). 전체 방법론과 포맷별 분석은 [`docs/i18n/EVALUATION.ko.md`](EVALUATION.ko.md)를 참고하세요.
 
 | 지표 | 측정값 | 비고 |
 |------|--------|------|
-| 처리량 | **10,975 tok/ms** | Python 파싱 기준 대비 ≈75배 빠름 |
-| Semantic 축소율 | **33.9%** (Markdown) | 15–30% 목표 달성 |
-| Compressed 축소율 | **39.7%** (Markdown) | 예산 적응형, PruneLowImportance 이상 보장 |
-| Lossless 단어 커버리지 | **98.8% 평균** | 모든 포맷 및 언어 기준 |
-| HTML 축소율 | **97.6%** | 네비게이션/스크립트/스타일 마크업 오버헤드 제거 |
-| 다국어 지원 | 15개 언어 테스트 | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 평균 99.4% 단어 커버리지 |
+| 처리량 (Markdown 단일 피크) | **10,975 tok/ms** | Python 파싱 기준 대비 ≈75배 빠름; 단일 포맷 피크 |
+| 처리량 (데이터셋 집계) | **~1,070 tok/ms** | 48개 문서 / 3포맷 가중 평균 (BPE) — Benchmarks 표 참고 |
+| Semantic 축소율 | **27.4%** (Markdown) | 실제 압축률; 15–30% 목표 구간 내 |
+| Compressed 축소율 | **69.4%** (Markdown) | 예산 적응형, PruneLowImportance 이상 보장 |
+| Lossless 단어 커버리지 | **99.0% 평균** | 모든 포맷 및 언어 기준 |
+| HTML 축소율 | **98.7%** | 네비게이션/스크립트/스타일 마크업 오버헤드 제거 |
+| 다국어 지원 | 15개 언어 테스트 | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 평균 99.0% 단어 커버리지 |
 
 직접 평가 스위트 실행:
 
 ```bash
-cargo run --release --example eval
+make eval          # 구조화 JSON (BPE + 휴리스틱; `epic eval`이 소비)
+make eval-report   # 사람용 파일별 표 + 요약
 ```
 
-파일별 상세 내역, 측정 방법론 및 알려진 제한 사항: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+파일별 상세 내역, 측정 방법론 및 토큰 정직성 분석: [`docs/i18n/EVALUATION.ko.md`](EVALUATION.ko.md)
 
 ---
 

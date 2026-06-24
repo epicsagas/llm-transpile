@@ -60,15 +60,16 @@ Los LLM funcionan mejor cuando el contexto es limpio y denso. Esta biblioteca ma
 
 ### Benchmarks
 
-37 documentos, 4 formatos, 5 idiomas — Apple M-series, build `--release`. Informe completo: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+48 documentos, 3 formatos, 15 idiomas — Apple M-series, build `--release`. Las cifras a continuación se miden con el **tokenizador BPE `cl100k` real** (no la heurística auto-referencial — ver el análisis). Metodología completa y desglose de honestidad de tokens: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 | Format | Semantic reduction | Compressed reduction | Lossless word coverage | Throughput |
 |--------|-------------------:|--------------------:|----------------------:|-----------:|
-| Markdown (EN) | 29.8% | 42.0% | 99.7% | 895 tok/ms |
-| Markdown (ML) | 43.1% | 43.9% | 97.3% | 3,483 tok/ms |
-| HTML | 97.7% | 97.7% | 93.0% | 5,879 tok/ms |
-| PlainText | 17.7% | 47.7% | 100.0% | 189 tok/ms |
-| **Overall** | **79.2%** | **81.1%** | **98.4%** | **2,258 tok/ms** |
+| Markdown | 27.4% | 69.4% | 99.0% | — |
+| HTML | 98.7% | 99.3% | 99.0% | — |
+| PlainText | -3.5% | 30.4% | 99.0% | — |
+| **Overall (BPE)** | **81.5%** | **91.8%** | **99.0%** | **~1,070 tok/ms** |
+
+> ⚠️ La cifra global está dominada por la eliminación del marcado HTML. **Markdown 27.4% es la tasa de compresión genuina.** PlainText es neto-negativo en modo Semantic debido al overhead estructural. Ver [`docs/EVALUATION.md`](../EVALUATION.md) para la realidad por formato.
 
 > La reducción de HTML refleja la eliminación del overhead de marcado (nav, scripts, estilos), no solo la compresión del texto.
 
@@ -426,24 +427,26 @@ match transpile(input, format, fidelity, budget) {
 
 ## Rendimiento
 
-Medido con build de release (`cargo build --release`), Apple M-series, 48 documentos entre Markdown/HTML/PlainText:
+Medido con build de release (`cargo build --release`), Apple M-series, 48 documentos entre Markdown/HTML/PlainText. Todas las cifras de reducción se miden con el **tokenizador BPE `cl100k` real** (no la heurística auto-referencial). Ver [`docs/EVALUATION.md`](../EVALUATION.md) para la metodología completa y el desglose por formato.
 
 | Métrica | Medido | Notas |
 |---------|--------|-------|
-| Rendimiento | **10,975 tok/ms** | ≈75× más rápido que la línea base de Python |
-| Reducción Semantic | **33.9%** (Markdown) | Objetivo 15–30% alcanzado |
-| Reducción Compressed | **39.7%** (Markdown) | Adaptativo al presupuesto, ≥ PruneLowImportance garantizado |
-| Cobertura de palabras Lossless | **98.8% promedio** | En todos los formatos e idiomas |
-| Reducción HTML | **97.6%** | Eliminación de overhead de marcado nav/scripts/estilos |
-| Soporte multilingüe | 15 idiomas probados | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.4% cobertura promedio |
+| Rendimiento (pico solo Markdown) | **10,975 tok/ms** | ≈75× más rápido que la línea base de Python; pico de formato único |
+| Rendimiento (agregado del dataset) | **~1,070 tok/ms** | Ponderado en los 48 docs / 3 formatos (BPE) — ver tabla de Benchmarks |
+| Reducción Semantic | **27.4%** (Markdown) | Tasa de compresión genuina; dentro de la banda objetivo 15–30% |
+| Reducción Compressed | **69.4%** (Markdown) | Adaptativo al presupuesto, ≥ PruneLowImportance garantizado |
+| Cobertura de palabras Lossless | **99.0% promedio** | En todos los formatos e idiomas |
+| Reducción HTML | **98.7%** | Eliminación de overhead de marcado nav/scripts/estilos |
+| Soporte multilingüe | 15 idiomas probados | AR/DE/ES/FR/HI/IT/JA/KO/NL/PL/PT/RU/SV/TR/ZH — 99.0% cobertura promedio |
 
 Ejecuta la suite de evaluación por tu cuenta:
 
 ```bash
-cargo run --release --example eval
+make eval          # JSON estructurado (BPE + heurística; consumido por `epic eval`)
+make eval-report   # tabla por archivo legible + resumen
 ```
 
-Desglose por archivo, metodología y limitaciones conocidas: [`eval/EVAL_REPORT.md`](../../eval/EVAL_REPORT.md)
+Desglose por archivo, metodología y limitaciones conocidas: [`docs/EVALUATION.md`](../EVALUATION.md)
 
 ---
 

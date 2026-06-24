@@ -1,0 +1,4 @@
+# epic eval result snapshots (generated per run)
+# Ignore everything in this dir except this .gitignore itself.
+*
+!.gitignore

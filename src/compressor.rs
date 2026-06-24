@@ -784,20 +784,56 @@ mod tests {
 
     #[test]
     fn stopword_removal_ascii_works() {
-        // "about" (5 chars, ~2 tokens) is in the default list and has ROI → should be removed.
-        // "the" (3 chars, 1 token) is filtered by the ROI gate and is intentionally kept.
-        let compressor = AdaptiveCompressor::new();
-        let nodes = vec![make_para("all about performance", 1.0)];
+        // "about" (5 chars, ~2 heuristic tokens) is in the default list and has ROI under
+        // the heuristic → should be removed. "the" (3 chars, 1 token) is filtered by the ROI
+        // gate and is intentionally kept.
+        //
+        // NOTE: under the `tiktoken` feature, "about" is a *single* cl100k token, so the ROI
+        // gate correctly keeps it — this test asserts the heuristic-only behavior. The
+        // tiktoken-aware variant is `stopword_removal_multitoken_word_works`.
+        #[cfg(not(feature = "tiktoken"))]
+        {
+            let compressor = AdaptiveCompressor::new();
+            let nodes = vec![make_para("all about performance", 1.0)];
+            let cfg = CompressionConfig {
+                budget: 1000,
+                current_tokens: 100, // ~10% — StopwordOnly stage
+                fidelity: FidelityLevel::Semantic,
+            };
+            let result = compressor.compress(nodes, &cfg);
+            if let DocNode::Para { text, .. } = &result[0] {
+                assert!(
+                    !text.to_lowercase().contains("about"),
+                    "stopword 'about' (2-token word) must be removed: got '{}'",
+                    text
+                );
+            }
+        }
+    }
+
+    /// tiktoken-aware variant: under the real tokenizer, a word must cost >1 token
+    /// for stopword removal to have positive ROI. "nevertheless" = 2 cl100k tokens,
+    /// so it is removed; common words like "about" (1 token) are kept.
+    #[cfg(feature = "tiktoken")]
+    #[test]
+    fn stopword_removal_multitoken_word_works() {
+        // Confirm the ground truth the test depends on.
+        assert_eq!(crate::bpe_token_count("nevertheless"), 2);
+        assert_eq!(crate::bpe_token_count("about"), 1);
+
+        // Register "nevertheless" as a stopword and verify it is removed (ROI positive).
+        let compressor = AdaptiveCompressor::with_stopwords(vec!["nevertheless".into()]);
+        let nodes = vec![make_para("nevertheless it works", 1.0)];
         let cfg = CompressionConfig {
             budget: 1000,
-            current_tokens: 100, // ~10% — StopwordOnly stage
+            current_tokens: 100,
             fidelity: FidelityLevel::Semantic,
         };
         let result = compressor.compress(nodes, &cfg);
         if let DocNode::Para { text, .. } = &result[0] {
             assert!(
-                !text.to_lowercase().contains("about"),
-                "stopword 'about' (2-token word) must be removed: got '{}'",
+                !text.to_lowercase().contains("nevertheless"),
+                "2-token stopword 'nevertheless' must be removed: got '{}'",
                 text
             );
         }
@@ -826,26 +862,54 @@ mod tests {
 
     #[test]
     fn with_stopwords_removes_specified_ascii_words() {
-        let compressor = AdaptiveCompressor::with_stopwords(vec!["hello".into(), "world".into()]);
-        let nodes = vec![make_para("hello world foo", 1.0)];
-        let cfg = CompressionConfig {
-            budget: 1000,
-            current_tokens: 100,
-            fidelity: FidelityLevel::Semantic,
-        };
-        let result = compressor.compress(nodes, &cfg);
-        if let DocNode::Para { text, .. } = &result[0] {
-            assert!(
-                !text.to_lowercase().contains("hello"),
-                "'hello' must be removed: got '{}'",
-                text
-            );
-            assert!(
-                !text.to_lowercase().contains("world"),
-                "'world' must be removed: got '{}'",
-                text
-            );
-            assert!(text.contains("foo"), "'foo' must remain: got '{}'", text);
+        // "hello"/"world" are ~2 heuristic tokens each → ROI positive under the
+        // heuristic, so they are removed. "foo" remains. Under the `tiktoken`
+        // feature these are single cl100k tokens and the ROI gate keeps them;
+        // the tiktoken-aware assertion lives in
+        // `stopword_removal_multitoken_word_works`.
+        #[cfg(not(feature = "tiktoken"))]
+        {
+            let compressor =
+                AdaptiveCompressor::with_stopwords(vec!["hello".into(), "world".into()]);
+            let nodes = vec![make_para("hello world foo", 1.0)];
+            let cfg = CompressionConfig {
+                budget: 1000,
+                current_tokens: 100,
+                fidelity: FidelityLevel::Semantic,
+            };
+            let result = compressor.compress(nodes, &cfg);
+            if let DocNode::Para { text, .. } = &result[0] {
+                assert!(
+                    !text.to_lowercase().contains("hello"),
+                    "'hello' must be removed: got '{}'",
+                    text
+                );
+                assert!(
+                    !text.to_lowercase().contains("world"),
+                    "'world' must be removed: got '{}'",
+                    text
+                );
+                assert!(text.contains("foo"), "'foo' must remain: got '{}'", text);
+            }
+        }
+        // Under tiktoken, "hello"/"world" are 1 token → ROI-negative → kept.
+        #[cfg(feature = "tiktoken")]
+        {
+            let compressor =
+                AdaptiveCompressor::with_stopwords(vec!["hello".into(), "world".into()]);
+            let nodes = vec![make_para("hello world foo", 1.0)];
+            let cfg = CompressionConfig {
+                budget: 1000,
+                current_tokens: 100,
+                fidelity: FidelityLevel::Semantic,
+            };
+            let result = compressor.compress(nodes, &cfg);
+            if let DocNode::Para { text, .. } = &result[0] {
+                assert!(
+                    text.contains("hello"),
+                    "1-token 'hello' is ROI-negative, kept: got '{text}'"
+                );
+            }
         }
     }
 
@@ -995,11 +1059,15 @@ mod tests {
         );
     }
 
-    /// Word-boundary regression: stopword "through" (7 chars, 2 tokens — ROI positive)
-    /// must be removed as a whole word but must NOT be stripped from inside compound words.
+    /// Word-boundary regression: stopword removal must act on whole words only.
+    /// Two properties:
+    ///   1. A ROI-positive standalone stopword is removed (heuristic-only: under
+    ///      tiktoken, "through" is 1 token → ROI-negative → kept — verified in
+    ///      `stopword_removal_multitoken_word_works` instead).
+    ///   2. A compound word containing the stopword as a prefix is NEVER altered.
+    ///      This word-boundary guarantee holds under both tokenizers.
     #[test]
     fn ascii_stopword_respects_word_boundaries() {
-        // "through" is in the default stopword list and has ROI (2 tokens → 0 tokens).
         let compressor = AdaptiveCompressor::with_stopwords(vec!["through".into()]);
         let cfg = CompressionConfig {
             budget: 1000,
@@ -1007,23 +1075,29 @@ mod tests {
             fidelity: FidelityLevel::Semantic,
         };
 
-        // "through" as a standalone word → must be removed
-        let nodes = vec![make_para("pass through carefully", 1.0)];
-        let result = compressor.compress(nodes, &cfg);
-        if let DocNode::Para { text, .. } = &result[0] {
-            assert!(
-                !text.to_lowercase().contains(" through "),
-                "standalone 'through' must be removed: got '{}'",
-                text
-            );
-            assert!(
-                text.contains("pass") && text.contains("carefully"),
-                "non-stopword tokens must remain: got '{}'",
-                text
-            );
+        // Property 1 — standalone removal is heuristic-only (2 heuristic tokens).
+        #[cfg(not(feature = "tiktoken"))]
+        {
+            let nodes = vec![make_para("pass through carefully", 1.0)];
+            let result = compressor.compress(nodes, &cfg);
+            if let DocNode::Para { text, .. } = &result[0] {
+                assert!(
+                    !text.to_lowercase().contains(" through "),
+                    "standalone 'through' must be removed: got '{}'",
+                    text
+                );
+                assert!(
+                    text.contains("pass") && text.contains("carefully"),
+                    "non-stopword tokens must remain: got '{}'",
+                    text
+                );
+            }
         }
 
-        // "throughput" contains "through" as a prefix → must NOT be altered
+        // Property 2 — word-boundary preservation holds under BOTH tokenizers.
+        // "throughput" contains "through" as a prefix → must NOT be altered,
+        // regardless of ROI. (tiktoken: "throughput" = 2 tokens, "through" inside
+        // is never substring-stripped.)
         let nodes2 = vec![make_para("system throughput matters", 1.0)];
         let result2 = compressor.compress(nodes2, &cfg);
         if let DocNode::Para { text, .. } = &result2[0] {

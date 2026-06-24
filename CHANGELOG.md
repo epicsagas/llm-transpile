@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-23
+
+### Summary
+
+Makes token-reduction measurement **non-self-referential** and raises the
+PUA substitution ROI gate to the empirically-measured break-even point.
+The eval harness now reports both the heuristic and the real cl100k BPE
+token counts; the previous heuristic-only reporting inflated reduction on
+PUA-heavy output because it baked in the same "PUA = 1 token" assumption
+the compressor optimizes for.
+
+### Added
+
+- **Token-honesty measurement API** (`src/lib.rs`): `TokenMethod`,
+  `TokenMeasurement`, `DualTokenMeasurement`, `bpe_token_count`,
+  `measure_tokens`, `measure_tokens_dual`. The dual measurement reports
+  the heuristic count alongside the real cl100k count so reduction claims
+  are auditable.
+- `pub const PUA_TOKEN_COST: usize = 3` — the measured cl100k cost of a
+  single PUA character (byte-fallback), feature-independent.
+- `stream::estimate_tokens_heuristic` extracted and always compiled, so
+  dual measurement genuinely differs under the `tiktoken` feature (the
+  heuristic path is no longer compiled out).
+- `eval` harness `--json` mode: emits a single JSON object with a
+  `composite` score (0.0–1.0) derived from the **BPE** numbers, plus the
+  heuristic numbers for transparency. `make eval` → JSON,
+  `make eval-report` → human-readable table (preserved).
+- `eval.yaml` wired to `epic eval` via `result_type: composite`; the
+  `eval` example now `required-features = ["tiktoken"]`.
+- Tests pinning the PUA ground truth (3 tokens/char), the substitution
+  break-even (4+ token terms only), and a long-high-frequency
+  positive-ROI interning case.
+
+### Changed
+
+- **PUA ROI gate raised to 4+ tokens** (`auto_intern_frequent_terms`).
+  The gate previously assumed a PUA char costs 1 token; the real cl100k
+  cost is 3, so substituting ordinary words (most are 1–2 tokens)
+  *increased* the token count. The gate now requires
+  `term_tokens > PUA_TOKEN_COST` (4+) **and** a strictly positive net
+  saving after dictionary overhead.
+  - Measured effect (cl100k): `hub-docs_model_cards_metadata.md` PUA
+    50→0, `diffusers_dreambooth_training.md` PUA 35→0.
+  - Real token reduction improved: BPE semantic 80.3%→**81.5%**,
+    compressed 91.5%→**91.8%**.
+
+### Fixed
+
+- Dual measurement bug: under `tiktoken`, the heuristic field reported the
+  BPE value (the heuristic path was compiled out). `measure_tokens_dual`
+  now always uses `estimate_tokens_heuristic` so the two fields differ.
+- cfg-split the ROI-gated stopword tests (`compressor.rs`) to assert the
+  correct behavior under each tokenizer (the heuristic and BPE disagree
+  on common-word token counts).
+
 ## [0.3.3] — 2026-06-12
 
 ### Added
@@ -224,6 +279,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Evaluation suite with 37 documents across 15 languages
 - Apache-2.0 license
 
+[0.4.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.4.0
+[0.3.3]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.3
+[0.3.2]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.2
 [0.3.1]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.1
 [0.3.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.0
 [0.2.5]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.2.5
