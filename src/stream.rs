@@ -131,17 +131,30 @@ pub fn estimate_tokens_heuristic(text: &str) -> usize {
 /// are measured by the same tokenizer, so the gate stays self-consistent regardless
 /// of feature flags.
 ///
-/// - Under `tiktoken`: cl100k byte-fallback → **3 tokens** (the real ground truth).
-/// - Under the heuristic: [`chars_per_token`] returns `cpt = 1` for the PUA range → **1 token**.
+/// - Under `tiktoken`: returns [`crate::PUA_TOKEN_COST`] (= 3) — the real cl100k
+///   byte-fallback ground truth. Single source of truth: the constant and this
+///   function cannot drift apart.
+/// - Under the heuristic: returns 1 — matching the PUA branch of
+///   [`chars_per_token`] (`cpt = 1`), the same unit `estimate_tokens` uses for
+///   `term_tokens` in this build.
 ///
-/// Note: the heuristic's `1` is *itself* the self-referential assumption this crate's
-/// eval documents as inflated — it only matches reality when the real tokenizer is in
-/// use. [`crate::PUA_TOKEN_COST`] is the build-independent constant holding the measured
-/// cl100k value (3) for reporting/eval; the gate uses this function so its two sides
-/// are always in the same units.
+/// Because the result is a per-build constant, callers in hot paths (notably the
+/// ROI gate) should hoist the call out of loops rather than recomputing it per
+/// iteration. The heuristic's `1` is *itself* the self-referential assumption
+/// this crate's eval documents as inflated — it only matches reality when the
+/// real tokenizer is in use.
 pub fn pua_token_cost() -> usize {
-    // A single PUA char, measured the same way term_tokens is measured.
-    estimate_tokens("\u{E000}")
+    // A compile-time-fixed per-build constant, so this is cheap to hoist.
+    #[cfg(feature = "tiktoken")]
+    {
+        crate::PUA_TOKEN_COST
+    }
+    #[cfg(not(feature = "tiktoken"))]
+    {
+        // Matches the PUA branch of `chars_per_token` (cpt = 1) so the gate's
+        // two sides share the heuristic unit in this build.
+        1
+    }
 }
 
 /// Returns the chars-per-token value based on the Unicode codepoint range.
