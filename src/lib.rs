@@ -201,23 +201,29 @@ fn auto_intern_frequent_terms(
         .collect();
     candidates.sort_by_key(|b| std::cmp::Reverse(b.1));
 
+    // ── ROI gate ─────────────────────────────────────────────────────────────
+    // A substituted occurrence replaces `term_tokens` with one PUA char. Both
+    // `term_tokens` and `pua_cost` come from the SAME active measurement
+    // (`stream::estimate_tokens` / `stream::pua_token_cost`), so the gate's two
+    // sides are always in the same units:
+    //   - tiktoken:  pua_cost = 3 (real cl100k byte-fallback ground truth) → BPE-honest
+    //   - heuristic: pua_cost = 1 (the chars-per-token heuristic itself; this is the
+    //     self-referential estimate the eval documents as inflated — gate is
+    //     self-consistent but not honest until the feature is enabled)
+    //
+    // Net saving across the document:
+    //   body_saving   = count × (term_tokens − pua_cost)   // each occurrence
+    //   dict_overhead = pua_cost + term_tokens + ENTRY_OVERHEAD
+    //                  // the "<PUA>=<term>\n" line in the <D> block
+    // Intern iff body_saving > dict_overhead (strictly positive net).
+    //
+    // `pua_cost` is a per-build constant (see `stream::pua_token_cost`), so it is
+    // hoisted out of the candidate loop rather than recomputed per term — under
+    // the `tiktoken` feature that would otherwise re-run a cl100k BPE encode for
+    // every candidate (up to `max_terms`).
+    let pua_cost = stream::pua_token_cost();
+
     for (term, count) in candidates.into_iter().take(max_terms) {
-        // ── ROI gate ─────────────────────────────────────────────────────────
-        // A substituted occurrence replaces `term_tokens` with one PUA char.
-        // Both `term_tokens` and `pua_cost` come from the SAME active measurement
-        // (`stream::estimate_tokens` / `stream::pua_token_cost`), so the gate's
-        // two sides are always in the same units:
-        //   - tiktoken:  pua_cost = 3 (real cl100k byte-fallback ground truth) → BPE-honest
-        //   - heuristic: pua_cost = 1 (the chars-per-token heuristic itself; this is the
-        //     self-referential estimate the eval documents as inflated — gate is
-        //     self-consistent but not honest until the feature is enabled)
-        //
-        // Net saving across the document:
-        //   body_saving   = count × (term_tokens − pua_cost)   // each occurrence
-        //   dict_overhead = pua_cost + term_tokens + ENTRY_OVERHEAD
-        //                  // the "<PUA>=<term>\n" line in the <D> block
-        // Intern iff body_saving > dict_overhead (strictly positive net).
-        let pua_cost = stream::pua_token_cost();
         let term_tokens = stream::estimate_tokens(term);
         if term_tokens <= pua_cost {
             // Break-even bar: a term must cost MORE than a PUA char for

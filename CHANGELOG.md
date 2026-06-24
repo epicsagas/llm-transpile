@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] — 2026-06-24
+
+### Summary
+
+Internal follow-up to 0.4.0: the ROI gate's PUA-cost calculation is hoisted out
+of the candidate loop and unified with the `PUA_TOKEN_COST` constant, so the two
+no longer drift and the gate no longer recomputes a per-build constant per term.
+No behavior change — interning decisions and token counts are identical to 0.4.0.
+
+### Changed
+
+- `stream::pua_token_cost` now returns a per-build compile-time constant
+  (`PUA_TOKEN_COST` under `tiktoken`, `1` under the heuristic) instead of
+  encoding a PUA char on every call. Single source of truth: the function and
+  the constant cannot diverge.
+- The ROI gate hoists `pua_cost` out of the candidate loop. Under the `tiktoken`
+  feature this removes up to `max_terms` redundant cl100k BPE encodes per
+  `transpile` call (the value is loop-invariant).
+
+### Internal
+
+- Doc comments on `pua_token_cost` and the ROI gate updated to reflect the
+  hoisting and the unified constant.
+
 ## [0.4.0] — 2026-06-23
 
 ### Summary
@@ -279,6 +303,7 @@ the compressor optimizes for.
 - Evaluation suite with 37 documents across 15 languages
 - Apache-2.0 license
 
+[0.4.1]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.4.1
 [0.4.0]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.4.0
 [0.3.3]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.3
 [0.3.2]: https://github.com/epicsagas/llm-transpile/releases/tag/v0.3.2
