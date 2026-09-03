@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "R=\"${GROK_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}\"; node \"$R/registry/scripts/install.js\"",
+            "timeout": 60
+          }
+        ],
+        "description": "Install transpile binary if missing"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TP=$(command -v transpile 2>/dev/null); if [ -n \"$TP\" ] && [ -n \"$TP_INPUT\" ]; then \"$TP\" --input \"$TP_INPUT\" --fidelity semantic --quiet; fi",
+            "timeout": 30
+          }
+        ],
+        "description": "Auto-compress .md, .html, .txt files after Read"
+      }
+    ]
+  }
+}
