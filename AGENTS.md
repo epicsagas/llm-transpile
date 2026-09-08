@@ -95,9 +95,24 @@ When creating a new release tag, update ALL of the following to the same version
 | `Cargo.toml` | `version = "x.y.z"` | `0.1.6` |
 | `.claude-plugin/plugin.json` | `"version": "x.y.z"` | `0.1.6` |
 | `.codex-plugin/plugin.json` | `"version": "x.y.z"` | `0.1.6` |
+| `.grok-plugin/plugin.json` | `"version": "x.y.z"` | `0.1.6` |
 | Git tag | `vx.y.z` | `v0.1.6` |
 
-All four must match before tagging.
+All five must match before tagging.
+
+This repo ships **no root `plugin.json`**, so grok resolves its version from
+`.grok-plugin/plugin.json`. If a root manifest is ever added (agy's), it must
+be bumped in lockstep: grok reads the root file first and only falls back to
+`.grok-plugin` when the root is absent (measured on grok 1.0.13), so a root
+manifest left behind would silently pin grok to the old version.
+
+After pushing, re-pin the hub catalog in `epicsagas/plugins`: the grok entry in
+`.grok-plugin/marketplace.json` (and `.grok-plugin/plugin-index.json`, if present)
+carries a 40-char `source.sha` plus `version`, and `.hermes/llm-transpile/plugin.yaml`
+carries a `version`. While that sha points at an old commit, `grok plugin update`
+keeps installing the pinned commit no matter how many times this repo is pushed.
+The claude and codex hub entries track remote HEAD and need no edit.
+`forge.py publish --marketplace epicsagas/plugins` does the grok and hermes updates.
 
 ## Release Success Route
 
