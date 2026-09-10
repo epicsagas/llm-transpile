@@ -1,6 +1,6 @@
 {
   "name": "llm-transpile",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Raw documents (Markdown, HTML, plain text) to structured bridge format with adaptive compression that keeps you under token budget.",
   "author": {
     "name": "epicsagas",
@@ -17,5 +17,5 @@
     "tokens",
     "context"
   ],
-  "hooks": "./hooks/hooks.json"
+  "hooks": "./.grok-plugin/hooks.json"
 }
