@@ -84,7 +84,7 @@ Les LLM fonctionnent mieux lorsque le contexte est propre et dense. Cette biblio
 /plugin install transpile@epicsagas
 ```
 
-Auto-installe le binaire et configure le hook PostToolUse au prochain démarrage de session — aucune configuration supplémentaire requise.
+Auto-installe le binaire et configure le hook PreToolUse au prochain démarrage de session — aucune configuration supplémentaire requise.
 
 ### Codex CLI
 
@@ -92,7 +92,7 @@ Auto-installe le binaire et configure le hook PostToolUse au prochain démarrage
 codex plugin marketplace add epicsagas/plugins
 ```
 
-Le hook PostToolUse est enregistré automatiquement — aucune étape supplémentaire nécessaire.
+Le hook PreToolUse est enregistré automatiquement — aucune étape supplémentaire nécessaire.
 
 ### macOS / Linux
 

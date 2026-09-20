@@ -84,7 +84,7 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 /plugin install transpile@epicsagas
 ```
 
-次回セッション開始時にバイナリを自動インストールし、PostToolUseフックを設定します — 追加のセットアップは不要です。
+次回セッション開始時にバイナリを自動インストールし、PreToolUseフックを設定します — 追加のセットアップは不要です。
 
 ### Codex CLI
 
@@ -92,7 +92,7 @@ LLMはコンテキストがクリーンで密度が高いほど性能が向上�
 codex plugin marketplace add epicsagas/plugins
 ```
 
-PostToolUseフックが自動的に登録されます — 追加の手順は不要です。
+PreToolUseフックが自動的に登録されます — 追加の手順は不要です。
 
 ### macOS / Linux
 

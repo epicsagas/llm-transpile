@@ -85,7 +85,7 @@ LLMs funcionam melhor quando o contexto é limpo e denso. Esta biblioteca cuida 
 /plugin install transpile@epicsagas
 ```
 
-Instala automaticamente o binário e configura o hook PostToolUse no próximo início de sessão — nenhuma configuração adicional necessária.
+Instala automaticamente o binário e configura o hook PreToolUse no próximo início de sessão — nenhuma configuração adicional necessária.
 
 ### Codex CLI
 
@@ -93,7 +93,7 @@ Instala automaticamente o binário e configura o hook PostToolUse no próximo in
 codex plugin marketplace add epicsagas/plugins
 ```
 
-O hook PostToolUse é registrado automaticamente — nenhuma etapa adicional necessária.
+O hook PreToolUse é registrado automaticamente — nenhuma etapa adicional necessária.
 
 ### macOS / Linux
 

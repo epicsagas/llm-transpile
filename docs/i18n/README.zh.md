@@ -85,7 +85,7 @@
 /plugin install transpile@epicsagas
 ```
 
-下次会话启动时自动安装二进制文件并配置 PostToolUse 钩子 — 无需额外设置。
+下次会话启动时自动安装二进制文件并配置 PreToolUse 钩子 — 无需额外设置。
 
 ### Codex CLI
 
@@ -93,7 +93,7 @@
 codex plugin marketplace add epicsagas/plugins
 ```
 
-PostToolUse 钩子会自动注册 — 无需进一步操作。
+PreToolUse 钩子会自动注册 — 无需进一步操作。
 
 ### macOS / Linux
 

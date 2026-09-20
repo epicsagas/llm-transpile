@@ -12,13 +12,13 @@
         ]
       }
     ],
-    "PostToolUse": [
+    "PreToolUse": [
       {
         "matcher": "Read",
         "hooks": [
           {
             "type": "command",
-            "command": "TP=$(command -v transpile 2>/dev/null); if [ -n \"$TP\" ] && [ -n \"$TP_INPUT\" ]; then \"$TP\" --input \"$TP_INPUT\" --fidelity semantic --quiet; fi",
+            "command": "node \"${GROK_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/registry/scripts/read-hook.mjs\"",
             "timeout": 30
           }
         ]

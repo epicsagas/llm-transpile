@@ -84,7 +84,7 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 /plugin install transpile@epicsagas
 ```
 
-바이너리를 자동 설치하고 PostToolUse 훅을 다음 세션 시작 시 구성합니다 — 추가 설정이 필요 없습니다.
+바이너리를 자동 설치하고 PreToolUse 훅을 다음 세션 시작 시 구성합니다 — 추가 설정이 필요 없습니다.
 
 ### Codex CLI
 
@@ -92,7 +92,7 @@ LLM은 컨텍스트가 깔끔하고 밀도 높을 때 더 잘 작동합니다. �
 codex plugin marketplace add epicsagas/plugins
 ```
 
-PostToolUse 훅이 자동으로 등록됩니다 — 추가 단계가 필요 없습니다.
+PreToolUse 훅이 자동으로 등록됩니다 — 추가 단계가 필요 없습니다.
 
 ### macOS / Linux
 

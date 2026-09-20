@@ -84,7 +84,7 @@
 /plugin install transpile@epicsagas
 ```
 
-يُثبّت الملف الثنائي ويهيّئ خطاف PostToolUse تلقائياً عند بدء الجلسة التالية — لا حاجة لإعداد إضافي.
+يُثبّت الملف الثنائي ويهيّئ خطاف PreToolUse تلقائياً عند بدء الجلسة التالية — لا حاجة لإعداد إضافي.
 
 ### Codex CLI
 
@@ -92,7 +92,7 @@
 codex plugin marketplace add epicsagas/plugins
 ```
 
-يُسجّل خطاف PostToolUse تلقائياً — لا حاجة لخطوات إضافية.
+يُسجّل خطاف PreToolUse تلقائياً — لا حاجة لخطوات إضافية.
 
 ### macOS / Linux
 
